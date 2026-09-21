@@ -1,0 +1,22 @@
+{
+  "name": "مكرونجي | مكرونة بطعم لا يُقاوم",
+  "short_name": "مكرونجي",
+  "description": "مكرونجي — تطبيق الطلبات الرسمي: باستا، مقبلات، حلويات، صوصات ومشروبات. اختر فرعك الأقرب وأطلب مباشرة عبر واتساب.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "fullscreen"],
+  "background_color": "#faf3ea",
+  "theme_color": "#5a1830",
+  "orientation": "portrait",
+  "lang": "ar",
+  "dir": "rtl",
+  "categories": ["food", "shopping"],
+  "icons": [
+    { "src": "img/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "img/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "img/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "img/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

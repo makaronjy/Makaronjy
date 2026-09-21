@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#5a1830">
+<link rel="manifest" href="manifest.json">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="مكرونجي">
+<link rel="apple-touch-icon" href="img/icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="img/icon-192.png">
+<meta name="application-name" content="مكرونجي">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="format-detection" content="telephone=no">
+<meta name="msapplication-tap-highlight" content="no">
+<title>مكرونجي | مكرونة بطعم لا يُقاوم</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&family=Aref+Ruqaa:wght@700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="welcome">
+  <div class="w-card" id="wCard">
+    <button class="w-close" onclick="skipIntro()" aria-label="إغلاق">✕</button>
+    <img src="img/welcome.png" data-appimg="img/welcome.png" alt="مطاعم مكرونجي" decoding="async">
+    <h2 data-i18n="welcomeTitle">أهلاً وسهلاً بكم</h2>
+    <p data-i18n="welcomeMsg" data-i18n-html="1"></p>
+    <div class="w-actions">
+      <button class="w-btn-primary" onclick="skipIntro()" data-i18n="welcomeBtn">اطلب الآن 🍝</button>
+    </div>
+  </div>
+</div>
+
+<header class="topbar">
+  <div class="brand">
+    <img src="img/logo.png" data-appimg="img/logo.png" alt="شعار مكرونجي" class="logo" decoding="async">
+    <div>
+      <b data-i18n="brandName">مكرونجي</b>
+      <small data-i18n="brandTag">باستا • مقبلات • حلويات</small>
+    </div>
+  </div>
+  <button class="lang-btn" id="langBtn" onclick="toggleLang()" aria-label="تبديل اللغة / Toggle Language">
+    <span class="lang-seg" data-lang="ar">AR</span>
+    <span class="lang-seg" data-lang="en">EN</span>
+  </button>
+</header>
+
+<section class="hero">
+  <div class="status-pill open" id="statusPill">
+    <span class="status-dot"></span>
+    <b id="statusText">مفتوح</b>
+    <span class="status-sep">•</span>
+    <small id="statusNote">يغلق عند الساعة ٢ ص</small>
+  </div>
+  <p class="hero-tag" data-i18n="heroSubtitle">مكرونة بطعم لا يُقاوم</p>
+  <div class="hero-search">
+    <input class="search" id="search" data-i18n-ph="searchPh" placeholder="🔍 ابحث عن صنف...">
+  </div>
+  <div class="search-stats" id="searchStats">
+    <span id="statsCount">0 نتيجة</span>
+    <button class="clear-btn" onclick="clearSearch()" data-i18n="clearSearch">✕ مسح البحث</button>
+  </div>
+</section>
+
+<nav class="cats" id="cats"></nav>
+<main id="menu"></main>
+
+<footer>
+  <div class="branch-box">
+    <div class="branch-current" id="branchCurrent">🍝 —</div>
+    <button class="branches-toggle" id="branchesToggle" onclick="openGate('switch')">
+      <span>📍 <span id="changeBranchLbl">تغيير الفرع</span></span>
+      <span class="toggle-icon">🔄</span>
+    </button>
+  </div>
+  <div class="credit">
+    <span class="design-text" data-i18n="designBy">تصميم</span>
+    <a href="https://abdul3ziz95.com/" target="_blank" rel="noopener noreferrer">Abdul3ziz95</a>
+  </div>
+</footer>
+
+<div id="featured">
+  <button class="f-close" onclick="closeFeatured()" aria-label="إغلاق">✕</button>
+  <div class="f-top">
+    <img src="img/logo.png" data-appimg="img/logo.png" alt="مكرونجي" class="f-logo" decoding="async">
+    <h2 class="f-title" data-i18n="featTitle">الأكثر مبيعاً</h2>
+  </div>
+  <div class="f-stage" id="featStage">
+    <button class="f-arrow f-right" onclick="manualNav(-1)" aria-label="السابق">❯</button>
+    <div class="f-img-box" id="featAnim">
+      <img id="featImg" src="" alt="" decoding="async">
+      <div class="f-caption"><b id="featCaption"></b></div>
+    </div>
+    <button class="f-arrow f-left" onclick="manualNav(1)" aria-label="التالي">❮</button>
+  </div>
+  <div class="f-dots" id="featDots"></div>
+  <button class="f-menu-btn" onclick="closeFeatured()" data-i18n="browseMenu">تصفح قائمة الطعام</button>
+</div>
+
+<div class="gate" id="gate">
+  <div class="gate-head">
+    <button class="gate-close" id="gateClose" onclick="closeGate()" aria-label="إغلاق">✕</button>
+    <button class="lang-btn gate-lang" id="gateLangBtn" onclick="toggleLang()" aria-label="تبديل اللغة / Toggle Language">
+      <span class="lang-seg" data-lang="ar">AR</span>
+      <span class="lang-seg" data-lang="en">EN</span>
+    </button>
+    <img src="img/logo.png" data-appimg="img/logo.png" alt="مكرونجي" class="gate-logo" decoding="async">
+    <h2 class="gate-brand" id="gateBrand">مطاعم مكرونجي</h2>
+    <p class="gate-tagline" id="gateTagline">مكرونة بطعم لا يُقاوم</p>
+    <p class="gate-direct" id="gateDirectLbl">اطلب من المطعم مباشرة</p>
+    <p class="gate-pickup" id="gatePickup">🛍️ طلبك يكون جاهزاً عند وصولك للفرع</p>
+    <h3 class="gate-title" id="gateTitle">اختر فرعك للطلب 📍</h3>
+  </div>
+  <div class="gate-body">
+    <button class="gate-nearest" id="gateNearest"><span class="ping"></span><span id="gateNearestLbl">🎯 حدّد الفرع الأقرب لموقعي</span></button>
+    <button class="gate-listbtn" id="gateListBtn" aria-expanded="false">
+      <span>📋</span>
+      <span id="gateListLbl">قائمة الفروع</span>
+      <span class="glb-count" id="gateCount">0</span>
+      <span class="glb-chev">⌄</span>
+    </button>
+    <div class="gate-drop" id="gateDrop">
+      <div class="gate-list" id="gateList"></div>
+    </div>
+    <div class="gate-delivery" id="gateDelivery"></div>
+    <div class="gate-social" id="gateSocial"></div>
+  </div>
+</div>
+
+<div class="install-sheet" id="installSheet" onclick="if(event.target===this) closeSheet()">
+  <div class="sheet-card">
+    <div class="sheet-head">
+      <span class="sheet-ico">📲</span>
+      <b data-i18n="sheetTitle">تثبيت تطبيق مكرونجي</b>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <div class="sheet-steps" id="sheetBody"></div>
+  </div>
+</div>
+
+<div id="overlay" onclick="closeCart()"></div>
+<aside id="drawer">
+  <div class="d-head">🛒 <span data-i18n="cartTitle">سلة الطلبات</span> <button onclick="closeCart()">✕</button></div>
+  <div class="d-items" id="dItems"></div>
+  <div class="d-foot">
+    <div class="closed-note" id="closedNote">🕐 <span id="closedNoteTxt">مغلق يرجى العودة لاحقاً</span></div>
+    <div class="pickup-note">🛍️ <span data-i18n="pickupNote">طلبك يكون جاهزاً عند وصولك للفرع</span></div>
+    <textarea id="cnotes" rows="2" data-i18n-ph="notePh" placeholder="📝 توصية / ملاحظة"></textarea>
+    <button class="save-fav-btn" id="saveFavBtn" data-i18n="favSaveBtn">💾 حفظ الوجبة كمفضلة</button>
+    <div class="total-row">
+      <span><span data-i18n="total">الإجمالي</span> <small data-i18n="taxInc">(شامل الضريبة)</small></span>
+      <span id="dTotal">0 ريال</span>
+    </div>
+    <button class="checkout" onclick="checkout()">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+      <span data-i18n="orderWa">إتمام الطلب عبر واتساب</span>
+    </button>
+  </div>
+</aside>
+
+<div class="fabs">
+  <button class="fab-install" id="installBtn" onclick="installApp()" aria-label="تثبيت التطبيق">
+    <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+  </button>
+  <button class="fab fab-cart" onclick="openCart()">
+    <span class="cart-icon-wrap" aria-hidden="true"></span>
+    <span class="cart-txt" data-i18n="yourOrder">طلبك</span>
+    <span class="cart-count" id="cartCount">0</span>
+  </button>
+  <button class="fav-fab" id="favFab" aria-label="وجباتي المفضلة">
+    ❤️
+    <span id="favCount" class="fav-badge">0</span>
+  </button>
+</div>
+
+<div class="fav-sheet" id="favSheet" onclick="if(event.target===this) closeFavSheet()">
+  <div class="fav-sheet-card">
+    <button id="favClose" class="fav-close" onclick="closeFavSheet()">✕</button>
+    <h3 id="favTitleEl" data-i18n="favTitle">وجباتي المفضلة ❤️</h3>
+    <p id="favNoteEl" class="fav-note" data-i18n="favPageNote"></p>
+    <div id="favList" class="fav-list"></div>
+  </div>
+</div>
+
+<div class="slot-picker" id="slotPicker" onclick="if(event.target===this) closeSlotPicker()">
+  <div class="slot-picker-card">
+    <h4 id="slotPickerTitle" data-i18n="favChooseSlot">اختر اسم الوجبة:</h4>
+    <div class="slot-btns" id="slotBtns">
+      <button class="slot-btn" data-slot="0"></button>
+      <button class="slot-btn" data-slot="1"></button>
+      <button class="slot-btn" data-slot="2"></button>
+    </div>
+    <button class="slot-cancel" id="slotCancel" onclick="closeSlotPicker()">✕ <span data-i18n="favCancel">إلغاء</span></button>
+  </div>
+</div>
+
+<div class="confirm-modal" id="confirmModal" onclick="if(event.target===this) resolveConfirm(false)">
+  <div class="confirm-card">
+    <div class="confirm-ico">🔄</div>
+    <h4 id="confirmTitle">استبدال الوجبة المحفوظة</h4>
+    <p id="confirmMsg"></p>
+    <div class="confirm-actions">
+      <button class="confirm-yes" id="confirmYes" onclick="resolveConfirm(true)">نعم، استبدال</button>
+      <button class="confirm-no" id="confirmNo" onclick="resolveConfirm(false)">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<div class="ad-modal" id="adModal" onclick="if(event.target===this) closeAd()">
+  <div class="ad-card">
+    <button class="ad-close" onclick="closeAd()">✕</button>
+    <div class="ad-body">
+      <div class="ad-medal" id="adMedal">🍝</div>
+      <h4 class="ad-title" id="adTitle"></h4>
+      <p class="ad-text" id="adText"></p>
+      <button class="ad-btn" id="adBtn" onclick="closeAd()">حسناً 🍝</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== إشعار المطعم مغلق ===== -->
+<div class="closed-modal" id="closedModal" onclick="if(event.target===this) closeClosedNotice()">
+  <div class="closed-card">
+    <button class="closed-close" id="closedClose" aria-label="إغلاق">✕</button>
+    <img class="closed-img" src="img/closed.png" data-appimg="img/closed.png" alt="المطعم مغلق" decoding="async">
+    <h3 class="closed-title" id="closedTitle">المطعم مغلق</h3>
+    <p class="closed-text" id="closedText">نعتذر منك، المطعم حالياً لا يستقبل الطلبات، ولكن بإمكانك اكتشاف وعرض قائمة الطعام</p>
+    <div class="closed-openat" id="closedOpenAt">🕐 يفتح عند الساعة ١ م</div>
+    <button class="closed-btn" id="closedBtn">عرض قائمة الطعام</button>
+  </div>
+</div>
+
+<div id="toast"><span id="toastMsg"></span></div>
+
+<script src="i18n.js"></script>
+<script src="menu.js"></script>
+<script src="settings.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
