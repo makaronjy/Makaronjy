@@ -80,7 +80,6 @@ window.I18N = {
     /* ===== الفروع ===== */
     branchGateTitle: 'اختر فرعك للطلب 📍',
     gateBrand: 'مطاعم مكرونجي',
-    gateTagline: 'مكرونة بطعم لا يُقاوم',
     gateListBtn: 'قائمة الفروع',
     branchNearestBtn: '🎯 حدّد الفرع الأقرب لموقعي',
     branchNearestBadge: '🎯 الأقرب لك',
@@ -93,8 +92,9 @@ window.I18N = {
     waBranch: 'الفرع',
 
     /* ===== شركاء التوصيل (عنوان ثنائي اللغة دائم) ===== */
-    deliveryHeadAr: 'اطلب الآن عبر شركائنا في التوصيل',
-    deliveryHeadEn: 'Order now via our delivery partners',
+    deliveryHeadAr: '🛵 اطلب الآن عبر شركائنا في التوصيل',
+    deliveryHeadEn: '🛵 Order now via our delivery partners',
+    followUs: 'تابعنا على',
 
     /* ===== اختيار الفرع والموقع ===== */
     branchReconfirm: function(n){ return '✓ تم تأكيد فرعك: ' + n; },
@@ -202,7 +202,6 @@ window.I18N = {
     /* ===== Branches ===== */
     branchGateTitle: 'Choose Your Branch 📍',
     gateBrand: 'Makaronjy Restaurants',
-    gateTagline: 'Irresistible pasta experience',
     gateListBtn: 'Branch List',
     branchNearestBtn: '🎯 Find My Nearest Branch',
     branchNearestBadge: '🎯 Nearest to You',
@@ -215,8 +214,9 @@ window.I18N = {
     waBranch: 'Branch',
 
     /* ===== Delivery partners (bilingual heading always) ===== */
-    deliveryHeadAr: 'Order now via our delivery partners',
-    deliveryHeadEn: 'اطلب الآن عبر شركائنا في التوصيل',
+    deliveryHeadAr: '🛵 Order now via our delivery partners',
+    deliveryHeadEn: '🛵 اطلب الآن عبر شركائنا في التوصيل',
+    followUs: 'Follow us',
 
     /* ===== Branch selection & location ===== */
     branchReconfirm: function(n){ return '✓ Your branch confirmed: ' + n; },
@@ -244,7 +244,7 @@ window.I18N = {
       '<div class="sheet-step"><span class="num">2</span><p>Scroll up and choose <b>"Add to Home Screen"</b> (＋ icon).</p></div>' +
       '<div class="sheet-step"><span class="num">3</span><p>Tap <b>"Add"</b> — the Makaronjy icon will appear on your home screen 🎉</p></div>',
     otherSteps:
-      '<div class="sheet-step"><span class="num">1</span><p>Open the browser menu (⋮ or ⋯) at the top.</p></div>' +
+      '<div class="sheet-step"><span class="num">1</span><p>Open the browser menu (⋮ or ) at the top.</p></div>' +
       '<div class="sheet-step"><span class="num">2</span><p>Choose <b>"Install App"</b> or <b>"Add to Home Screen"</b>.</p></div>' +
       '<div class="sheet-step"><span class="num">3</span><p>Confirm — the Makaronjy icon will appear on your home screen 🎉</p></div>'
   }
