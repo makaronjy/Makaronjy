@@ -80,6 +80,7 @@ window.I18N = {
     /* ===== الفروع ===== */
     branchGateTitle: 'اختر فرعك للطلب 📍',
     gateBrand: 'مطاعم مكرونجي',
+    gateTagline: 'مكرونة بطعم لا يُقاوم',
     gateListBtn: 'قائمة الفروع',
     branchNearestBtn: '🎯 حدّد الفرع الأقرب لموقعي',
     branchNearestBadge: '🎯 الأقرب لك',
@@ -108,6 +109,12 @@ window.I18N = {
     closesAt: function(h){ return 'يغلق عند الساعة ' + h; },
     opensAt: function(h){ return 'يفتح عند الساعة ' + h; },
     opensOn: function(d,h){ return 'يفتح يوم ' + d + ' عند الساعة ' + h; },
+
+    /* ===== إشعار المطعم مغلق ===== */
+    closedTitle: 'المطعم مغلق',
+    closedText: 'نعتذر منك، المطعم حالياً لا يستقبل الطلبات، ولكن بإمكانك اكتشاف وعرض قائمة الطعام',
+    closedBtn: 'عرض قائمة الطعام',
+    closedNote: 'مغلق يرجى العودة لاحقاً',
 
     /* ===== التوفر والنفد ===== */
     soldOut: 'نفد ❌',
@@ -202,6 +209,7 @@ window.I18N = {
     /* ===== Branches ===== */
     branchGateTitle: 'Choose Your Branch 📍',
     gateBrand: 'Makaronjy Restaurants',
+    gateTagline: 'Irresistible pasta experience',
     gateListBtn: 'Branch List',
     branchNearestBtn: '🎯 Find My Nearest Branch',
     branchNearestBadge: '🎯 Nearest to You',
@@ -231,6 +239,12 @@ window.I18N = {
     opensAt: function(h){ return 'Opens at ' + h; },
     opensOn: function(d,h){ return 'Opens ' + d + ' at ' + h; },
 
+    /* ===== Closed notice ===== */
+    closedTitle: 'The Restaurant Closed',
+    closedText: 'We\'re sorry, the restaurant is not accepting orders right now, but you can still explore and view the menu',
+    closedBtn: 'View Menu',
+    closedNote: 'Closed — please come back later',
+
     /* ===== Availability & Sold-out ===== */
     soldOut: 'Sold out ❌',
     notAvailableBranch: 'Not available at this branch',
@@ -244,7 +258,7 @@ window.I18N = {
       '<div class="sheet-step"><span class="num">2</span><p>Scroll up and choose <b>"Add to Home Screen"</b> (＋ icon).</p></div>' +
       '<div class="sheet-step"><span class="num">3</span><p>Tap <b>"Add"</b> — the Makaronjy icon will appear on your home screen 🎉</p></div>',
     otherSteps:
-      '<div class="sheet-step"><span class="num">1</span><p>Open the browser menu (⋮ or ) at the top.</p></div>' +
+      '<div class="sheet-step"><span class="num">1</span><p>Open the browser menu (⋮ or ⋯) at the top.</p></div>' +
       '<div class="sheet-step"><span class="num">2</span><p>Choose <b>"Install App"</b> or <b>"Add to Home Screen"</b>.</p></div>' +
       '<div class="sheet-step"><span class="num">3</span><p>Confirm — the Makaronjy icon will appear on your home screen 🎉</p></div>'
   }
