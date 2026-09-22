@@ -3,6 +3,7 @@
    + الأكثر مبيعاً: مرة واحدة يومياً + مدخل يدوي 🏆
    + تحديد الفرع الأقرب بمسار قيادة حقيقي (بدون مفتاح API)
    + صيغة إشعار الإغلاق: "يفتح عند الساعة ..."
+   + نافذة المغلق: لا تُغلق بالخارج + صعود للهيدر عند الخروج
 ===================================================== */
 
 /* ===== استعادة لقطة محلية عند فشل تحميل الملفات ===== */
@@ -310,7 +311,7 @@ function socialHref(x){
   if(x.key==='email') return /^mailto:/i.test(x.url) ? x.url : ('mailto:'+x.url);
   return x.url;
 }
-/* ===== تعديل #2: فاصل "♡ تابعنا على ♡" ===== */
+/* ===== تعديل: فاصل "♡ تابعنا على ♡" فوق أيقونات بوابة الفروع ===== */
 function renderSocial(){
   const list = socialList();
   const html = list.map(x=>{
@@ -339,7 +340,7 @@ function applyImageVersions(){
   });
 }
 
-/* ===== تعديل #4: إضافة 🛵 لعنوان شركاء التوصيل ===== */
+/* ===== تعديل: 🛵 في النص الاحتياطي لعنوان شركاء التوصيل ===== */
 function renderDelivery(){
   const d = S().delivery || [];
   const box = el('gateDelivery');
@@ -378,7 +379,7 @@ function openDeliveryApp(event, idx){
   return false;
 }
 
-/* ===== تعديل #1: حذف سطري gateTagline و gateDirectLbl ===== */
+/* ===== تعديل: حذف سطري gateTagline و gateDirectLbl (العنصران لم يعودا موجودين) ===== */
 function applyLang(lang){
   currentLang = lang;
   localStorage.setItem('mk_lang', lang);
@@ -502,8 +503,11 @@ function showClosedNotice(){
   el('closedModal').classList.add('show');
   pushGuard();
 }
+/* ===== تعديل: المخرج الوحيد — إخفاء + صعود ناعم لأعلى الصفحة (الهيدر أولاً) ===== */
 function closeClosedNotice(){
+  if(!el('closedModal').classList.contains('show')) return;
   el('closedModal').classList.remove('show');
+  window.scrollTo({top:0, behavior:'smooth'});
 }
 /* ===== الأكثر مبيعاً: مرة واحدة يومياً + إشعار المغلق عند الإغلاق ===== */
 function featuredSeenToday(){
@@ -518,11 +522,8 @@ function maybeClosedInsteadOfFeatured(){
   localStorage.setItem('mk_feat_day', new Date().toDateString());
   openFeatured();
 }
-el('closedBtn').addEventListener('click', ()=>{
-  closeClosedNotice();
-  const m = el('menu');
-  if(m) m.scrollIntoView({behavior:'smooth', block:'start'});
-});
+/* ===== تعديل: الزران كلاهما يستدعيان المخرج الوحيد (بدون scrollIntoView القديم) ===== */
+el('closedBtn').addEventListener('click', closeClosedNotice);
 el('closedClose').addEventListener('click', closeClosedNotice);
 
 /* ===== شاشة الترحيب: بدون عداد ===== */
@@ -646,7 +647,7 @@ function renderGateList(){
   }).join('');
 }
 
-/* ===== تعديل #3: إظهار زر ✕ دائماً ===== */
+/* ===== تعديل: إظهار زر ✕ دائماً في البوابة ===== */
 function openGate(mode){
   gateMode = mode;
   pushGuard();
@@ -1161,7 +1162,7 @@ function clearSearch(){
   document.querySelectorAll('.card.highlight').forEach(c=>c.classList.remove('highlight'));
   document.querySelectorAll('.section').forEach(s=>{
     s.style.display='';
-    s.querySelectorAll('.card').forEach(c=> c.style.display = '');
+    s.querySelectorAll('.card').forEach(c=> c.style.display = ''; });
   });
   showSection(currentSection);
 }
