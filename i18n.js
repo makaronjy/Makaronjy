@@ -93,9 +93,8 @@ window.I18N = {
     waBranch: 'الفرع',
 
     /* ===== شركاء التوصيل (عنوان ثنائي اللغة دائم) ===== */
-    deliveryHeadAr: '🛵 اطلب الآن عبر شركائنا في التوصيل',
-    deliveryHeadEn: '🛵 Order now via our delivery partners',
-    followUs: 'تابعنا على',
+    deliveryHeadAr: 'اطلب الآن عبر شركائنا في التوصيل',
+    deliveryHeadEn: 'Order now via our delivery partners',
 
     /* ===== اختيار الفرع والموقع ===== */
     branchReconfirm: function(n){ return '✓ تم تأكيد فرعك: ' + n; },
@@ -109,12 +108,6 @@ window.I18N = {
     closesAt: function(h){ return 'يغلق عند الساعة ' + h; },
     opensAt: function(h){ return 'يفتح عند الساعة ' + h; },
     opensOn: function(d,h){ return 'يفتح يوم ' + d + ' عند الساعة ' + h; },
-
-    /* ===== إشعار المطعم مغلق ===== */
-    closedTitle: 'المطعم مغلق',
-    closedText: 'نعتذر منك، المطعم حالياً لا يستقبل الطلبات، ولكن بإمكانك اكتشاف وعرض قائمة الطعام',
-    closedBtn: 'عرض قائمة الطعام',
-    closedNote: 'مغلق يرجى العودة لاحقاً',
 
     /* ===== التوفر والنفد ===== */
     soldOut: 'نفد ❌',
@@ -222,9 +215,8 @@ window.I18N = {
     waBranch: 'Branch',
 
     /* ===== Delivery partners (bilingual heading always) ===== */
-    deliveryHeadAr: '🛵 Order now via our delivery partners',
-    deliveryHeadEn: '🛵 اطلب الآن عبر شركائنا في التوصيل',
-    followUs: 'Follow us',
+    deliveryHeadAr: 'Order now via our delivery partners',
+    deliveryHeadEn: 'اطلب الآن عبر شركائنا في التوصيل',
 
     /* ===== Branch selection & location ===== */
     branchReconfirm: function(n){ return '✓ Your branch confirmed: ' + n; },
@@ -238,12 +230,6 @@ window.I18N = {
     closesAt: function(h){ return 'Closes at ' + h; },
     opensAt: function(h){ return 'Opens at ' + h; },
     opensOn: function(d,h){ return 'Opens ' + d + ' at ' + h; },
-
-    /* ===== Closed notice ===== */
-    closedTitle: 'The Restaurant Closed',
-    closedText: 'We\'re sorry, the restaurant is not accepting orders right now, but you can still explore and view the menu',
-    closedBtn: 'View Menu',
-    closedNote: 'Closed — please come back later',
 
     /* ===== Availability & Sold-out ===== */
     soldOut: 'Sold out ❌',

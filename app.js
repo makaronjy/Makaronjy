@@ -3,7 +3,6 @@
    + الأكثر مبيعاً: مرة واحدة يومياً + مدخل يدوي 🏆
    + تحديد الفرع الأقرب بمسار قيادة حقيقي (بدون مفتاح API)
    + صيغة إشعار الإغلاق: "يفتح عند الساعة ..."
-   + نافذة المغلق: لا تُغلق بالخارج + صعود للهيدر عند الخروج
 ===================================================== */
 
 /* ===== استعادة لقطة محلية عند فشل تحميل الملفات ===== */
@@ -311,7 +310,6 @@ function socialHref(x){
   if(x.key==='email') return /^mailto:/i.test(x.url) ? x.url : ('mailto:'+x.url);
   return x.url;
 }
-/* ===== تعديل: فاصل "♡ تابعنا على ♡" فوق أيقونات بوابة الفروع فقط ===== */
 function renderSocial(){
   const list = socialList();
   const html = list.map(x=>{
@@ -322,11 +320,8 @@ function renderSocial(){
     const nm = socEsc(currentLang==='ar' ? (x.nameAr||x.nameEn||'') : (x.nameEn||x.nameAr||''));
     return '<a href="'+socEsc(socialHref(x))+'"'+cls+stl+' target="_blank" rel="noopener noreferrer" aria-label="'+nm+'">'+ic+'</a>';
   }).join('');
-  const head = list.length
-    ? '<div class="gs-head"><span class="gs-line"></span><span class="gs-heart">♡</span><b>'+socEsc(tt('followUs','تابعنا على','Follow us'))+'</b><span class="gs-heart">♡</span><span class="gs-line"></span></div>'
-    : '';
   const m = el('menuSocial'); if(m) m.innerHTML = html;
-  const g = el('gateSocial'); if(g) g.innerHTML = head + html;
+  const g = el('gateSocial'); if(g) g.innerHTML = html;
 }
 
 /* ===== إصدار الصور — تحديث حي صامت ===== */
@@ -340,7 +335,6 @@ function applyImageVersions(){
   });
 }
 
-/* ===== تعديل: 🛵 في النص الاحتياطي لعنوان شركاء التوصيل ===== */
 function renderDelivery(){
   const d = S().delivery || [];
   const box = el('gateDelivery');
@@ -350,7 +344,7 @@ function renderDelivery(){
   box.innerHTML = `
     <span class="gd-or">${tt('orWord','أو','OR')}</span>
     <div class="gd-head">
-      <b>${tt('deliveryHeadAr','🛵 اطلب الآن عبر شركائنا في التوصيل','🛵 Order now via our delivery partners')}</b>
+      <b>${tt('deliveryHeadAr','اطلب الآن عبر شركائنا في التوصيل','Order now via our delivery partners')}</b>
       <small></small>
     </div>
     <div class="gd-tiles">
@@ -504,11 +498,8 @@ function showClosedNotice(){
   el('closedModal').classList.add('show');
   pushGuard();
 }
-/* ===== تعديل: المخرج الوحيد — إخفاء + صعود ناعم لأعلى الصفحة (الهيدر أولاً) ===== */
 function closeClosedNotice(){
-  if(!el('closedModal').classList.contains('show')) return;
   el('closedModal').classList.remove('show');
-  window.scrollTo({top:0, behavior:'smooth'});
 }
 /* ===== الأكثر مبيعاً: مرة واحدة يومياً + إشعار المغلق عند الإغلاق ===== */
 function featuredSeenToday(){
@@ -523,8 +514,11 @@ function maybeClosedInsteadOfFeatured(){
   localStorage.setItem('mk_feat_day', new Date().toDateString());
   openFeatured();
 }
-/* ===== تعديل: الزران كلاهما يستدعيان المخرج الوحيد (بدون scrollIntoView القديم) ===== */
-el('closedBtn').addEventListener('click', closeClosedNotice);
+el('closedBtn').addEventListener('click', ()=>{
+  closeClosedNotice();
+  const m = el('menu');
+  if(m) m.scrollIntoView({behavior:'smooth', block:'start'});
+});
 el('closedClose').addEventListener('click', closeClosedNotice);
 
 /* ===== شاشة الترحيب: بدون عداد ===== */
@@ -648,11 +642,10 @@ function renderGateList(){
   }).join('');
 }
 
-/* ===== تعديل: إظهار زر ✕ دائماً في البوابة ===== */
 function openGate(mode){
   gateMode = mode;
   pushGuard();
-  el('gateClose').classList.add('can');
+  el('gateClose').classList.toggle('can', mode === 'switch');
   renderGateList();
   setDrop(false);
   el('gate').classList.add('show');
@@ -1163,7 +1156,7 @@ function clearSearch(){
   document.querySelectorAll('.card.highlight').forEach(c=>c.classList.remove('highlight'));
   document.querySelectorAll('.section').forEach(s=>{
     s.style.display='';
-    s.querySelectorAll('.card').forEach(c=> c.style.display = ''; });
+    s.querySelectorAll('.card').forEach(c=> c.style.display = '');
   });
   showSection(currentSection);
 }
