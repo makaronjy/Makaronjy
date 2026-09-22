@@ -35,6 +35,7 @@ img{-ms-interpolation-mode:bicubic;max-width:100%}
 .hero::before{content:'🍝 ';position:absolute;inset:0;display:flex;justify-content:space-around;align-items:center;
  font-size:5rem;opacity:.07;pointer-events:none}
 .hero p{color:#f7e3cf;font-weight:700;margin:.15rem auto .5rem;font-size:1.05rem}
+/* ===== العبارة الذهبية النبّاضة ===== */
 .hero-tag{display:inline-block;margin:.25rem auto .55rem;font-size:clamp(1.2rem,4.6vw,1.65rem);font-weight:900;letter-spacing:.4px;line-height:1.7;
  background:linear-gradient(90deg,var(--gold2) 0%,#fff6dd 25%,var(--gold2) 50%,#ffe9b3 75%,var(--gold2) 100%);
  background-size:200% auto;-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;
@@ -151,27 +152,25 @@ img{-ms-interpolation-mode:bicubic;max-width:100%}
 @keyframes logoIn{from{transform:scale(.5);opacity:0}to{transform:scale(1);opacity:1}}
 .gate-brand{font-family:'Cairo',sans-serif;color:var(--gold2);font-size:clamp(1.7rem,7vw,2.5rem);font-weight:900;
  margin:.6rem 0 .2rem;text-shadow:0 4px 18px rgba(0,0,0,.4);animation:fadeUp .5s .1s both;line-height:1.5;letter-spacing:.5px}
-.gate-tagline{display:none !important;color:#f7e3cf;font-size:1.05rem;font-weight:800;opacity:.95;margin:0 0 .5rem;
- animation:fadeUp .5s .18s both,softPulse 2.6s ease-in-out 1s infinite}
-.gate-direct{color:var(--gold2);font-size:.95rem;font-weight:900;margin:0 0 .4rem;animation:fadeUp .5s .2s both;letter-spacing:.3px}
-.gate-pickup{display:inline-block;color:#fff;font-size:1rem;font-weight:800;background:#ffffff14;border:1px solid #ffffff2b;
- border-radius:50px;padding:.45rem 1.2rem;margin:0 auto .7rem;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
- animation:fadeUp .5s .24s both,softPulse 2.6s ease-in-out 1.4s infinite}
-@keyframes softPulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.04);opacity:.88}}
-.gate-title{color:#fff;font-size:1rem;font-weight:900;margin:0;animation:fadeUp .5s .26s both}
+/* جملة الاستلام: سطر ذهبي عادي تحت الاسم (بدون كبسولة) */
+.gate-pickup{display:block;color:var(--gold2);font-size:1rem;font-weight:800;margin:.1rem 0 0;letter-spacing:.3px;
+ animation:fadeUp .5s .22s both}
+/* عنوان الاختيار: سطر أبيض بسيط كما سابقاً (بدون كبسولة) */
+.gate-title{color:#fff;font-size:1rem;font-weight:900;margin:.45rem 0 0;animation:fadeUp .5s .26s both}
 @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
 .gate-body{flex:1;overflow-y:auto;background:var(--cream);
  background-image:radial-gradient(#efe3d3 1px,transparent 1px);background-size:22px 22px;
  display:flex;flex-direction:column;align-items:center;padding:1.2rem 0 2.6rem}
+/* زر الـ GPS: بنفس هيئة زر "عرض قائمة الطعام" في نافذة المغلق — سماكة وحضور */
 .gate-nearest{position:relative;display:flex;align-items:center;justify-content:center;gap:.5rem;width:min(430px,92vw);
  background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--dark);border:none;border-radius:16px;
- padding:.9rem 1rem;font-family:inherit;font-weight:900;font-size:.95rem;cursor:pointer;transition:.25s;
- box-shadow:0 10px 26px rgba(224,145,47,.45);margin:0 auto 1rem;animation:fadeUp .5s .34s both;overflow:hidden}
+ padding:1.05rem 1rem;min-height:58px;font-family:inherit;font-weight:900;font-size:1.05rem;cursor:pointer;transition:.25s;
+ box-shadow:0 10px 26px rgba(224,145,47,.5);margin:0 auto .9rem;animation:fadeUp .5s .34s both;overflow:hidden}
 .gate-nearest:active{transform:scale(.97)}
 .gate-nearest:disabled{opacity:.75;cursor:default;transform:none}
 .gate-nearest .ping{position:absolute;inset:0;border-radius:16px;border:2px solid var(--gold2);opacity:0;animation:btnPing 2.2s ease-out infinite;pointer-events:none}
 @keyframes btnPing{0%{transform:scale(.9);opacity:.7}100%{transform:scale(1.12);opacity:0}}
-.gate-listbtn{display:flex;align-items:center;gap:.6rem;width:min(430px,92vw);margin:0 auto .9rem;
+.gate-listbtn{display:flex;align-items:center;gap:.6rem;width:min(430px,92vw);margin:0 auto .55rem;
  background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:.85rem 1rem;
  font-family:inherit;font-weight:900;font-size:.95rem;color:var(--brown);cursor:pointer;transition:.25s;
  box-shadow:0 4px 14px rgba(90,24,48,.08);animation:fadeUp .5s .4s both}
@@ -213,9 +212,12 @@ img{-ms-interpolation-mode:bicubic;max-width:100%}
  color:var(--brown2);border-radius:12px;padding:.65rem .9rem;font-size:.76rem;font-weight:800;text-decoration:none;transition:.2s}
 .gc-dir:active{transform:scale(.95)}
 .gc-dir:hover{border-color:var(--gold);color:#a06b1c}
-.gate-delivery{width:min(430px,92vw);margin:1.6rem auto 0;display:flex;flex-direction:column;gap:.9rem;position:relative}
-.gd-or{position:absolute;top:-1.5rem;left:0;right:0;text-align:center;font-weight:900;font-size:.95rem;line-height:1.2;
- color:var(--gold);letter-spacing:.5px}
+.gate-delivery{width:min(430px,92vw);margin:.4rem auto 0;display:flex;flex-direction:column;gap:.9rem;position:relative}
+/* شارة "أو": ثابتة بخطوط ذهبية جانبية بين قائمة الفروع وقسم التوصيل */
+.gd-or{display:flex;align-items:center;gap:.7rem;width:78%;margin:.45rem auto .5rem;
+ color:var(--gold);font-weight:900;font-size:.95rem;line-height:1.2;letter-spacing:.5px}
+.gd-or::before,.gd-or::after{content:'';flex:1;height:2px;border-radius:2px;background:linear-gradient(90deg,transparent,#e0912f66)}
+.gd-or::after{background:linear-gradient(270deg,transparent,#e0912f66)}
 .gd-head{text-align:center;line-height:1.7}
 .gd-head b{display:block;color:var(--ink);font-size:.95rem;font-weight:900}
 .gd-head small{display:none !important;color:var(--muted);font-size:.75rem;font-weight:700}
@@ -310,6 +312,7 @@ main{max-width:1100px;margin:auto;padding:1.5rem 1rem 3rem}
 .cal-note .cal-icon{width:28px;height:28px;flex-shrink:0;border-radius:50%;
  background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--dark);
  display:grid;place-items:center;font-size:.85rem;box-shadow:0 3px 8px rgba(224,145,47,.4)}
+/* ===== أيقونات التواصل — الصفحة الرئيسية ===== */
 .menu-social{display:flex;justify-content:center;align-items:center;gap:.8rem;margin:.9rem auto 0;flex-wrap:wrap;max-width:600px}
 .menu-social:empty{display:none;margin:0}
 .menu-social a{width:46px;height:46px;border-radius:50%;background:#fff;border:1.5px solid var(--line);
@@ -348,6 +351,7 @@ html[dir="ltr"] #drawer.show{transform:translateX(0)}
 .total-row small{color:var(--muted);font-weight:700}
 .checkout{background:var(--wa);color:#fff;border:none;border-radius:12px;padding:.85rem;font-family:inherit;font-weight:900;font-size:1rem;cursor:pointer;display:flex;justify-content:center;align-items:center;gap:.5rem}
 .checkout:active{transform:scale(.98)}
+/* ===== قفل الطلب عند الإغلاق ===== */
 .order-locked .c-img .step{opacity:.55;pointer-events:none}
 .order-locked .c-info .size{opacity:.6;pointer-events:none}
 .order-locked .checkout{opacity:.55;pointer-events:none}
@@ -505,6 +509,7 @@ html[dir="ltr"] .fav-badge{left:auto;right:-4px}
 .ad-close{position:absolute;top:10px;left:10px;width:32px;height:32px;border-radius:50%;border:none;
  background:#00000055;color:#fff;font-weight:900;cursor:pointer;font-size:.95rem;transition:.2s}
 .ad-close:hover{background:#00000088;transform:rotate(90deg)}
+/* ===== إشعار المطعم مغلق ===== */
 .closed-modal{position:fixed;inset:0;z-index:2400;background:rgba(40,10,22,.72);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
  display:flex;align-items:center;justify-content:center;padding:1rem;opacity:0;pointer-events:none;transition:.35s}
 .closed-modal.show{opacity:1;pointer-events:auto}
@@ -521,98 +526,20 @@ html[dir="ltr"] .fav-badge{left:auto;right:-4px}
 .closed-text{color:var(--muted);font-weight:700;font-size:.88rem;line-height:1.9;margin:0 0 .7rem}
 .closed-openat{display:inline-flex;align-items:center;gap:.4rem;background:#fff6e6;border:1px solid #f0dcb8;color:#a06b1c;
  border-radius:50px;padding:.4rem 1rem;font-size:.8rem;font-weight:900;margin:0 0 1rem;line-height:1.6}
-.closed-btn{width:100%;border:none;border-radius:12px;padding:.85rem;background:linear-gradient(135deg,var(--gold),var(--gold2));
- color:var(--dark);font-family:inherit;font-weight:900;font-size:.95rem;cursor:pointer;transition:.2s;
- box-shadow:0 6px 16px rgba(224,145,47,.4)}
+.closed-btn{width:100%;border:none;border-radius:16px;padding:1.05rem;background:linear-gradient(135deg,var(--gold),var(--gold2));
+ color:var(--dark);font-family:inherit;font-weight:900;font-size:1.05rem;cursor:pointer;transition:.2s;
+ box-shadow:0 10px 26px rgba(224,145,47,.5)}
 .closed-btn:hover{background:var(--gold2);transform:translateY(-2px)}
 .closed-btn:active{transform:scale(.97)}
-.gate-social{display:flex;justify-content:center;gap:.8rem;margin:1.2rem auto 0;flex-wrap:wrap;animation:fadeUp .5s .46s both}
+/* ===== أيقونات التواصل — صفحة اختيار الفرع + فاصل "تابعنا على" ===== */
+.gate-social{display:flex;justify-content:center;align-items:center;gap:.8rem;margin:1.2rem auto 0;flex-wrap:wrap;animation:fadeUp .5s .46s both}
 .gate-social:empty{display:none;margin:0}
 .gate-social a{width:46px;height:46px;border-radius:50%;background:#fff;border:1.5px solid var(--line);
  display:grid;place-items:center;color:var(--brown2);transition:.2s;box-shadow:0 6px 16px rgba(90,24,48,.14)}
 .gate-social a:hover{background:var(--gold);color:var(--dark);transform:translateY(-3px)}
 .gate-social svg{width:24px;height:24px;fill:currentColor}
-
-/* =====================================================
-   Gate Redesign v2 — التعديلات الأربعة المضافة
-   (يُلصق بعد النسخة الأصلية ويغلبها)
-===================================================== */
-
-/* 1. الكبسولة على عنوان الاختيار (بدل جملة الاستلام) */
-.gate-title{
-  display:inline-block !important;
-  margin-top:.7rem !important;
-  background:#ffffff12 !important;
-  border:1px solid #ffffff26 !important;
-  border-radius:50px !important;
-  padding:.9rem 2.2rem !important;
-  color:#fff !important;
-  font-size:1.05rem !important;
-  font-weight:900 !important;
-  backdrop-filter:blur(6px);
-  -webkit-backdrop-filter:blur(6px);
-}
-
-/* 2. جملة الاستلام كسطر ذهبي عادي تحت الاسم (بدون كبسولة) */
-.gate-pickup{
-  display:block !important;
-  background:transparent !important;
-  border:none !important;
-  padding:0 !important;
-  color:var(--gold2) !important;
-  font-size:1rem !important;
-  font-weight:800 !important;
-  border-radius:0 !important;
-  backdrop-filter:none !important;
-  -webkit-backdrop-filter:none !important;
-  margin:.1rem 0 0 !important;
-  animation:fadeUp .5s .22s both !important;
-}
-
-/* 3. شارة "أو" — شارة ثابتة بخطوط ذهبية جانبية بين قائمة الفروع وقسم التوصيل */
-.gd-or{
-  position:static !important;
-  top:auto !important;
-  display:flex !important;
-  align-items:center !important;
-  gap:.7rem !important;
-  width:78% !important;
-  margin:1.5rem auto .55rem !important;
-  color:var(--gold) !important;
-  font-weight:900 !important;
-  font-size:.95rem !important;
-  letter-spacing:.5px !important;
-}
-.gd-or::before,.gd-or::after{
-  content:'';
-  flex:1;
-  height:2px;
-  border-radius:2px;
-  background:linear-gradient(90deg,transparent,#e0912f66);
-}
-.gd-or::after{
-  background:linear-gradient(270deg,transparent,#e0912f66);
-}
-
-/* 4. فاصل "♡ تابعنا على ♡" فوق أيقونات السوشيال في صفحة الفروع */
-.gs-head{
-  display:flex;
-  align-items:center;
-  gap:.6rem;
-  width:86%;
-  margin:0 auto 1rem;
-  color:var(--brown);
-  font-weight:900;
-  font-size:.95rem;
-}
-.gs-line{
-  flex:1;
-  height:1.5px;
-  background:var(--brown);
-  opacity:.45;
-  border-radius:2px;
-}
-.gs-heart{
-  color:var(--brown);
-  font-size:.85rem;
-}
+.gs-head{flex:0 0 100%;display:flex;align-items:center;gap:.6rem;padding:0 7%;
+ margin:0 auto .2rem;color:var(--brown);font-weight:900;font-size:.95rem}
+.gs-head b{font-weight:900}
+.gs-line{flex:1;height:1.5px;background:var(--brown);opacity:.45;border-radius:2px}
+.gs-heart{color:var(--brown);font-size:.85rem}
