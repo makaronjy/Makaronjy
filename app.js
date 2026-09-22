@@ -310,6 +310,7 @@ function socialHref(x){
   if(x.key==='email') return /^mailto:/i.test(x.url) ? x.url : ('mailto:'+x.url);
   return x.url;
 }
+/* ===== تعديل #2: فاصل "♡ تابعنا على ♡" ===== */
 function renderSocial(){
   const list = socialList();
   const html = list.map(x=>{
@@ -320,8 +321,11 @@ function renderSocial(){
     const nm = socEsc(currentLang==='ar' ? (x.nameAr||x.nameEn||'') : (x.nameEn||x.nameAr||''));
     return '<a href="'+socEsc(socialHref(x))+'"'+cls+stl+' target="_blank" rel="noopener noreferrer" aria-label="'+nm+'">'+ic+'</a>';
   }).join('');
+  const head = list.length
+    ? '<div class="gs-head"><span class="gs-line"></span><span class="gs-heart">♡</span><b>'+socEsc(tt('followUs','تابعنا على','Follow us'))+'</b><span class="gs-heart">♡</span><span class="gs-line"></span></div>'
+    : '';
   const m = el('menuSocial'); if(m) m.innerHTML = html;
-  const g = el('gateSocial'); if(g) g.innerHTML = html;
+  const g = el('gateSocial'); if(g) g.innerHTML = head + html;
 }
 
 /* ===== إصدار الصور — تحديث حي صامت ===== */
@@ -335,6 +339,7 @@ function applyImageVersions(){
   });
 }
 
+/* ===== تعديل #4: إضافة 🛵 لعنوان شركاء التوصيل ===== */
 function renderDelivery(){
   const d = S().delivery || [];
   const box = el('gateDelivery');
@@ -344,7 +349,7 @@ function renderDelivery(){
   box.innerHTML = `
     <span class="gd-or">${tt('orWord','أو','OR')}</span>
     <div class="gd-head">
-      <b>${tt('deliveryHeadAr','اطلب الآن عبر شركائنا في التوصيل','Order now via our delivery partners')}</b>
+      <b>${tt('deliveryHeadAr','🛵 اطلب الآن عبر شركائنا في التوصيل','🛵 Order now via our delivery partners')}</b>
       <small></small>
     </div>
     <div class="gd-tiles">
@@ -373,6 +378,7 @@ function openDeliveryApp(event, idx){
   return false;
 }
 
+/* ===== تعديل #1: حذف سطري gateTagline و gateDirectLbl ===== */
 function applyLang(lang){
   currentLang = lang;
   localStorage.setItem('mk_lang', lang);
@@ -398,8 +404,6 @@ function applyLang(lang){
   el('confirmYes').textContent = tt('favConfirmYes','نعم، استبدال','Yes, Replace');
   el('confirmNo').textContent = tt('favCancel','إلغاء','Cancel');
   el('gateBrand').textContent = brandize(tt('gateBrand','مطاعم مكرونجي','Makaronjy Restaurants'));
-  el('gateTagline').textContent = brandize(tt('gateTagline','مكرونة بطعم لا يُقاوم','Irresistible pasta experience'));
-  el('gateDirectLbl').textContent = tt('gateDirect','اطلب من المطعم مباشرة','Order directly from the restaurant');
   el('gatePickup').textContent = '🛍️ ' + tt('pickupNote','طلبك يكون جاهزاً عند وصولك للفرع','Your order will be ready upon arrival');
   el('gateTitle').textContent = tt('branchGateTitle','اختر فرعك للطلب 📍','Choose Your Branch 📍');
   el('gateNearestLbl').textContent = tt('branchNearestBtn','🎯 حدّد الفرع الأقرب لموقعي','🎯 Find My Nearest Branch');
@@ -642,10 +646,11 @@ function renderGateList(){
   }).join('');
 }
 
+/* ===== تعديل #3: إظهار زر ✕ دائماً ===== */
 function openGate(mode){
   gateMode = mode;
   pushGuard();
-  el('gateClose').classList.toggle('can', mode === 'switch');
+  el('gateClose').classList.add('can');
   renderGateList();
   setDrop(false);
   el('gate').classList.add('show');
