@@ -311,7 +311,7 @@ function socialHref(x){
   if(x.key==='email') return /^mailto:/i.test(x.url) ? x.url : ('mailto:'+x.url);
   return x.url;
 }
-/* ===== تعديل: فاصل "♡ تابعنا على ♡" فوق أيقونات بوابة الفروع ===== */
+/* ===== تعديل: فاصل "♡ تابعنا على ♡" فوق أيقونات بوابة الفروع فقط ===== */
 function renderSocial(){
   const list = socialList();
   const html = list.map(x=>{
@@ -379,7 +379,6 @@ function openDeliveryApp(event, idx){
   return false;
 }
 
-/* ===== تعديل: حذف سطري gateTagline و gateDirectLbl (العنصران لم يعودا موجودين) ===== */
 function applyLang(lang){
   currentLang = lang;
   localStorage.setItem('mk_lang', lang);
@@ -405,6 +404,8 @@ function applyLang(lang){
   el('confirmYes').textContent = tt('favConfirmYes','نعم، استبدال','Yes, Replace');
   el('confirmNo').textContent = tt('favCancel','إلغاء','Cancel');
   el('gateBrand').textContent = brandize(tt('gateBrand','مطاعم مكرونجي','Makaronjy Restaurants'));
+  el('gateTagline').textContent = brandize(tt('gateTagline','مكرونة بطعم لا يُقاوم','Irresistible pasta experience'));
+  el('gateDirectLbl').textContent = tt('gateDirect','اطلب من المطعم مباشرة','Order directly from the restaurant');
   el('gatePickup').textContent = '🛍️ ' + tt('pickupNote','طلبك يكون جاهزاً عند وصولك للفرع','Your order will be ready upon arrival');
   el('gateTitle').textContent = tt('branchGateTitle','اختر فرعك للطلب 📍','Choose Your Branch 📍');
   el('gateNearestLbl').textContent = tt('branchNearestBtn','🎯 حدّد الفرع الأقرب لموقعي','🎯 Find My Nearest Branch');
