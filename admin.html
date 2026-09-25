@@ -1,4 +1,4 @@
-<!-- ===== ADMIN COMPLETE BUILD v10 ===== -->
+<!-- ===== ADMIN COMPLETE BUILD v11 ===== -->
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -9,6 +9,27 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&display=swap" rel="stylesheet">
+<script>
+/* مراقب الأخطاء والإقلاع — يعمل حتى لو تعطّل السكربت الرئيسي */
+window.addEventListener('error', function(e){
+  if(window.__ADMIN_ERR_SHOWN) return;
+  window.__ADMIN_ERR_SHOWN = true;
+  var d = document.createElement('div');
+  d.style.cssText = 'position:fixed;left:0;right:0;bottom:0;background:#b91c1c;color:#fff;padding:.7rem .8rem;font-size:.75rem;font-weight:800;z-index:99999;text-align:center;line-height:1.7';
+  d.textContent = '⛠ خطأ في ملف اللوحة: ' + (e.message || 'غير معروف') + ' — غالباً الملف منسوخ بشكل ناقص أو تالف. أعد استبدال admin.html بالنسخة الكاملة دفعة واحدة.';
+  document.documentElement.appendChild(d);
+});
+window.addEventListener('load', function(){
+  setTimeout(function(){
+    if(!window.__ADMIN_BOOTED && !window.__ADMIN_ERR_SHOWN){
+      var d = document.createElement('div');
+      d.style.cssText = 'position:fixed;left:0;right:0;bottom:0;background:#b91c1c;color:#fff;padding:.7rem .8rem;font-size:.75rem;font-weight:800;z-index:99999;text-align:center;line-height:1.7';
+      d.textContent = '⛠ سكربت اللوحة لم يكتمل (ملف ناقص أو به خطأ صياغة). أعد رفع النسخة الكاملة مرة واحدة بدون تجزئة.';
+      document.documentElement.appendChild(d);
+    }
+  }, 800);
+});
+</script>
 <style>
 :root{
   --rust:#b45309; --rust-d:#8f4307;
@@ -39,6 +60,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--ink);min-he
 .screen h1.r-title{color:var(--ink);font-size:1.3rem;font-weight:900;margin-bottom:.8rem}
 .screen .hint{color:var(--muted);font-size:.78rem;font-weight:700;line-height:1.8;margin-bottom:1.2rem}
 .renew-link{display:inline-block;margin-top:1rem;font-size:.8rem;font-weight:800;color:var(--rust);text-decoration:underline}
+.ver{margin-top:1rem;font-size:.68rem;font-weight:800;color:var(--muted)}
 
 /* ===== الأزرار ===== */
 .primary{width:100%;border:none;border-radius:14px;padding:.85rem;background:var(--rust);color:#fff;
@@ -223,6 +245,7 @@ fieldset label{display:inline-flex;align-items:center;gap:.35rem;font-size:.76re
     <label><span data-al="lblPass">كلمة السر</span><input id="inPass" type="password" autocomplete="current-password" placeholder="••••••••"></label>
     <button id="btnLogin" class="primary" data-al="btnLogin">دخول</button>
     <div id="loginErr" class="banner error"></div>
+    <p class="ver">الإصدار 11</p>
   </div>
 </div>
 
@@ -332,14 +355,6 @@ fieldset label{display:inline-flex;align-items:center;gap:.35rem;font-size:.76re
 <div id="toasts"></div>
 
 <script>
-/* ===== كاشف أخطاء ظاهر ===== */
-window.addEventListener('error', function(e){
-  var d = document.createElement('div');
-  d.style.cssText = 'position:fixed;left:0;right:0;bottom:0;background:#b91c1c;color:#fff;padding:.6rem .8rem;font-size:.72rem;font-weight:800;z-index:99999;text-align:center;line-height:1.6';
-  d.textContent = '⛠ خطأ في اللوحة: ' + (e.message || 'غير معروف') + ' — سطر ' + (e.lineno || '؟');
-  document.documentElement.appendChild(d);
-});
-
 /* ===== إيقاف التكبير ===== */
 document.addEventListener('touchstart', e=>{ if(e.touches.length > 1) e.preventDefault(); }, {passive:false});
 document.addEventListener('touchmove', e=>{ if(e.touches.length > 1) e.preventDefault(); }, {passive:false});
@@ -347,7 +362,7 @@ document.addEventListener('touchmove', e=>{ if(e.touches.length > 1) e.preventDe
 document.addEventListener('dblclick', e=> e.preventDefault());
 
 /* =====================================================
-   لوحة تحكم مكرونجي — BUILD v10
+   لوحة تحكم مكرونجي — BUILD v11
 ===================================================== */
 
 /* ##### ثوابت اختيارية (للدخول بدون لصق التوكن كل مرة) ##### */
@@ -775,7 +790,6 @@ el('btnLogin').addEventListener('click', async ()=>{
   hideBanner('loginErr');
   if(!u || !p){ showBanner('loginErr', L('errComplete')); return; }
 
-  /* أ) الثابتان داخل الملف  ب) اسم GitHub + التوكن ككلمة سر  ج) كلمة السر = GH_TOKEN */
   const tokenLike = /^(github_pat_|ghp_|gho_|ghu_|ghs_|ghr_)/i.test(p);
   const isLocal   = (u.toLowerCase() === String(ADMIN_USER).toLowerCase()) && (p === ADMIN_PASS);
   const isEmbed   = (GH_TOKEN !== '') && (p === GH_TOKEN);
@@ -1487,7 +1501,10 @@ function renderAll(){
   }
   applyAdminLang();
 })();
+
+/* علامة اكتمال السكربت (يفحصها مراقب الإقلاع في الأعلى) */
+window.__ADMIN_BOOTED = true;
 </script>
 </body>
 </html>
-<!-- ===== END OF FILE v10 ===== -->
+<!-- ===== END OF FILE v11 ===== -->
