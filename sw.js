@@ -3,7 +3,7 @@
    الإصدار v7 — بعد تقسيم index.html إلى style.css و app.js
 ===================================================== */
 
-const CACHE = 'makaronjy-v10';
+const CACHE = 'makaronjy-v11';
 
 /* ===== الملفات الأساسية للتخزين المسبق ===== */
 const CORE = [
