@@ -188,6 +188,28 @@ fieldset label{display:inline-flex;align-items:center;gap:.35rem;font-size:.76re
 .img-btn.ok{background:#e8f5e9;color:#2d6a4f;border:1.5px solid #bfe3c8}
 .soc-ico{display:inline-grid;place-items:center;width:22px;height:22px;margin-inline-end:.4rem;vertical-align:middle}
 .soc-ico svg{width:18px;height:18px;fill:var(--brown2)}
+
+/* ===== شاشة الدخول — تصميم البطاقة النظيفة ===== */
+#loginScreen{background:#ebebeb;padding:1.2rem}
+#loginScreen .card{background:#f5f5f6;border:none;border-radius:26px;padding:2rem 1.5rem 1.6rem;
+  width:min(430px,94vw);box-shadow:0 12px 40px rgba(0,0,0,.08);text-align:center}
+#loginScreen .login-head{display:flex;align-items:center;gap:.8rem;margin-bottom:1.7rem}
+#loginScreen .login-head svg{width:54px;height:54px;fill:#b45309;flex-shrink:0}
+#loginScreen .login-head h1{flex:1;margin:0;color:#20242e;font-size:1.5rem;font-weight:900;line-height:1.6;text-align:center}
+#loginScreen label{display:block;text-align:start;font-size:.85rem;font-weight:800;color:#8b909a;margin:0 0 .5rem}
+#loginScreen input{width:100%;direction:ltr;text-align:right;border:1px solid #e3e4e8;border-radius:16px;
+  padding:.95rem 1rem;background:#fbfbfc;color:#20242e;font-family:inherit;font-size:1rem;font-weight:700;
+  outline:none;margin:0 0 1.15rem;transition:.2s}
+#loginScreen input:focus{border-color:#b45309;box-shadow:0 0 0 3px rgba(180,83,9,.13)}
+#loginScreen .adv{margin:0 0 1.15rem;text-align:start}
+#loginScreen .adv summary{cursor:pointer;font-size:.75rem;font-weight:800;color:#8b909a}
+#loginScreen .adv input{margin-bottom:.8rem}
+#loginScreen .primary{width:100%;border:none;border-radius:18px;padding:1.05rem;background:#b45309;background-image:none;
+  color:#fff;font-family:inherit;font-size:1.15rem;font-weight:800;cursor:pointer;
+  box-shadow:0 10px 24px rgba(180,83,9,.32);transition:.2s}
+#loginScreen .primary:active{transform:scale(.98)}
+#loginScreen .hint{margin:.9rem 0 0;font-size:.68rem;font-weight:700;color:#9aa0a8;line-height:1.7}
+#loginScreen .help{margin-top:.6rem;font-size:.72rem}
 </style>
 </head>
 <body>
@@ -195,18 +217,28 @@ fieldset label{display:inline-flex;align-items:center;gap:.35rem;font-size:.76re
 <!-- ===== شاشة الدخول ===== -->
 <div id="loginScreen" class="screen">
   <div class="card">
-    <h1 data-al="loginTitle">🔐 لوحة تحكم مكرونجي</h1>
-    <p class="hint" data-al="loginHint">بيانات الوصول تُحفظ في جلسة المتصفح فقط، وتُمسح تلقائياً عند إغلاق التبويب.</p>
-    <label><span data-al="lblOwner">المالك (Owner)</span><input id="inOwner" value=""></label>
-    <label><span data-al="lblRepo">المستودع (Repo)</span><input id="inRepo" placeholder="makaronjy"></label>
-    <label><span data-al="lblBranch">فرع المستودع (Branch)</span><input id="inBranch" value="main"></label>
-    <label><span data-al="lblToken">توكن الوصول (Fine-grained PAT)</span><input id="inToken" type="password" placeholder="github_pat_..."></label>
+    <div class="login-head">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3C9.79 3 8 4.79 8 7C6.34 7 5 8.34 5 10C5 11.66 6.34 13 8 13H16C17.66 13 19 11.66 19 10C19 8.34 17.66 7 16 7C16 4.79 14.21 3 12 3M8 15V18C8 19.1 9.79 20 12 20C14.21 20 16 19.1 16 18V15H8Z"/></svg>
+      <h1 data-al="loginTitle">لوحة تحكم مكرونجي</h1>
+    </div>
+
+    <label><span data-al="lblOwner">اسم المستخدم</span><input id="inOwner" value=""></label>
+    <label><span data-al="lblToken">كلمة السر</span><input id="inToken" type="password" placeholder="••••••••"></label>
+
+    <details class="adv">
+      <summary data-al="advSummary">خيارات متقدمة (المستودع والفرع)</summary>
+      <label><span data-al="lblRepo">المستودع (Repo)</span><input id="inRepo" value="Makaronjy"></label>
+      <label><span data-al="lblBranch">فرع المستودع (Branch)</span><input id="inBranch" value="main"></label>
+    </details>
+
     <button id="btnLogin" class="primary" data-al="btnLogin">دخول</button>
     <div id="loginErr" class="banner error"></div>
+
     <details class="help">
       <summary data-al="helpSummary">كيف أنشئ التوكن؟</summary>
       <ol id="helpList"></ol>
     </details>
+    <p class="hint" data-al="loginHint"></p>
   </div>
 </div>
 
@@ -338,9 +370,10 @@ let ALANG = localStorage.getItem('mk_admin_lang') || 'ar';
 /* ===== قاموس اللوحة ===== */
 const ASTR = {
   ar: {
-    loginTitle:'🔐 لوحة تحكم مكرونجي',
+    loginTitle:'لوحة تحكم مكرونجي',
     loginHint:'بيانات الوصول تُحفظ في جلسة المتصفح فقط، وتُمسح تلقائياً عند إغلاق التبويب.',
-    lblOwner:'المالك (Owner)', lblRepo:'المستودع (Repo)', lblBranch:'فرع المستودع (Branch)', lblToken:'توكن الوصول (Fine-grained PAT)',
+    lblOwner:'اسم المستخدم', lblRepo:'المستودع (Repo)', lblBranch:'فرع المستودع (Branch)', lblToken:'كلمة السر',
+    advSummary:'خيارات متقدمة (المستودع والفرع)',
     btnLogin:'دخول', helpSummary:'كيف أنشئ التوكن؟',
     helpHtml:'<li>GitHub ← Settings ← Developer settings ← Fine-grained tokens.</li><li>Generate new token ← اختر هذا المستودع فقط.</li><li>صلاحية Contents: Read and write — والمدة التي تريدها.</li><li>انسخ التوكن والصقه أعلاه.</li>',
     errComplete:'أكمل جميع الحقول.', errToken:'التوكن مرفوض — تأكد من صلاحية Contents: Read and write.',
@@ -397,206 +430,230 @@ const ASTR = {
     bestNote:'اختر أربعة أصناف تظهر في شاشة «الأكثر مبيعاً» بالتطبيق بنفس ترتيبها هنا. التغيير يصل للزبائن خلال ≤60 ثانية.',
     bestSlot:'الصنف ', btnSaveBest:'💾 حفظ ونشر الأكثر مبيعاً', savedBest:'تم نشر الأكثر مبيعاً',
     warnBestDup:'لا يمكن تكرار نفس الصنف في خانتين — اختر أصنافاً مختلفة',
-    warnBestEmpty:'اختر صنفاً لكل خانة من الخانات الأربع',
+    warnBestEmpty:'اختر صنفاً في كل خانات الأربعة', warnBestNot4:'يجب اختيار 4 أصناف بالضبط',
     deliveryNote:'روابط تطبيقات التوصيل تظهر في شاشة اختيار الفروع بالتطبيق. الروابط الرسمية تفتح التطبيق إن كان مثبتاً وإلا الموقع الرسمي.',
-    btnAddDelivery:'➕ إضافة تطبيق توصيل', editDeliveryTitle:'تعديل تطبيق توصيل', addDeliveryTitle:'إضافة تطبيق توصيل',
-    lblDelNameAr:'الاسم بالعربي', lblDelNameEn:'الاسم بالإنجليزي', lblDelUrl:'الرابط (https://...)', lblDelColor:'لون النقطة', lblDelImg:'مسار صورة الشعار (اختياري)',
-    warnDelName:'اسم التطبيق مطلوب', warnDelUrl:'رابط صحيح مطلوب (يبدأ بـ https://)',
-    savedDelivery:'تم حفظ بيانات التوصيل والسوشيال',
-    delDeliveryMsg:function(n){ return 'سيُحذف «'+n+'» من شاشة اختيار الفروع. متابعة؟'; },
-    deletedDelivery:'تم حذف تطبيق التوصيل', noDelivery:'لا توجد تطبيقات توصيل مضافة بعد.',
-    legendSocial:'حسابات التواصل الاجتماعي',
-    btnAddSocial:'➕ إضافة حساب تواصل',
-    addSocialTitle:'إضافة حساب تواصل', editSocialTitle:'تعديل حساب تواصل',
-    lblSocialPlatform:'المنصة', platCustom:'أخرى (مخصص)',
-    lblSocialNameAr:'الاسم بالعربي', lblSocialNameEn:'الاسم بالإنجليزي',
-    lblSocialUrl:'الرابط (https://...)', lblSocialEmail:'البريد الإلكتروني',
-    warnSocialUrl:'رابط صحيح مطلوب (يبدأ بـ https://)', warnSocialEmail:'بريد إلكتروني صحيح مطلوب',
+    btnAddDelivery:'➕ إضافة تطبيق توصيل', btnSaveDelivery:'💾 حفظ ونشر التوصيل والسوشيال',
+    editDeliveryTitle:'تعديل تطبيق توصيل', addDeliveryTitle:'إضافة تطبيق توصيل',
+    lblDelNameAr:'الاسم بالعربي', lblDelNameEn:'الاسم بالإنجليزي', lblDelUrl:'الرابط (Deep link أو موقع رسمي)',
+    lblDelColor:'اللون المميز', lblDelImg:'مسار صورة الشعار',
+    warnDelName:'الاسم مطلوب', warnDelUrl:'الرابط يجب أن يبدأ بـ https://',
+    noDelivery:'لا توجد تطبيقات توصيل حالياً — أضف واحداً ليظهر في شاشة اختيار الفروع.',
+    delDeliveryMsg:function(n){ return 'سيُحذف «'+n+'» من قائمة التطبيقات. متابعة؟'; },
+    deletedDelivery:'تم حذف التطبيق', savedDelivery:'تم حفظ التطبيق',
+    legendSocial:'حسابات التواصل الاجتماعي', btnAddSocial:'➕ إضافة حساب تواصل',
+    editSocialTitle:'تعديل حساب تواصل', addSocialTitle:'إضافة حساب تواصل',
+    lblSocialPlatform:'المنصة', lblSocialNameAr:'الاسم بالعربي', lblSocialNameEn:'الاسم بالإنجليزي',
+    lblSocialUrl:'الرابط', lblSocialEmail:'البريد الإلكتروني',
     warnSocialMax:'الحد الأقصى 5 حسابات', warnSocialName:'الاسم مطلوب',
-    savedSocial:'تم حفظ حساب التواصل', deletedSocial:'تم حذف حساب التواصل',
-    delSocialMsg:function(n){ return 'سيُحذف «'+n+'» من أيقونات التطبيق. متابعة؟'; },
-    noSocial:'لا توجد حسابات تواصل مضافة بعد.',
-    btnSaveDelivery:'💾 حفظ ونشر التوصيل والسوشيال',
-    lblBrandAr:'اسم السلسلة بالعربي', lblBrandEn:'اسم السلسلة بالإنجليزي', lblTagAr:'الوصف بالعربي', lblTagEn:'الوصف بالإنجليزي',
-    settingsNote:'الوصف يظهر تحت اسم السلسلة أعلى التطبيق. صور التطبيق تُستبدل من قسم «صور التطبيق» في تبويب الإعدادات بنفس اسم الملف.',
-    legendImages:'🖼️ صور التطبيق',
-    imgLogo:'صورة الشعار (logo.png)', imgBg:'خلفية الأصناف (bg.png)',
-    imgWelcome:'صورة الترحيب (welcome.png)', imgClosed:'صورة «مغلق» (closed.png)',
-    imgPick:'📷 تغيير الصورة', imgConfirm:'✅ تأكيد الرفع', imgCancel:'❌ إلغاء',
-    imgUploadingApp:'جارٍ رفع الصورة...', imgUploadedApp:'تم رفع الصورة ✔', imgUploadFailApp:'فشل رفع الصورة: ',
-    imagesNote:'اختر صورة جديدة ثم أكّد الرفع — تُستبدل الصورة في المستودع بنفس اسم الملف، وتصل للزبائن خلال ≤60 ثانية بدون تحديث الصفحة.',
-    btnSaveSettings:'💾 حفظ ونشر الإعدادات',
+    warnSocialEmail:'صيغة البريد غير صحيحة', warnSocialUrl:'الرابط يجب أن يبدأ بـ https://',
+    noSocial:'لا توجد حسابات تواصل حالياً.',
+    delSocialMsg:function(n){ return 'سيُحذف حساب «'+n+'» من شاشة الفروع. متابعة؟'; },
+    deletedSocial:'تم حذف الحساب', savedSocial:'تم حفظ الحساب',
+    platCustom:'— منصة أخرى —',
     adNote:'الإعلان نصي: أيقونة + عنوان + نص — بدون صور، لعرض فوري وبدون روابط مكسورة. يظهر مرة واحدة يومياً لكل جهاز.',
-    lblAdEnabled:'تشغيل الإعلان المنبثق', lblAdOnce:'مرة واحدة يومياً لكل جهاز', lblAdIcon:'أيقونة الإعلان (إيموجي واحد)',
-    lblAdBtnAr:'نص زر الإغلاق بالعربي', lblAdBtnEn:'نص زر الإغلاق بالإنجليزي', lblAdTitleAr:'العنوان بالعربي', lblAdTitleEn:'العنوان بالإنجليزي',
-    lblAdTextAr:'نص الإعلان بالعربي', lblAdTextEn:'نص الإعلان بالإنجليزي', btnSaveAd:'💾 حفظ ونشر الإعلان',
-    adPrevTitle:'(عنوان الإعلان)', adPrevText:'(نص الإعلان يظهر هنا للزبائن)',
-    modalSave:'حفظ', modalCancel:'إلغاء', confirmDefault:'تأكيد العملية',
-    loggedIn:'تم الدخول بنجاح', loggedSub:'تم تحميل المنيو والإعدادات من المستودع',
-    renewed:'تم التجديد والمتابعة', exported:'تم تنزيل النسخة الاحتياطية', published:'تم النشر'
+    btnSaveAd:'💾 حفظ ونشر الإعلان', savedAd:'تم نشر الإعلان',
+    lblAdEnabled:'مفعّل', lblAdOnce:'مرة واحدة يومياً لكل جهاز',
+    lblAdIcon:'الأيقونة (إيموجي)', lblAdBtnAr:'نص الزر بالعربي', lblAdBtnEn:'نص الزر بالإنجليزي',
+    lblAdTitleAr:'العنوان بالعربي', lblAdTitleEn:'العنوان بالإنجليزي',
+    lblAdTextAr:'النص بالعربي', lblAdTextEn:'النص بالإنجليزي',
+    adPrevTitle:'إعلان تجريبي', adPrevText:'هذا نص الإعلان كما سيظهر في التطبيق.',
+    legendImages:'صور التطبيق', imagesNote:'اختر صورة جديدة ثم «تأكيد» لرفعها فوراً. الصورة ستحلّ محل القديمة وتظهر مباشرة في التطبيق.',
+    imgLogo:'شعار التطبيق (لوغو)', imgBg:'خلفية بطاقات الصنف', imgWelcome:'شاشة الترحيب', imgClosed:'شاشة الإغلاق',
+    imgPick:'📷 اختر صورة', imgConfirm:'✔ تأكيد الرفع', imgCancel:'إلغاء',
+    imgUploadingApp:'جارٍ الرفع...', imgUploadedApp:'تم رفع الصورة ✔',
+    imgUploadFailApp:'فشل الرفع: ', imgBadTypeApp:'صيغة غير مدعومة', imgTooBigApp:'الحجم كبير (الحد 4MB)',
+    lblBrandAr:'اسم المطعم بالعربي', lblBrandEn:'اسم المطعم بالإنجليزي',
+    lblTagAr:'الوصف بالعربي', lblTagEn:'الوصف بالإنجليزي',
+    settingsNote:'بعد الرفع والحفظ، التغييرات تصل للزبائن خلال ≤60 ثانية.',
+    exported:'تم تصدير النسخة الاحتياطية ✔',
+    confirmDefault:'تأكيد',
+    loggedIn:'تم الدخول ✔', loggedSub:'بياناتك تُحمَّل الآن',
+    published:'تم النشر ✔'
   },
   en: {
-    loginTitle:'🔐 Makaronjy Admin',
+    loginTitle:'Makaronjy Admin Panel',
     loginHint:'Access data is kept in the browser session only and cleared when the tab closes.',
-    lblOwner:'Owner', lblRepo:'Repository', lblBranch:'Repository branch', lblToken:'Access token (Fine-grained PAT)',
+    lblOwner:'Username', lblRepo:'Repository', lblBranch:'Branch', lblToken:'Password',
+    advSummary:'Advanced (repository & branch)',
     btnLogin:'Login', helpSummary:'How do I create the token?',
-    helpHtml:'<li>GitHub ← Settings ← Developer settings ← Fine-grained tokens.</li><li>Generate new token ← select this repository only.</li><li>Permission: Contents: Read and write — plus your chosen expiry.</li><li>Copy the token and paste it above.</li>',
+    helpHtml:'<li>GitHub → Settings → Developer settings → Fine-grained tokens.</li><li>Generate new token → select this repository only.</li><li>Permission: Contents: Read and write — and choose the duration.</li><li>Copy the token and paste above.</li>',
     errComplete:'Please complete all fields.', errToken:'Token rejected — check Contents: Read and write permission.',
     errNotFound:'Repository or file not found — check the name and branch.', errGeneric:'Error: ',
-    renewTitle:'⚠️ Token expired', renewHint:'The token expired or lacks permission. Renew it on GitHub then enter it here — your data is safe.',
-    lblNewToken:'New token', btnRenew:'Save & continue', errRenewEmpty:'Enter the new token.', errRenewBad:'Token still rejected.',
-    headerTitle:'Makaronjy Admin', btnExport:'⬇️ Export backup', btnLogout:'Logout',
+    renewTitle:'⚠️ Token expired', renewHint:'The token expired or lacks permission. Renew it on GitHub then paste here — your data is intact.',
+    lblNewToken:'New token', btnRenew:'Save and continue', errRenewEmpty:'Enter the new token.', errRenewBad:'Token still rejected.',
+    headerTitle:'Makaronjy Admin', btnExport:'⬇️ Backup', btnLogout:'Logout',
     tabMenu:'🍝 Menu', tabBranches:'🍝 Branches', tabBest:'⭐ Best Sellers',
-    tabDelivery:'🛵 Delivery & Social', tabSettings:'⚙️ Settings', tabAd:'📢 Ad',
-    menuNote:'Changes reach customers automatically within ≤60s without a refresh. Item images upload automatically under img/items/ and appear instantly. Hide = all branches; Sold ❌ = daily per branch.',
+    tabDelivery:'🛵 Delivery & Social', tabSettings:'⚙️ Settings', tabAd:'📢 Announcement',
+    menuNote:'Changes reach customers automatically within ≤60 seconds without refresh. Item images upload under the item name inside img/items/ and appear instantly. Hiding = all branches, Sold out ❌ = per-branch per-day.',
     btnSaveMenu:'💾 Save & publish menu', publishing:'Publishing...', publishedMenu:'Menu published',
     subLive:'Reaches customers within ≤60s without refresh', publishFail:'Publish failed: ',
     hide:'🙈 Hide', show:'👁 Show', hidden:'(hidden)', addItem:'➕ Add item', addSec:'➕ Add section',
-    editSecTitle:'Edit section', addSecTitle:'Add section', lblSecNameAr:'Section name (Arabic)', lblSecNameEn:'Section name (English)', lblSecIcon:'Icon (emoji)',
-    editItemTitle:'Edit item', addItemTitle:'Add item', lblNameAr:'Name (Arabic)', lblNameEn:'Name (English)',
-    lblDescAr:'Description (Arabic, optional)', lblDescEn:'Description (English, optional)',
-    lblImgMode:'Item image mode', imgModeCut:'Transparent cutout over background', imgModeFull:'Full photo covering the card',
+    editSecTitle:'Edit section', addSecTitle:'Add section', lblSecNameAr:'Section name (AR)', lblSecNameEn:'Section name (EN)', lblSecIcon:'Icon (emoji)',
+    editItemTitle:'Edit item', addItemTitle:'Add item', lblNameAr:'Name (AR)', lblNameEn:'Name (EN)',
+    lblDescAr:'Description (AR, optional)', lblDescEn:'Description (EN, optional)',
+    lblImgMode:'Item image mode', imgModeCut:'Transparent cut-out over background', imgModeFull:'Full image covering the card',
     lblItemImage:'📷 Item image',
-    imgPreviewNone:'No image — the item name will show over the background',
+    imgPreviewNone:'No image — item name will show over the background',
     imgChange:'📷 Add / change image', imgDelete:'🗑 Delete current image',
-    imgUploading:'Uploading image...', imgUploaded:'Item image uploaded ✔', imgDeleted:'Item image deleted ✔',
-    imgBadType:'Unsupported format — use PNG, JPG or WEBP', imgTooBig:'Image too large (max 4MB)',
-    imgUploadFail:'Image upload failed — item will save and retry on next edit',
-    lblPrices:'Prices (commas: 12 or 2,3,5)', lblCal:'Calories (empty = zero)',
-    legendAvail:'Availability per branch (permanent)', allBranches:'All branches', missLegend:'In unavailable branches show it as:',
-    missGray:'Gray card "Not available at this branch"', missHide:'Fully hidden',
+    imgUploading:'Uploading image...', imgUploaded:'Image uploaded ✔', imgDeleted:'Image deleted ✔',
+    imgBadType:'Unsupported format — use PNG, JPG, or WEBP', imgTooBig:'Image too large (max 4MB)',
+    imgUploadFail:'Upload failed — item will save and retry on next edit',
+    lblPrices:'Prices (comma-separated: 12 or 2,3,5)', lblCal:'Calories (empty = 0)',
+    legendAvail:'Availability in branches (permanent)', allBranches:'All branches', missLegend:'For unavailable branches, make it:',
+    missGray:'Grey card «not available in this branch»', missHide:'Completely hidden',
     legendSold:'Sold out ❌ (unavailable today)',
-    warnSecName:'Section name is required', warnAvail:'Select at least one branch', warnItem:'Arabic name and at least one price are required',
-    savedSec:'Section saved', savedItem:'Item saved', dontForget:"Don't forget to save & publish",
-    delSecMsg:function(t){ return 'Section "'+t+'" and all its items will be permanently deleted from all branches. Continue?'; },
-    delItemMsg:function(t){ return 'Item "'+t+'" will be permanently deleted from all branches. Continue?'; },
+    warnSecName:'Section name is required', warnAvail:'Select at least one branch for availability', warnItem:'Arabic name and at least one price are required',
+    savedSec:'Section saved', savedItem:'Item saved', dontForget:'Don\'t forget to save & publish',
+    delSecMsg:function(t){ return 'Section «'+t+'» and all its items will be permanently deleted from all branches. Continue?'; },
+    delItemMsg:function(t){ return 'Item «'+t+'» will be permanently deleted from all branches. Continue?'; },
     btnDelFinal:'Delete permanently', deletedSec:'Section deleted', deletedItem:'Item deleted',
-    availTag:function(names, mode){ return ' • Not available at: '+names+' ('+mode+')'; },
-    modeGray:'gray', modeHide:'hidden',
+    availTag:function(names, mode){ return ' • Unavailable in: '+names+' ('+mode+')'; },
+    modeGray:'grey', modeHide:'hidden',
     soldAll:' • Sold out: all branches', soldSome:' • Sold out: ', riyal:'SAR', calWord:'cal',
-    branchNote:'Branch WhatsApp is required: country code then 9 digits, no + and no leading zero — e.g. 9665XXXXXXXX. The branch number defines the order-ID code (B1, B2...). Hours support half hours.',
+    branchNote:'WhatsApp number is mandatory: country code then 9 digits, no + and no leading zero — e.g. 9665XXXXXXXX. Branch number sets the ID (B1, B2...). Hours support half-hours.',
     btnAddBranch:'➕ Add branch', btnSaveBranches:'💾 Save & publish branches',
     editBranchTitle:'Edit branch', addBranchTitle:'Add branch',
-    lblBrNameAr:'Name (Arabic)', lblBrNameEn:'Name (English)', lblBrAddrAr:'Address (Arabic)', lblBrAddrEn:'Address (English)',
+    lblBrNameAr:'Name (AR)', lblBrNameEn:'Name (EN)', lblBrAddrAr:'Address (AR)', lblBrAddrEn:'Address (EN)',
     lblBrNum:'Branch number (1, 2, 3...)',
-    lblWa:'Branch WhatsApp (required)', lblMap:'Map link (optional)', lblLat:'Latitude', lblLng:'Longitude',
-    waOk:'✔ WhatsApp link:', waNonSa:'ℹ️ Non-Saudi country code — make sure it is a valid WhatsApp number',
+    lblWa:'Branch WhatsApp (mandatory)', lblMap:'Map link (optional)', lblLat:'Latitude', lblLng:'Longitude',
+    waOk:'✔ WhatsApp link:', waNonSa:'ℹ️ Non-SA country code — make sure it is a real WhatsApp number',
     waBad:'⚠️ Format: country code then 9 digits, no + and no leading zero — e.g. 9665XXXXXXXX',
-    warnCoords:'Coordinates are required for the nearest button', warnName:'Name is required', savedBranch:'Branch saved',
-    warnNum:'Branch number must be an integer ≥ 1',
+    warnCoords:'Coordinates are required for the nearest-branch button', warnName:'Name is required', savedBranch:'Branch saved',
+    warnNum:'Branch number must be an integer 1 or more',
     warnNumDup:'This number is already used by another branch — pick a different one',
-    warnNumChange:function(code){ return 'This branch code will become '+code+'. Previous orders keep their old IDs unchanged; new orders take the new code. Continue?'; },
+    warnNumChange:function(code){ return 'This branch\'s code will become '+code+'. Old orders keep their IDs, new ones get the new code. Continue?'; },
     yesContinue:'Yes, continue',
-    delBranchMsg:function(n){ return '"'+n+'" will be permanently deleted. Devices that chose it will see the branch screen again. Continue?'; },
+    delBranchMsg:function(n){ return '«'+n+'» will be permanently deleted. Devices that chose it will see the branches screen again. Continue?'; },
     deletedBranch:'Branch deleted', warnLastBranch:'Cannot delete the last branch',
     brWa:'WhatsApp: ', brCoords:'Coordinates: ', brNum:'Number: ',
     legendHours:'Working hours per day (minute precision)', dayClosed:'Closed', openLbl:'Open:', closeLbl:'Close:', am:'AM', pm:'PM',
     days:['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],
-    bestNote:'Pick four items to appear in the app "Best Sellers" screen in this exact order. Changes reach customers within ≤60s.',
-    bestSlot:'Item ', btnSaveBest:'💾 Save & publish best sellers', savedBest:'Best sellers published',
-    warnBestDup:'The same item cannot repeat in two slots — pick different items',
-    warnBestEmpty:'Choose an item for each of the four slots',
-    deliveryNote:'Delivery app links appear in the branch selection screen. Official links open the installed app, otherwise the website.',
-    btnAddDelivery:'➕ Add delivery app', editDeliveryTitle:'Edit delivery app', addDeliveryTitle:'Add delivery app',
-    lblDelNameAr:'Name (Arabic)', lblDelNameEn:'Name (English)', lblDelUrl:'URL (https://...)', lblDelColor:'Dot color', lblDelImg:'Logo image path (optional)',
-    warnDelName:'App name is required', warnDelUrl:'A valid URL is required (https://)',
-    savedDelivery:'Delivery & social data saved',
-    delDeliveryMsg:function(n){ return '"'+n+'" will be removed from the branch selection screen. Continue?'; },
-    deletedDelivery:'Delivery app deleted', noDelivery:'No delivery apps added yet.',
-    legendSocial:'Social media accounts',
-    btnAddSocial:'➕ Add social account',
-    addSocialTitle:'Add social account', editSocialTitle:'Edit social account',
-    lblSocialPlatform:'Platform', platCustom:'Other (custom)',
-    lblSocialNameAr:'Name (Arabic)', lblSocialNameEn:'Name (English)',
-    lblSocialUrl:'URL (https://...)', lblSocialEmail:'Email address',
-    warnSocialUrl:'A valid URL is required (https://)', warnSocialEmail:'A valid email is required',
+    bestNote:'Choose four items to show on the «Best Sellers» screen in the app, in this order. Changes reach customers within ≤60 seconds.',
+    bestSlot:'Slot ', btnSaveBest:'💾 Save & publish best sellers', savedBest:'Best sellers published',
+    warnBestDup:'You cannot repeat the same item in two slots — pick different ones',
+    warnBestEmpty:'Pick an item in all four slots', warnBestNot4:'You must choose exactly 4 items',
+    deliveryNote:'Delivery app links appear on the branches-selection screen. Official links open the app if installed, else the official website.',
+    btnAddDelivery:'➕ Add delivery app', btnSaveDelivery:'💾 Save & publish delivery & social',
+    editDeliveryTitle:'Edit delivery app', addDeliveryTitle:'Add delivery app',
+    lblDelNameAr:'Name (AR)', lblDelNameEn:'Name (EN)', lblDelUrl:'Link (Deep link or official site)',
+    lblDelColor:'Brand color', lblDelImg:'Logo image path',
+    warnDelName:'Name is required', warnDelUrl:'Link must start with https://',
+    noDelivery:'No delivery apps yet — add one to show on the branches screen.',
+    delDeliveryMsg:function(n){ return '«'+n+'» will be removed from the delivery list. Continue?'; },
+    deletedDelivery:'App deleted', savedDelivery:'App saved',
+    legendSocial:'Social media accounts', btnAddSocial:'➕ Add social account',
+    editSocialTitle:'Edit social account', addSocialTitle:'Add social account',
+    lblSocialPlatform:'Platform', lblSocialNameAr:'Name (AR)', lblSocialNameEn:'Name (EN)',
+    lblSocialUrl:'Link', lblSocialEmail:'Email',
     warnSocialMax:'Maximum 5 accounts', warnSocialName:'Name is required',
-    savedSocial:'Social account saved', deletedSocial:'Social account deleted',
-    delSocialMsg:function(n){ return '"'+n+'" will be removed from the app icons. Continue?'; },
-    noSocial:'No social accounts added yet.',
-    btnSaveDelivery:'💾 Save & publish delivery & social',
-    lblBrandAr:'Chain name (Arabic)', lblBrandEn:'Chain name (English)', lblTagAr:'Tagline (Arabic)', lblTagEn:'Tagline (English)',
-    settingsNote:'The tagline appears under the chain name at the top of the app. App images are replaced from the "App images" section in the Settings tab with the same file name.',
-    legendImages:'🖼️ App images',
-    imgLogo:'Logo (logo.png)', imgBg:'Items background (bg.png)',
-    imgWelcome:'Welcome image (welcome.png)', imgClosed:'"Closed" image (closed.png)',
-    imgPick:'📷 Change image', imgConfirm:'✅ Confirm upload', imgCancel:'❌ Cancel',
-    imgUploadingApp:'Uploading image...', imgUploadedApp:'Image uploaded ✔', imgUploadFailApp:'Image upload failed: ',
-    imagesNote:'Pick a new image then confirm — the file is replaced in the repository with the same name and reaches customers within ≤60s without a refresh.',
-    btnSaveSettings:'💾 Save & publish settings',
-    adNote:'The ad is text-only: icon + title + text — no images, instant display, no broken links. Shows once per day per device.',
-    lblAdEnabled:'Enable popup ad', lblAdOnce:'Once per day per device', lblAdIcon:'Ad icon (single emoji)',
-    lblAdBtnAr:'Close button text (Arabic)', lblAdBtnEn:'Close button text (English)', lblAdTitleAr:'Title (Arabic)', lblAdTitleEn:'Title (English)',
-    lblAdTextAr:'Ad text (Arabic)', lblAdTextEn:'Ad text (English)', btnSaveAd:'💾 Save & publish ad',
-    adPrevTitle:'(Ad title)', adPrevText:'(Ad text appears here for customers)',
-    modalSave:'Save', modalCancel:'Cancel', confirmDefault:'Confirm action',
-    loggedIn:'Logged in', loggedSub:'Menu & settings loaded from repository',
-    renewed:'Renewed & continued', exported:'Backup downloaded', published:'Published'
+    warnSocialEmail:'Invalid email format', warnSocialUrl:'Link must start with https://',
+    noSocial:'No social accounts yet.',
+    delSocialMsg:function(n){ return 'Account «'+n+'» will be removed from the branches screen. Continue?'; },
+    deletedSocial:'Account deleted', savedSocial:'Account saved',
+    platCustom:'— Other platform —',
+    adNote:'Text-based announcement: icon + title + text — no images, instant display, no broken links. Shows once per day per device.',
+    btnSaveAd:'💾 Save & publish announcement', savedAd:'Announcement published',
+    lblAdEnabled:'Enabled', lblAdOnce:'Once per day per device',
+    lblAdIcon:'Icon (emoji)', lblAdBtnAr:'Button text (AR)', lblAdBtnEn:'Button text (EN)',
+    lblAdTitleAr:'Title (AR)', lblAdTitleEn:'Title (EN)',
+    lblAdTextAr:'Text (AR)', lblAdTextEn:'Text (EN)',
+    adPrevTitle:'Sample announcement', adPrevText:'This is the announcement text as it will appear in the app.',
+    legendImages:'App images', imagesNote:'Pick a new image then "Confirm" to upload instantly. It replaces the old one and appears in the app immediately.',
+    imgLogo:'App logo', imgBg:'Item cards background', imgWelcome:'Welcome screen', imgClosed:'Closed screen',
+    imgPick:'📷 Choose image', imgConfirm:'✔ Confirm upload', imgCancel:'Cancel',
+    imgUploadingApp:'Uploading...', imgUploadedApp:'Image uploaded ✔',
+    imgUploadFailApp:'Upload failed: ', imgBadTypeApp:'Unsupported format', imgTooBigApp:'File too large (max 4MB)',
+    lblBrandAr:'Brand name (AR)', lblBrandEn:'Brand name (EN)',
+    lblTagAr:'Tagline (AR)', lblTagEn:'Tagline (EN)',
+    settingsNote:'After upload & save, changes reach customers within ≤60 seconds.',
+    exported:'Backup exported ✔',
+    confirmDefault:'Confirm',
+    loggedIn:'Logged in ✔', loggedSub:'Loading your data',
+    published:'Published ✔'
   }
 };
-function L(key, ...args){
-  let v = ASTR[ALANG][key];
-  if(v === undefined) v = ASTR.ar[key];
-  if(typeof v === 'function') return v(...args);
-  return v;
-}
-function brName(b){ return (ALANG==='ar') ? b.nameAr : b.nameEn; }
-function brAddr(b){ return (ALANG==='ar') ? b.addrAr : b.addrEn; }
-function brNameOther(b){ return (ALANG==='ar') ? b.nameEn : b.nameAr; }
-function brAddrOther(b){ return (ALANG==='ar') ? b.addrEn : b.addrAr; }
+
+/* ===== أدوات عامة ===== */
+const el = id => document.getElementById(id);
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function L(k, a){ const d = ASTR[ALANG] || ASTR.ar; const v = d[k] ?? ASTR.ar[k] ?? k; return typeof v === 'function' ? v(a) : v; }
 function applyAdminLang(){
   document.documentElement.lang = ALANG;
-  document.documentElement.dir = (ALANG==='ar') ? 'rtl' : 'ltr';
+  document.documentElement.dir = 'rtl';
+  document.querySelectorAll('[data-al]').forEach(n=>{
+    const k = n.getAttribute('data-al'); const v = L(k);
+    if(v !== k) n.textContent = v;
+  });
+  document.querySelectorAll('.lang-seg[data-alang]').forEach(s=>{
+    s.classList.toggle('active', s.getAttribute('data-alang') === ALANG);
+  });
   localStorage.setItem('mk_admin_lang', ALANG);
-  document.querySelectorAll('.lang-seg').forEach(s=> s.classList.toggle('active', s.dataset.alang===ALANG));
-  document.querySelectorAll('[data-al]').forEach(elm=>{ elm.textContent = L(elm.getAttribute('data-al')); });
-  el('helpList').innerHTML = L('helpHtml');
-  if(STATE) renderAll();
 }
-el('adminLangBtn').addEventListener('click', ()=>{
-  ALANG = (ALANG==='ar') ? 'en' : 'ar';
-  applyAdminLang();
+el('adminLangBtn').addEventListener('click', e=>{
+  const s = e.target.closest('.lang-seg'); if(!s) return;
+  ALANG = s.getAttribute('data-alang');
+  applyAdminLang(); if(STATE) renderAll();
 });
 
-function el(id){ return document.getElementById(id); }
-function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
-/* ===== التوست ===== */
-function toast(msg, type='success', sub=''){
-  const box = el('toasts');
-  while(box.children.length >= 3) box.removeChild(box.firstChild);
-  const icons = {success:'✅', error:'⛔', info:'ℹ️', warn:'⚠️'};
-  const dur = (type==='error') ? 6000 : 4000;
-  const t = document.createElement('div');
-  t.className = 'toast ' + type;
-  t.innerHTML = `<span class="t-ico">${icons[type]}</span><div class="t-body"><b></b>${sub?'<small></small>':''}</div><span class="t-bar" style="animation-duration:${dur}ms"></span>`;
-  t.querySelector('b').textContent = msg;
-  if(sub) t.querySelector('small').textContent = sub;
-  let killed = false;
-  function kill(){ if(killed) return; killed = true; clearTimeout(h); t.classList.add('out'); setTimeout(()=> t.remove(), 300); }
-  t.addEventListener('click', kill);
-  const h = setTimeout(kill, dur);
-  box.appendChild(t);
+/* ===== Toasts ===== */
+let toastSeq = 0;
+function toast(title, kind='info', sub=''){
+  const wrap = el('toasts');
+  const id = 't'+(++toastSeq);
+  const icons = {success:'✔', error:'✖', info:'ℹ', warn:'⚠'};
+  const div = document.createElement('div');
+  div.className = 'toast ' + kind;
+  div.id = id;
+  div.innerHTML = `
+    <div class="t-ico">${icons[kind] || 'ℹ'}</div>
+    <div class="t-body"><b>${esc(title)}</b>${sub?'<small>'+esc(sub)+'</small>':''}</div>
+    <div class="t-bar" style="animation-duration:3.5s"></div>`;
+  wrap.appendChild(div);
+  setTimeout(()=>{ div.classList.add('out'); setTimeout(()=>div.remove(), 350); }, 3400);
 }
 
-/* ===== نافذة التأكيد ===== */
-let cfResolve = null;
-function askConfirm(msg, title, icon='🗑', yesTxt){
-  return new Promise(res=>{
-    cfResolve = res;
-    el('cfIco').textContent = icon;
+/* ===== التأكيد ===== */
+function askConfirm(msg, title, ico, yesLbl){
+  return new Promise(resolve=>{
+    el('cfIco').textContent = ico || '⚠️';
     el('cfTitle').textContent = title || L('confirmDefault');
     el('cfMsg').textContent = msg;
-    el('cfYes').textContent = yesTxt || L('confirmDefault');
+    el('cfYes').textContent = yesLbl || L('btnDelFinal');
+    el('cfNo').textContent = L('modalCancel');
     el('confirmModal').classList.remove('hidden');
+    const yes = ()=>{ cleanup(); resolve(true); };
+    const no = ()=>{ cleanup(); resolve(false); };
+    const close = (e)=>{ if(e.target === el('confirmModal')) no(); };
+    function cleanup(){
+      el('confirmModal').classList.add('hidden');
+      el('cfYes').removeEventListener('click', yes);
+      el('cfNo').removeEventListener('click', no);
+      el('confirmModal').removeEventListener('click', close);
+    }
+    el('cfYes').addEventListener('click', yes);
+    el('cfNo').addEventListener('click', no);
+    el('confirmModal').addEventListener('click', close);
   });
 }
-function resolveCf(v){
-  el('confirmModal').classList.add('hidden');
-  if(cfResolve){ const r = cfResolve; cfResolve = null; r(v); }
+
+/* ===== Modal ===== */
+function openModal(title, bodyHtml, onSave){
+  el('modalTitle').textContent = title;
+  el('modalBody').innerHTML = bodyHtml;
+  modalOnSave = onSave;
+  el('modal').classList.remove('hidden');
 }
-el('cfYes').addEventListener('click', ()=> resolveCf(true));
-el('cfNo').addEventListener('click', ()=> resolveCf(false));
+function closeModal(){
+  el('modal').classList.add('hidden');
+  modalOnSave = null;
+}
+el('modalCancel').addEventListener('click', closeModal);
+el('modal').addEventListener('click', e=>{ if(e.target === el('modal')) closeModal(); });
+el('modalSave').addEventListener('click', async ()=>{
+  if(!modalOnSave) return;
+  const res = await modalOnSave();
+  if(res !== false) closeModal();
+});
 
 /* ===== لافتات الأخطاء ===== */
 function showBanner(id, msg){
@@ -610,196 +667,178 @@ function showBanner(id, msg){
 function hideBanner(id){ el(id).classList.remove('show'); }
 
 /* ===== GitHub API ===== */
-async function api(path, opts={}){
-  const res = await fetch(`https://api.github.com/repos/${CFG.owner}/${CFG.repo}${path}`, {
-    method: opts.method || 'GET',
+const GH_API = 'https://api.github.com';
+async function gh(path, opts={}){
+  const r = await fetch(GH_API + path, Object.assign({
     headers: {
-      'Authorization': `Bearer ${CFG.token}`,
-      'Accept': 'application/vnd.github+json',
-      'Content-Type': 'application/json'
-    },
-    body: opts.body ? JSON.stringify(opts.body) : undefined
-  });
-  if(res.status === 401 || res.status === 403 || res.status === 404){
-    const e = new Error('HTTP ' + res.status); e.http = res.status; throw e;
+      'Accept':'application/vnd.github+json',
+      'Authorization':'Bearer ' + CFG.token,
+      'X-GitHub-Api-Version':'2022-11-28'
+    }
+  }, opts));
+  if(!r.ok){
+    const e = new Error('HTTP ' + r.status);
+    e.http = r.status;
+    try{ const j = await r.json(); e.message = j.message || e.message; }catch{}
+    throw e;
   }
-  if(!res.ok){ const e = new Error('HTTP ' + res.status); e.http = res.status; throw e; }
-  return res.json();
-}
-function decode64(b64){
-  const bin = atob(b64.replace(/\n/g,''));
-  const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
-  return new TextDecoder().decode(bytes);
-}
-function encode64(str){
-  const bytes = new TextEncoder().encode(str);
-  let bin = '';
-  for(let i=0;i<bytes.length;i+=0x8000){
-    bin += String.fromCharCode.apply(null, bytes.subarray(i, i+0x8000));
-  }
-  return btoa(bin);
+  const ct = r.headers.get('content-type') || '';
+  return ct.includes('json') ? r.json() : { text: await r.text(), sha: r.headers.get('etag') };
 }
 async function getFile(path){
-  const r = await api(`/contents/${path}?ref=${CFG.branch}`);
-  return { text: decode64(r.content), sha: r.sha };
+  const r = await gh('/repos/' + CFG.owner + '/' + CFG.repo + '/contents/' + path + '?ref=' + CFG.branch);
+  return { text: atob(r.content), sha: r.sha };
 }
-async function putFile(path, text, sha, message){
-  const r = await api(`/contents/${path}`, {
-    method: 'PUT',
-    body: { message, content: encode64(text), sha, branch: CFG.branch }
+async function putFile(path, content, sha, msg){
+  return gh('/repos/' + CFG.owner + '/' + CFG.repo + '/contents/' + path, {
+    method:'PUT',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ message: msg, content: btoa(unescape(encodeURIComponent(content))), branch: CFG.branch, sha })
   });
-  return r.content.sha;
 }
-/* رفع ملف ثنائي (صور) base64 */
-async function putBinary(path, b64, sha, message){
-  const body = { message, content: b64, branch: CFG.branch };
-  if(sha) body.sha = sha;
-  const r = await api(`/contents/${path}`, { method: 'PUT', body });
-  return r.content.sha;
-}
-async function deleteFile(path, sha, message){
-  return await api(`/contents/${path}`, { method: 'DELETE', body: { message, sha, branch: CFG.branch } });
-}
-async function putFileSafe(path, text, sha, message){
+
+/* ===== رفع صور الأصناف ===== */
+async function uploadItemImage(nameAr, file){
+  const safe = nameAr.replace(/[\/\\:*?"<>|]/g,'_').trim() || 'item';
+  const ext = (file.type.split('/')[1] || 'png').replace('jpeg','jpg');
+  const path = 'img/items/' + safe + '.' + ext;
+  const buf = await file.arrayBuffer();
+  let bytes = '';
+  const u8 = new Uint8Array(buf);
+  for(let i=0;i<u8.length;i+=32768) bytes += String.fromCharCode.apply(null, u8.subarray(i, i+32768));
+  const b64 = btoa(bytes);
   try{
-    return await putFile(path, text, sha, message);
+    const cur = await getFile(path).catch(()=>({sha:null}));
+    await gh('/repos/' + CFG.owner + '/' + CFG.repo + '/contents/' + path, {
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ message:'رفع صورة صنف: ' + nameAr, content: b64, branch: CFG.branch, sha: cur.sha })
+    });
+    return path;
   }catch(e){
-    if(e.http === 409){
-      const f = await getFile(path);
-      return await putFile(path, text, f.sha, message);
-    }
+    console.warn('Image upload failed', e);
     throw e;
   }
 }
-function parseJs(text){
-  const w = {};
-  new Function('window', text)(w);
-  return w;
+
+/* ===== رفع صور التطبيق (logo, welcome, bg, closed) ===== */
+async function uploadAppImage(path, file){
+  const buf = await file.arrayBuffer();
+  let bytes = '';
+  const u8 = new Uint8Array(buf);
+  for(let i=0;i<u8.length;i+=32768) bytes += String.fromCharCode.apply(null, u8.subarray(i, i+32768));
+  const b64 = btoa(bytes);
+  try{
+    const cur = await getFile(path).catch(()=>({sha:null}));
+    await gh('/repos/' + CFG.owner + '/' + CFG.repo + '/contents/' + path, {
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ message:'تحديث صورة: ' + path, content: b64, branch: CFG.branch, sha: cur.sha })
+    });
+    return path;
+  }catch(e){
+    console.warn('App image upload failed', e);
+    throw e;
+  }
 }
 
-/* ===== ترحيلات البيانات ===== */
+/* ===== تحميل menu.js و settings.js ===== */
+function parseJs(text){
+  const w = { window:{} };
+  try{ new Function('window', text)(w.window); }catch(e){ throw new Error('JS parse error: ' + e.message); }
+  return w.window;
+}
+
+/* ===== الحالة العامة ===== */
+function branches(){ return STATE.SETTINGS.branches || (STATE.SETTINGS.branches = []); }
+function menu(){ return STATE.MENU; }
+function findSection(id){ return STATE.MENU.find(s=>s.id===id); }
+function findItemAdmin(id){
+  for(const s of STATE.MENU) for(const it of s.items) if(it.id === id) return it;
+  return null;
+}
+function nextBranchNum(){
+  const used = branches().map(b=>b.num).filter(n=>Number.isFinite(n));
+  let n = 1; while(used.includes(n)) n++;
+  return n;
+}
+
+/* ===== هجرة البيانات القديمة ===== */
 function migrateBranchNums(){
-  const brs = STATE.SETTINGS.branches || [];
-  brs.forEach((b,i)=>{
-    if(typeof b.num !== 'number' || !isFinite(b.num) || b.num < 1) b.num = i+1;
+  branches().forEach((b,i)=>{
+    if(!Number.isFinite(b.num)) b.num = i + 1;
   });
   const seen = new Set();
-  let max = 0;
-  brs.forEach(b=>{ max = Math.max(max, b.num); });
-  brs.forEach(b=>{
-    if(seen.has(b.num)){ max += 1; b.num = max; }
+  branches().forEach(b=>{
+    while(seen.has(b.num)) b.num++;
     seen.add(b.num);
   });
 }
-function nextBranchNum(){
-  let max = 0;
-  branches().forEach(b=>{ if(typeof b.num === 'number') max = Math.max(max, b.num); });
-  return max + 1;
-}
-function branchCode(b){ return 'B' + b.num; }
-function normHM(t){
-  if(t && typeof t === 'object') return { h: (t.h|0), m: (t.m|0) };
-  const n = Math.floor(+t) || 0;
-  return { h: n, m: 0 };
-}
 function migrateHours(){
-  const H = STATE.SETTINGS.hours || { open:{h:13,m:0}, close:{h:2,m:0} };
-  const dO = normHM(H.open), dC = normHM(H.close);
-  (STATE.SETTINGS.branches || []).forEach(b=>{
-    if(!Array.isArray(b.hours) || b.hours.length !== 7){
-      b.hours = [0,1,2,3,4,5,6].map(()=> ({ o:{h:dO.h,m:dO.m}, c:{h:dC.h,m:dC.m} }));
-    } else {
-      b.hours = b.hours.map(d=> ({ o: normHM(d.o), c: normHM(d.c), closed: !!d.closed }));
+  branches().forEach(b=>{
+    if(!b.hours || !Array.isArray(b.hours) || b.hours.length !== 7){
+      b.hours = Array.from({length:7}, ()=>({
+        o:{ h:9, m:0 }, c:{ h:23, m:0 }, closed:false
+      }));
     }
+    b.hours.forEach(d=>{
+      if(!d.o) d.o = { h:9, m:0 };
+      if(!d.c) d.c = { h:23, m:0 };
+      if(typeof d.closed !== 'boolean') d.closed = false;
+    });
   });
-}
-function h12of(h){ h = h|0; let x = h % 12; if(x === 0) x = 12; return x; }
-function clamp12(v){ v = Math.floor(+v); if(!isFinite(v) || v < 1) v = 12; if(v > 12) v = 12; return v; }
-function to24h(h, ap){ h = clamp12(h); return (ap === 'pm') ? (h%12)+12 : (h%12); }
-const MIN_OPTS = [0,15,30,45];
-function pad2(n){ return String(n).padStart(2,'0'); }
-function findItemAdmin(id){
-  for(const s of STATE.MENU){ const it = s.items.find(x=>x.id===id); if(it) return it; }
-  return null;
 }
 function migrateBestSellers(){
-  const bs = STATE.SETTINGS.bestSellers;
-  const valid = Array.isArray(bs) ? bs.filter(id=> findItemAdmin(id)) : [];
-  if(valid.length === 4){ STATE.SETTINGS.bestSellers = valid; return; }
-  const fallback = ['pasta-red-half','pasta-bashamel','pasta-red-breasts','side-potato'];
-  const ids = [];
-  fallback.forEach(id=>{ if(findItemAdmin(id) && !ids.includes(id)) ids.push(id); });
-  for(const s of STATE.MENU){
-    for(const it of s.items){
-      if(ids.length >= 4) break;
-      if(!ids.includes(it.id)) ids.push(it.id);
-    }
-    if(ids.length >= 4) break;
+  const s = STATE.SETTINGS;
+  if(!s.bestSellers || !Array.isArray(s.bestSellers) || s.bestSellers.length !== 4){
+    s.bestSellers = ['', '', '', ''];
   }
-  STATE.SETTINGS.bestSellers = ids.slice(0,4);
 }
-/* ===== ترحيل السوشيال القديم (object) إلى جديد (array) ===== */
 function migrateSocial(){
-  const s = STATE.SETTINGS.social;
-  if(Array.isArray(s)) return;
-  const arr = [];
-  if(s && s.instagram) arr.push({id:'s-ig', key:'instagram', nameAr:'انستقرام', nameEn:'Instagram', url:s.instagram});
-  if(s && s.tiktok) arr.push({id:'s-tk', key:'tiktok', nameAr:'تيك توك', nameEn:'TikTok', url:s.tiktok});
-  STATE.SETTINGS.social = arr;
-}
-async function publishSettings(message){
-  STATE.shas.settings = await putFileSafe('settings.js', settingsText(), STATE.shas.settings, message);
-}
-function menuText(){
-  return `/* =====================================================
-   ملف المنيو — مكرونجي (يُولَّد من لوحة التحكم)
-===================================================== */
-window.MENU = ${JSON.stringify(STATE.MENU, null, 2)};
-`;
-}
-async function publishMenu(message){
-  STATE.shas.menu = await putFileSafe('menu.js', menuText(), STATE.shas.menu, message);
-}
-/* رفع صورة صنف إلى img/items/<id>.png (استبدال إن وجدت) */
-async function uploadItemImg(id, file){
-  const b64 = await new Promise((res, rej)=>{
-    const r = new FileReader();
-    r.onload = ()=> res(String(r.result).split(',')[1]);
-    r.onerror = rej;
-    r.readAsDataURL(file);
-  });
-  const path = 'img/items/' + id + '.png';
-  let sha = null;
-  try{ sha = (await getFile(path)).sha; }catch(e){}
-  await putBinary(path, b64, sha, 'رفع صورة صنف من لوحة التحكم 🍝');
-}
-async function deleteItemImg(id){
-  const path = 'img/items/' + id + '.png';
-  try{
-    const f = await getFile(path);
-    await deleteFile(path, f.sha, 'حذف صورة صنف من لوحة التحكم 🍝');
-  }catch(e){ if(e.http !== 404) throw e; }
+  if(STATE.SETTINGS.social === undefined) STATE.SETTINGS.social = [];
 }
 
-/* ===== رفع صور التطبيق (logo, bg, welcome, closed) ===== */
-async function uploadAppImage(path, file){
-  const b64 = await new Promise((res,rej)=>{
-    const r = new FileReader();
-    r.onload = ()=> res(String(r.result).split(',')[1]);
-    r.onerror = rej;
-    r.readAsDataURL(file);
-  });
-  let sha = null;
-  try{ sha = (await getFile(path)).sha; }catch(e){}
-  await putBinary(path, b64, sha, 'تحديث صورة التطبيق من لوحة التحكم 🖼️');
+/* ===== أدوات الوقت ===== */
+function clamp12(v){ let n = parseInt(v,10); if(!isFinite(n) || n<1) n = 12; if(n>12) n = 12; return n; }
+function to24h(h, ampm){ let v = +h; if(ampm === 'pm' && v < 12) v += 12; if(ampm === 'am' && v === 12) v = 0; return v; }
+function h12of(h){ h = +h; if(h === 0) return 12; if(h > 12) return h - 12; return h; }
+function minSelect(cls, d, val){
+  return `<select class="${cls}" data-d="${d}"><option value="0" ${val===0?'selected':''}>00</option><option value="30" ${val===30?'selected':''}>30</option></select>`;
 }
+function validWa(v){ return /^\d{1,3}\d{9}$/.test(v); }
+function waFeedback(inp, msg){
+  const v = inp.value.trim();
+  if(!v){ msg.className = 'wa-preview'; msg.textContent = ''; return; }
+  if(validWa(v)){
+    const cc = v.slice(0,-9);
+    const link = 'https://wa.me/' + v;
+    if(cc === '966'){ msg.className = 'wa-preview ok'; msg.innerHTML = L('waOk') + ' <a href="'+link+'" target="_blank" rel="noopener" style="color:#2d6a4f;text-decoration:underline">'+link+'</a>'; }
+    else{ msg.className = 'wa-preview ok'; msg.textContent = L('waNonSa'); }
+  }else{
+    msg.className = 'wa-preview bad';
+    msg.textContent = L('waBad');
+  }
+}
+
+/* ===== التبويبات ===== */
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.querySelectorAll('main > section').forEach(s=>s.classList.add('hidden'));
+    el('tab-'+t.dataset.tab).classList.remove('hidden');
+  });
+});
+
+/* ===== التصدير الاحتياطي ===== */
+el('btnLogout').addEventListener('click', async ()=>{
+  const ok = await askConfirm('سيتم تسجيل الخروج. متابعة؟', 'تأكيد الخروج', '🚪', 'نعم، خروج');
+  if(!ok) return;
+  sessionStorage.removeItem('mk_admin');
+  location.reload();
+});
 
 /* ===== الدخول والتحميل ===== */
-function showRenew(){
-  el('app').classList.add('hidden');
-  el('loginScreen').classList.add('hidden');
-  el('renewScreen').classList.remove('hidden');
-}
 async function loadAll(){
   const [m, s] = await Promise.all([ getFile('menu.js'), getFile('settings.js') ]);
   const mw = parseJs(m.text), sw = parseJs(s.text);
@@ -813,7 +852,6 @@ async function loadAll(){
   if(!STATE.SETTINGS.delivery) STATE.SETTINGS.delivery = [];
   if(STATE.SETTINGS.social === undefined) STATE.SETTINGS.social = [];
   if(!STATE.SETTINGS.imagesVersion) STATE.SETTINGS.imagesVersion = 0;
-  /* تنظيف نهائي: إزالة سجل الخلفيات القديم إن وُجد */
   if(STATE.SETTINGS.bgs) delete STATE.SETTINGS.bgs;
   migrateBranchNums();
   migrateHours();
@@ -824,6 +862,7 @@ async function loadAll(){
   el('app').classList.remove('hidden');
   renderAll();
 }
+
 el('btnLogin').addEventListener('click', async ()=>{
   const owner = el('inOwner').value.trim(), repo = el('inRepo').value.trim(),
         branch = el('inBranch').value.trim() || 'main', token = el('inToken').value.trim();
@@ -843,336 +882,122 @@ el('btnLogin').addEventListener('click', async ()=>{
   }
   el('btnLogin').textContent = L('btnLogin');
 });
+
+/* ===== شاشة تجديد التوكن ===== */
+function showRenew(){
+  el('renewScreen').classList.remove('hidden');
+}
 el('btnRenew').addEventListener('click', async ()=>{
-  const t = el('inRenewToken').value.trim();
+  const newTok = el('inRenewToken').value.trim();
   hideBanner('renewErr');
-  if(!t){ showBanner('renewErr', L('errRenewEmpty')); return; }
-  CFG.token = t;
+  if(!newTok){ showBanner('renewErr', L('errRenewEmpty')); return; }
+  CFG.token = newTok;
   sessionStorage.setItem('mk_admin', JSON.stringify(CFG));
-  try{ await loadAll(); applyAdminLang(); toast(L('renewed'),'success'); }
-  catch(e){ showBanner('renewErr', L('errRenewBad')); }
-});
-el('btnLogout').addEventListener('click', ()=>{ sessionStorage.removeItem('mk_admin'); location.reload(); });
-
-(function resume(){
+  el('btnRenew').textContent = L('publishing');
   try{
-    const c = JSON.parse(sessionStorage.getItem('mk_admin'));
-    if(c && c.token){ CFG = c; loadAll().then(applyAdminLang).catch(()=> showRenew()); }
-  }catch(e){}
-})();
-
-/* ===== التبويبات ===== */
-document.querySelectorAll('.tab').forEach(tb=>{
-  tb.addEventListener('click', ()=>{
-    document.querySelectorAll('.tab').forEach(x=> x.classList.toggle('active', x===tb));
-    ['menu','branches','best','delivery','settings','ad'].forEach(k=>{
-      el('tab-'+k).classList.toggle('hidden', k !== tb.dataset.tab);
-    });
-    if(tb.dataset.tab === 'ad') renderAdPreview();
-  });
-});
-
-/* ===== نافذة النماذج ===== */
-function openModal(title, bodyHtml, onSave){
-  el('modalTitle').textContent = title;
-  el('modalBody').innerHTML = bodyHtml;
-  modalOnSave = onSave;
-  el('modal').classList.remove('hidden');
-}
-el('modalCancel').addEventListener('click', ()=> el('modal').classList.add('hidden'));
-el('modalSave').addEventListener('click', async ()=>{
-  if(!modalOnSave) return;
-  const r = modalOnSave();
-  const ok = (r && typeof r.then === 'function') ? await r : r;
-  if(ok !== false) el('modal').classList.add('hidden');
-});
-
-/* ===== قواعد واتساب ===== */
-function validWa(v){ return /^[1-9]\d{9,11}$/.test(v); }
-function waFeedback(inp, msgEl){
-  const v = inp.value.trim();
-  if(!v){ msgEl.className='wa-preview'; msgEl.textContent=''; return; }
-  if(validWa(v)){
-    let html = L('waOk') + ' wa.me/' + esc(v);
-    if(!v.startsWith('966')) html += '<br>' + L('waNonSa');
-    msgEl.className='wa-preview ok'; msgEl.innerHTML = html;
-  } else {
-    msgEl.className='wa-preview bad';
-    msgEl.textContent = L('waBad');
+    await loadAll();
+    toast(L('loggedIn'),'success',L('loggedSub'));
+  }catch(e){
+    if(e.http === 401 || e.http === 403){ showBanner('renewErr', L('errRenewBad')); }
+    else { showBanner('renewErr', L('errGeneric') + e.message); }
   }
-}
+  el('btnRenew').textContent = L('btnRenew');
+});
 
-/* ===== التوفر لكل فرع ===== */
-function branches(){ return STATE.SETTINGS.branches; }
-function availLabel(obj){
-  const brs = branches();
-  if(!obj.only || !Array.isArray(obj.only) || obj.only.length === brs.length) return '';
-  const missing = brs.filter(b=>!obj.only.includes(b.id)).map(b=> brName(b)).join('، ');
-  const mode = (obj.miss === 'hide') ? L('modeHide') : L('modeGray');
-  return L('availTag', missing, mode);
+/* ===== النشر ===== */
+function menuText(){
+  return `/* =====================================================
+   قائمة طعام مكرونجي (يُولَّد من لوحة التحكم)
+===================================================== */
+window.MENU = ${JSON.stringify(STATE.MENU, null, 2)};
+`;
 }
-function soLabel(it){
-  if(!it.so || !it.so.length) return '';
-  if(it.so.length === branches().length) return L('soldAll');
-  return L('soldSome') + it.so.map(id => (branches().find(b=>b.id===id)||{}).nameAr || id).join('، ');
+function settingsText(){
+  return `/* =====================================================
+   ملف الإعدادات — مكرونجي (يُولَّد من لوحة التحكم)
+===================================================== */
+window.APP_SETTINGS = ${JSON.stringify(STATE.SETTINGS, null, 2)};
+`;
 }
-function availFieldset(prefix, obj){
-  const brs = branches();
-  const onlyArr = (obj && Array.isArray(obj.only)) ? obj.only : brs.map(b=>b.id);
-  const missVal = (obj && obj.miss) || 'gray';
-  return `
-    <fieldset>
-      <legend>${L('legendAvail')}</legend>
-      <label><input type="checkbox" id="${prefix}_onlyall" ${onlyArr.length===brs.length?'checked':''}> ${L('allBranches')}</label>
-      ${brs.map(b=>`<label><input type="checkbox" class="${prefix}_onlybr" value="${b.id}" ${onlyArr.includes(b.id)?'checked':''}> ${esc(brName(b))}</label>`).join('')}
-      <div class="miss-wrap">
-        <small>${L('missLegend')}</small>
-        <label><input type="radio" name="${prefix}MissMode" value="gray" ${missVal==='gray'?'checked':''}> ${L('missGray')}</label>
-        <label><input type="radio" name="${prefix}MissMode" value="hide" ${missVal==='hide'?'checked':''}> ${L('missHide')}</label>
-      </div>
-    </fieldset>`;
+async function publishSettings(msg){
+  const txt = settingsText();
+  const r = await putFile('settings.js', txt, STATE.shas.settings, msg);
+  STATE.shas.settings = r.content ? r.content.sha : r.sha;
 }
-function wireOnlyAll(prefix){
-  el(prefix+'_onlyall').addEventListener('change', e=>{
-    document.querySelectorAll('.'+prefix+'_onlybr').forEach(c=> c.checked = e.target.checked);
-  });
-}
-function readAvail(prefix, brs){
-  let only = [...document.querySelectorAll('.'+prefix+'_onlybr:checked')].map(c=>c.value);
-  if(el(prefix+'_onlyall').checked) only = brs.map(b=>b.id);
-  if(!only.length) return null;
-  const miss = document.querySelector(`input[name="${prefix}MissMode"]:checked`).value;
-  return { only, miss };
-}
-function applyAvail(target, av, brs){
-  if(!av || av.only.length === brs.length){ delete target.only; delete target.miss; }
-  else { target.only = av.only; target.miss = av.miss; }
+async function publishMenu(msg){
+  const txt = menuText();
+  const r = await putFile('menu.js', txt, STATE.shas.menu, msg);
+  STATE.shas.menu = r.content ? r.content.sha : r.sha;
 }
 
 /* ===== تبويب المنيو ===== */
 function renderMenu(){
-  el('menuWrap').innerHTML = STATE.MENU.map((sec,si)=>{
-    const secNm = (ALANG==='ar') ? sec.t : sec.tEn;
-    return `
-    <div class="sec-card ${sec.hidden===true?'is-hidden':''}">
+  const wrap = el('menuWrap');
+  if(!STATE.MENU.length){
+    wrap.innerHTML = '<div class="note">لا توجد أقسام بعد — أضف أول قسم.</div>';
+    return;
+  }
+  wrap.innerHTML = STATE.MENU.map((sec, si)=>`
+    <div class="sec-card ${sec.hidden?'is-hidden':''}">
       <div class="sec-head">
-        <span>${sec.i} ${esc(secNm)} ${sec.hidden===true?L('hidden'):''}<span class="avail-tag">${esc(availLabel(sec))}</span></span>
+        <b>${esc(sec.i)} ${esc((ALANG==='ar')?sec.t:sec.tEn)} ${sec.hidden?'<span style="opacity:.6;font-weight:700;font-size:.72rem">'+L('hidden')+'</span>':''}</b>
         <span class="sec-ops">
-          ${si>0?`<button class="edit" data-act="up-sec" data-sec="${si}">⬆️</button>`:''}
-          ${si<STATE.MENU.length-1?`<button class="edit" data-act="down-sec" data-sec="${si}">⬇️</button>`:''}
-          ${sec.hidden===true
-            ? `<button class="show" data-act="show-sec" data-sec="${si}">${L('show')}</button>`
-            : `<button class="hide" data-act="hide-sec" data-sec="${si}">${L('hide')}</button>`}
-          <button class="edit" data-act="edit-sec" data-sec="${si}">✏️</button>
-          <button class="del" data-act="del-sec" data-sec="${si}">🗑</button>
+          <button class="edit" data-act="editSec" data-i="${si}">✏️</button>
+          <button class="${sec.hidden?'show':'hide'}" data-act="hideSec" data-i="${si}">${sec.hidden?L('show'):L('hide')}</button>
+          <button class="del" data-act="delSec" data-i="${si}">🗑</button>
         </span>
       </div>
       <div class="items">
         ${sec.items.map((it,ii)=>{
-          const nm = (ALANG==='ar') ? it.ar : it.en;
-          const nm2 = (ALANG==='ar') ? it.en : it.ar;
-          return `
-          <div class="item-row ${it.hidden===true?'is-hidden':''}">
+          const availAll = it.avail === 'all';
+          const availNames = !availAll ? branches().filter(b=>!it.avail.includes(b.id)).map(b=>(ALANG==='ar'?b.nameAr:b.nameEn)||('B'+b.num)).join('، ') : '';
+          const soldAll = it.sold === 'all';
+          const soldSome = Array.isArray(it.sold) && it.sold.length ? branches().filter(b=>it.sold.includes(b.id)).map(b=>(ALANG==='ar'?b.nameAr:b.nameEn)||('B'+b.num)).join('، ') : '';
+          const missMode = it.miss || 'gray';
+          const name = (ALANG==='ar') ? it.ar : (it.en || it.ar);
+          const price = it.prices[0] + ' ' + L('riyal');
+          const tag = (!availAll && availNames) ? L('availTag')(availNames, missMode==='hide'?L('modeHide'):L('modeGray')) : '';
+          const soldTag = soldAll ? L('soldAll') : (soldSome ? L('soldSome') + soldSome : '');
+          return `<div class="item-row ${it.hidden?'is-hidden':''}" ${soldTag?'style="opacity:.6"':''}>
             <div class="item-info">
-              <b>${esc(nm)} ${it.hidden===true?L('hidden'):''} ${it.imgv?'📷':''}</b>
-              <small>${esc(nm2)} • ${it.prices.join('/')} ${L('riyal')} • ${it.cal ?? '—'} ${L('calWord')}${soLabel(it)}<span class="avail-tag">${esc(availLabel(it))}</span></small>
+              <b>${esc(it.i)} ${esc(name)} ${it.hidden?'<span style="opacity:.6;font-weight:700;font-size:.7rem">'+L('hidden')+'</span>':''}</b>
+              <small>${esc(price)}${it.cal?(' • '+it.cal+' '+L('calWord')):''}${esc(tag)}${esc(soldTag)}</small>
             </div>
             <span class="item-ops">
-              ${ii>0?`<button class="edit" data-act="up-it" data-sec="${si}" data-it="${ii}">⬆️</button>`:''}
-              ${ii<sec.items.length-1?`<button class="edit" data-act="down-it" data-sec="${si}" data-it="${ii}">⬇️</button>`:''}
-              ${it.hidden===true
-                ? `<button class="show" data-act="show-it" data-sec="${si}" data-it="${ii}">${L('show')}</button>`
-                : `<button class="hide" data-act="hide-it" data-sec="${si}" data-it="${ii}">${L('hide')}</button>`}
-              <button class="edit" data-act="edit-it" data-sec="${si}" data-it="${ii}">✏️</button>
-              <button class="del" data-act="del-it" data-sec="${si}" data-it="${ii}">🗑</button>
+              <button class="edit" data-act="editItem" data-si="${si}" data-ii="${ii}">✏️</button>
+              <button class="del" data-act="delItem" data-si="${si}" data-ii="${ii}">🗑</button>
             </span>
-          </div>`;}).join('')}
+          </div>`;
+        }).join('')}
+        <button class="add-item" data-act="addItem" data-si="${si}">${L('addItem')}</button>
       </div>
-      <button class="add-item" data-act="add-it" data-sec="${si}">${L('addItem')}</button>
-    </div>`;}).join('') +
-    `<button id="addSec" class="primary" style="margin-top:.4rem">${L('addSec')}</button>`;
+    </div>`).join('');
 }
+
 el('menuWrap').addEventListener('click', async e=>{
-  if(e.target.id==='addSec'){ openSectionModal(null); return; }
   const b = e.target.closest('button[data-act]'); if(!b) return;
-  const si = +b.dataset.sec, act = b.dataset.act;
-  const sec = STATE.MENU[si];
-  const M = STATE.MENU;
-  if(act==='up-sec'){ [M[si-1],M[si]]=[M[si],M[si-1]]; renderMenu(); }
-  if(act==='down-sec'){ [M[si+1],M[si]]=[M[si],M[si+1]]; renderMenu(); }
-  if(act==='hide-sec'){ sec.hidden = true; renderMenu(); }
-  if(act==='show-sec'){ delete sec.hidden; renderMenu(); }
-  if(act==='del-sec'){
-    const ok = await askConfirm(L('delSecMsg', sec.t), L('confirmDefault'), '🗑', L('btnDelFinal'));
-    if(ok){ M.splice(si,1); renderMenu(); toast(L('deletedSec'),'warn',L('dontForget')); }
+  const act = b.dataset.act, si = +b.dataset.i, ii = +b.dataset.ii, sIdx = +b.dataset.si;
+  if(act === 'editSec') openSectionModal(si);
+  if(act === 'delSec'){
+    const sec = STATE.MENU[si];
+    const ok = await askConfirm(L('delSecMsg')(sec.t), L('confirmDefault'), '🗑', L('btnDelFinal'));
+    if(ok){ STATE.MENU.splice(si,1); renderMenu(); toast(L('deletedSec'),'warn',L('dontForget')); }
   }
-  if(act==='edit-sec'){ openSectionModal(si); }
-  const ii = b.dataset.it !== undefined ? +b.dataset.it : null;
-  if(ii !== null){
-    if(act==='up-it'){ [sec.items[ii-1],sec.items[ii]]=[sec.items[ii],sec.items[ii-1]]; renderMenu(); }
-    if(act==='down-it'){ [sec.items[ii+1],sec.items[ii]]=[sec.items[ii],sec.items[ii+1]]; renderMenu(); }
-    if(act==='hide-it'){ sec.items[ii].hidden = true; renderMenu(); }
-    if(act==='show-it'){ delete sec.items[ii].hidden; renderMenu(); }
-    if(act==='del-it'){
-      const ok = await askConfirm(L('delItemMsg', sec.items[ii].ar), L('confirmDefault'), '🗑', L('btnDelFinal'));
-      if(ok){ sec.items.splice(ii,1); renderMenu(); toast(L('deletedItem'),'warn',L('dontForget')); }
-    }
-    if(act==='edit-it'){ openItemModal(si, ii); }
+  if(act === 'hideSec'){
+    STATE.MENU[si].hidden = !STATE.MENU[si].hidden;
+    renderMenu(); toast(STATE.MENU[si].hidden ? L('hide') : L('show'),'info',L('dontForget'));
   }
-  if(act==='add-it'){ openItemModal(si, null); }
+  if(act === 'editItem') openItemModal(sIdx, ii);
+  if(act === 'delItem'){
+    const it = STATE.MENU[sIdx].items[ii];
+    const ok = await askConfirm(L('delItemMsg')(it.ar), L('confirmDefault'), '🗑', L('btnDelFinal'));
+    if(ok){ STATE.MENU[sIdx].items.splice(ii,1); renderMenu(); toast(L('deletedItem'),'warn',L('dontForget')); }
+  }
+  if(act === 'addItem') openItemModal(si, null);
 });
-function openSectionModal(si){
-  const sec = si===null ? null : STATE.MENU[si];
-  openModal(sec ? L('editSecTitle') : L('addSecTitle'), `
-    <div class="form-grid">
-      <label>${L('lblSecNameAr')}<input id="f_t" value="${esc(sec?sec.t:'')}"></label>
-      <label>${L('lblSecNameEn')}<input id="f_tEn" class="ltr" value="${esc(sec?sec.tEn:'')}"></label>
-      <label>${L('lblSecIcon')}<input id="f_i" value="${esc(sec?sec.i:'🍝')}"></label>
-    </div>
-    ${availFieldset('s', sec)}`, ()=>{
-    const t = el('f_t').value.trim(), tEn = el('f_tEn').value.trim(), i = el('f_i').value.trim() || '🍝';
-    if(!t){ toast(L('warnSecName'),'warn'); return false; }
-    const brs = branches();
-    const av = readAvail('s', brs);
-    if(!av){ toast(L('warnAvail'),'warn'); return false; }
-    if(sec){
-      sec.t=t; sec.tEn=tEn; sec.i=i;
-      applyAvail(sec, av, brs);
-    } else {
-      const obj = { id:'sec'+Date.now(), t, tEn, i, items:[] };
-      applyAvail(obj, av, brs);
-      STATE.MENU.push(obj);
-    }
-    renderMenu(); toast(L('savedSec'),'success',L('dontForget'));
-  });
-  wireOnlyAll('s');
-}
-/* ===== نموذج الصنف + صورة الصنف ===== */
-function openItemModal(si, ii){
-  const sec = STATE.MENU[si];
-  const it = ii===null ? null : sec.items[ii];
-  const brs = branches();
-  let pendingFile = null;
-  let pendingDelete = false;
-  let previewURL = null;
 
-  function previewHTML(){
-    if(pendingDelete || (!pendingFile && !(it && it.imgv))){
-      return `<span class="none">${L('imgPreviewNone')}</span>`;
-    }
-    return `<img src="${pendingFile ? previewURL : ('img/items/'+it.id+'.png?v='+it.imgv)}" alt="">`;
-  }
-  openModal(it ? L('editItemTitle') : L('addItemTitle'), `
-    <div class="form-grid">
-      <label>${L('lblNameAr')}<input id="f_ar" value="${esc(it?it.ar:'')}"></label>
-      <label>${L('lblNameEn')}<input id="f_en" class="ltr" value="${esc(it?it.en:'')}"></label>
-      <label>${L('lblPrices')}<input id="f_prices" class="ltr" value="${it?it.prices.join(','):''}"></label>
-      <label>${L('lblCal')}<input id="f_cal" class="ltr" type="number" value="${it && it.cal!=null ? it.cal : ''}"></label>
-    </div>
-    <div class="full"><label>${L('lblDescAr')}<input id="f_desc" value="${esc(it && it.desc ? it.desc : '')}"></label></div>
-    <div class="full"><label>${L('lblDescEn')}<input id="f_descEn" class="ltr" value="${esc(it && it.descEn ? it.descEn : '')}"></label></div>
-    <div class="full"><label>${L('lblItemImage')}
-      <div class="img-prev" id="f_imgprev">${previewHTML()}</div>
-      <input type="file" id="f_imgfile" accept="image/png,image/jpeg,image/webp" hidden>
-      <div class="img-ops">
-        <button type="button" class="img-btn" id="f_imgpick">${L('imgChange')}</button>
-        ${(it && it.imgv) ? `<button type="button" class="img-btn del" id="f_imgdel">${L('imgDelete')}</button>` : ''}
-      </div>
-    </label></div>
-    <div class="form-grid">
-      <label>${L('lblImgMode')}<select id="f_imgmode">
-        <option value="cut" ${(!it || it.imgMode !== 'full') ? 'selected':''}>${L('imgModeCut')}</option>
-        <option value="full" ${it && it.imgMode === 'full' ? 'selected':''}>${L('imgModeFull')}</option>
-      </select></label>
-    </div>
-    ${availFieldset('i', it)}
-    <fieldset>
-      <legend>${L('legendSold')}</legend>
-      <label><input type="checkbox" id="f_soall" ${it && it.so && it.so.length===brs.length ? 'checked':''}> ${L('allBranches')}</label>
-      ${brs.map(b=>`<label><input type="checkbox" class="f_sobr" value="${b.id}" ${it && it.so && it.so.includes(b.id) ? 'checked':''}> ${esc(brName(b))}</label>`).join('')}
-    </fieldset>`, async ()=>{
-    const ar = el('f_ar').value.trim(), en = el('f_en').value.trim();
-    const desc = el('f_desc').value.trim(), descEn = el('f_descEn').value.trim();
-    const imgMode = el('f_imgmode').value;
-    const prices = el('f_prices').value.split(',').map(x=>+x.trim()).filter(n=>n>0);
-    const calV = el('f_cal').value.trim();
-    const cal = calV==='' ? null : +calV;
-    if(!ar || !prices.length){ toast(L('warnItem'),'warn'); return false; }
-    const av = readAvail('i', brs);
-    if(!av){ toast(L('warnAvail'),'warn'); return false; }
-    let so = [...document.querySelectorAll('.f_sobr:checked')].map(c=>c.value);
-    if(el('f_soall').checked) so = brs.map(b=>b.id);
-
-    let target = it;
-    if(it){
-      it.ar=ar; it.en=en; it.prices=prices; it.cal=cal;
-      if(desc) it.desc = desc; else delete it.desc;
-      if(descEn) it.descEn = descEn; else delete it.descEn;
-      if(imgMode === 'full') it.imgMode = 'full'; else delete it.imgMode;
-      applyAvail(it, av, brs);
-      if(so.length) it.so = so; else delete it.so;
-    } else {
-      target = { id: sec.id+'-'+Date.now(), ar, en, prices, cal };
-      if(desc) target.desc = desc;
-      if(descEn) target.descEn = descEn;
-      if(imgMode === 'full') target.imgMode = 'full';
-      applyAvail(target, av, brs);
-      if(so.length) target.so = so;
-      sec.items.push(target);
-    }
-
-    /* معالجة الصورة: حذف ثم رفع */
-    if(pendingDelete && target.imgv){
-      try{ await deleteItemImg(target.id); delete target.imgv; toast(L('imgDeleted'),'success'); }
-      catch(err){ toast(L('publishFail') + err.message,'error'); }
-    }
-    if(pendingFile){
-      try{
-        await uploadItemImg(target.id, pendingFile);
-        target.imgv = Date.now();
-        toast(L('imgUploaded'),'success');
-      }catch(err){
-        toast(L('imgUploadFail'),'warn');
-      }
-    }
-
-    renderMenu();
-    try{
-      await publishMenu('تحديث المنيو من لوحة التحكم 🍝');
-      toast(L('savedItem'),'success',L('subLive'));
-    }catch(err){
-      if(err.http===401||err.http===403) showRenew(); else toast(L('publishFail') + err.message,'error');
-    }
-  });
-
-  /* أزرار الصورة */
-  el('f_imgpick').addEventListener('click', ()=> el('f_imgfile').click());
-  el('f_imgfile').addEventListener('change', e=>{
-    const f = e.target.files[0];
-    if(!f) return;
-    if(!/image\/(png|jpeg|webp)/.test(f.type)){ toast(L('imgBadType'),'warn'); e.target.value=''; return; }
-    if(f.size > 4 * 1024 * 1024){ toast(L('imgTooBig'),'warn'); e.target.value=''; return; }
-    pendingFile = f;
-    pendingDelete = false;
-    if(previewURL) URL.revokeObjectURL(previewURL);
-    previewURL = URL.createObjectURL(f);
-    el('f_imgprev').innerHTML = `<img src="${previewURL}" alt="">`;
-  });
-  const delBtn = el('f_imgdel');
-  if(delBtn){
-    delBtn.addEventListener('click', ()=>{
-      pendingDelete = !pendingDelete;
-      pendingFile = null;
-      if(previewURL){ URL.revokeObjectURL(previewURL); previewURL = null; }
-      el('f_imgprev').innerHTML = previewHTML();
-      delBtn.style.opacity = pendingDelete ? '.55' : '1';
-    });
-  }
-  wireOnlyAll('i');
-  el('f_soall').addEventListener('change', e=>{
-    document.querySelectorAll('.f_sobr').forEach(c=> c.checked = e.target.checked || c.checked);
-  });
-}
+document.querySelector('#tab-menu > div.note + div').parentElement.querySelector('.save-bar button')
+  ? null : null;
 el('saveMenu').addEventListener('click', async ()=>{
   const btn = el('saveMenu'); btn.textContent = L('publishing');
   try{
@@ -1184,69 +1009,241 @@ el('saveMenu').addEventListener('click', async ()=>{
   btn.textContent = L('btnSaveMenu');
 });
 
+/* ===== Modal قسم ===== */
+function openSectionModal(i){
+  const s = i===null ? null : STATE.MENU[i];
+  openModal(s ? L('editSecTitle') : L('addSecTitle'), `
+    <div class="form-grid">
+      <label>${L('lblSecNameAr')}<input id="sec_ar" value="${esc(s?s.t:'')}"></label>
+      <label>${L('lblSecNameEn')}<input id="sec_en" class="ltr" value="${esc(s?s.tEn:'')}"></label>
+      <label>${L('lblSecIcon')}<input id="sec_i" value="${esc(s?s.i:'🍝')}" maxlength="4"></label>
+    </div>`, async ()=>{
+    const ar = el('sec_ar').value.trim(), en = el('sec_en').value.trim(), ic = el('sec_i').value.trim() || '🍝';
+    if(!ar){ toast(L('warnSecName'),'warn'); return false; }
+    if(s){ s.t = ar; s.tEn = en || ar; s.i = ic; }
+    else{
+      const id = 's' + Date.now();
+      STATE.MENU.push({ id, i: ic, t: ar, tEn: en || ar, hidden:false, items: [] });
+    }
+    renderMenu(); toast(L('savedSec'),'success',L('dontForget'));
+  });
+}
+
+/* ===== Modal صنف ===== */
+let itemModalImage = null;
+function openItemModal(si, ii){
+  const it = ii===null ? null : STATE.MENU[si].items[ii];
+  itemModalImage = it && it.img ? it.img : null;
+  const availVal = !it || it.avail === 'all' ? 'all' : (Array.isArray(it.avail) ? it.avail.join(',') : 'all');
+  const missVal = it ? (it.miss || 'gray') : 'gray';
+  const soldVal = !it ? 'none' : (it.sold === 'all' ? 'all' : (Array.isArray(it.sold) ? it.sold.join(',') : 'none'));
+  const brs = branches();
+  openModal(ii===null ? L('addItemTitle') : L('editItemTitle'), `
+    <div class="form-grid">
+      <label>${L('lblNameAr')}<input id="it_ar" value="${esc(it?it.ar:'')}"></label>
+      <label>${L('lblNameEn')}<input id="it_en" class="ltr" value="${esc(it?it.en:'')}"></label>
+      <label class="full">${L('lblDescAr')}<textarea id="it_descAr" rows="2">${esc(it?it.descAr||'':'')}</textarea></label>
+      <label class="full">${L('lblDescEn')}<textarea id="it_descEn" rows="2">${esc(it?it.descEn||'':'')}</textarea></label>
+      <label>${L('lblPrices')}<input id="it_prices" class="ltr" value="${esc(it?it.prices.join(','):'')}" placeholder="15 أو 15,18,22"></label>
+      <label>${L('lblCal')}<input id="it_cal" type="number" min="0" value="${esc(it&&it.cal?it.cal:'')}"></label>
+    </div>
+    <div class="full">
+      <label>${L('lblImgMode')}
+        <select id="it_imgMode">
+          <option value="cut" ${(it&&it.imgMode==='cut')||!it?'selected':''}>${L('imgModeCut')}</option>
+          <option value="full" ${it&&it.imgMode==='full'?'selected':''}>${L('imgModeFull')}</option>
+        </select>
+      </label>
+    </div>
+    <fieldset>
+      <legend>${L('lblItemImage')}</legend>
+      <div id="it_imgBox" class="img-prev" style="height:140px"><div class="none">${L('imgPreviewNone')}</div></div>
+      <div class="img-ops">
+        <button type="button" class="img-btn" id="it_imgPick">${L('imgChange')}</button>
+        <button type="button" class="img-btn del" id="it_imgDel">${L('imgDelete')}</button>
+      </div>
+      <input type="file" accept="image/png,image/jpeg,image/webp" hidden id="it_imgFile">
+    </fieldset>
+    <fieldset>
+      <legend>${L('legendAvail')}</legend>
+      <label><input type="radio" name="it_avail" value="all" ${availVal==='all'?'checked':''}> ${L('allBranches')}</label>
+      ${brs.length ? '<label><input type="radio" name="it_avail" value="custom" ${availVal!=='all'?'checked':''}> تخصيص</label>' : ''}
+      ${brs.length && availVal!=='all' ? `
+        <div class="miss-wrap">
+          <small>${brs.map(b=>(ALANG==='ar'?b.nameAr:b.nameEn)||('B'+b.num)).join(' • ')}</small>
+          ${brs.map(b=>`<label><input type="checkbox" class="it_br" value="${b.id}" ${availVal.split(',').includes(b.id)?'checked':''}> ${esc((ALANG==='ar'?b.nameAr:b.nameEn)||('B'+b.num))}</label>`).join('')}
+        </div>` : ''}
+      ${brs.length && availVal!=='all' ? `
+        <label style="margin-top:.4rem"><small>${L('missLegend')}</small></label>
+        <label><input type="radio" name="it_miss" value="gray" ${missVal==='gray'?'checked':''}> ${L('missGray')}</label>
+        <label><input type="radio" name="it_miss" value="hide" ${missVal==='hide'?'checked':''}> ${L('missHide')}</label>
+      ` : ''}
+    </fieldset>
+    <fieldset>
+      <legend>${L('legendSold')}</legend>
+      <label><input type="radio" name="it_sold" value="none" ${soldVal==='none'?'checked':''}> متاح في كل الفروع</label>
+      ${brs.length ? `<label><input type="radio" name="it_sold" value="all" ${soldVal==='all'?'checked':''}> نفد في كل الفروع</label>` : ''}
+      ${brs.length ? `<label><input type="radio" name="it_sold" value="custom" ${soldVal!=='none'&&soldVal!=='all'?'checked':''}> تخصيص</label>` : ''}
+      ${brs.length && soldVal!=='none' && soldVal!=='all' ? `
+        <div class="miss-wrap">
+          ${brs.map(b=>`<label><input type="checkbox" class="it_sold_br" value="${b.id}" ${soldVal.split(',').includes(b.id)?'checked':''}> ${esc((ALANG==='ar'?b.nameAr:b.nameEn)||('B'+b.num))}</label>`).join('')}
+        </div>` : ''}
+    </fieldset>
+  `, async ()=>{
+    const ar = el('it_ar').value.trim(), en = el('it_en').value.trim();
+    const pricesRaw = el('it_prices').value.trim();
+    const prices = pricesRaw.split(',').map(s=>parseFloat(s.trim())).filter(n=>isFinite(n));
+    const cal = parseInt(el('it_cal').value, 10) || 0;
+    if(!ar || prices.length === 0){ toast(L('warnItem'),'warn'); return false; }
+    const availRadio = document.querySelector('input[name="it_avail"]:checked').value;
+    let avail = 'all', miss = 'gray';
+    if(availRadio === 'custom'){
+      const checked = [...document.querySelectorAll('.it_br:checked')].map(c=>c.value);
+      if(checked.length === 0){ toast(L('warnAvail'),'warn'); return false; }
+      avail = checked;
+      miss = document.querySelector('input[name="it_miss"]:checked').value;
+    }
+    const soldRadio = document.querySelector('input[name="it_sold"]:checked').value;
+    let sold = 'none';
+    if(soldRadio === 'all') sold = 'all';
+    else if(soldRadio === 'custom') sold = [...document.querySelectorAll('.it_sold_br:checked')].map(c=>c.value);
+    const data = {
+      id: it ? it.id : ('it' + Date.now()),
+      i: it && it.i ? it.i : ar.charAt(0),
+      ar, en: en || ar,
+      descAr: el('it_descAr').value.trim(),
+      descEn: el('it_descEn').value.trim(),
+      prices, cal,
+      img: itemModalImage || null,
+      imgMode: el('it_imgMode').value,
+      avail, miss, sold, hidden: it ? it.hidden : false
+    };
+    if(it){ Object.assign(it, data); }
+    else { STATE.MENU[si].items.push(data); }
+    renderMenu(); toast(L('savedItem'),'success',L('dontForget'));
+  });
+
+  const imgBox = el('it_imgBox');
+  const imgPick = el('it_imgPick');
+  const imgDel = el('it_imgDel');
+  const imgFile = el('it_imgFile');
+  function renderImgBox(){
+    if(itemModalImage){
+      const isRemote = itemModalImage.startsWith('http') || itemModalImage.startsWith('img/');
+      const src = isRemote ? itemModalImage : URL.createObjectURL(itemModalImage);
+      imgBox.innerHTML = `<img src="${src}" alt="">`;
+    } else {
+      imgBox.innerHTML = `<div class="none">${L('imgPreviewNone')}</div>`;
+    }
+  }
+  renderImgBox();
+  imgPick.addEventListener('click', ()=> imgFile.click());
+  imgDel.addEventListener('click', ()=>{ itemModalImage = null; renderImgBox(); });
+  imgFile.addEventListener('change', ()=>{
+    const f = imgFile.files[0];
+    if(!f) return;
+    if(!/image\/(png|jpeg|webp)/.test(f.type)){ toast(L('imgBadType'),'warn'); return; }
+    if(f.size > 4*1024*1024){ toast(L('imgTooBig'),'warn'); return; }
+    itemModalImage = f;
+    renderImgBox();
+  });
+
+  const availRadios = document.querySelectorAll('input[name="it_avail"]');
+  availRadios.forEach(r=>{
+    r.addEventListener('change', ()=>{ openItemModal(si, ii); });
+  });
+  const soldRadios = document.querySelectorAll('input[name="it_sold"]');
+  soldRadios.forEach(r=>{
+    r.addEventListener('change', ()=>{ openItemModal(si, ii); });
+  });
+}
+
+document.querySelector('#tab-menu .save-bar button').addEventListener('click', async ()=>{
+  if(!el('saveMenu').disabled){
+    // upload any pending item images first
+    const btn = el('saveMenu');
+    btn.textContent = L('imgUploading');
+    for(const sec of STATE.MENU){
+      for(const it of sec.items){
+        if(it.img instanceof File){
+          try{
+            const path = await uploadItemImage(it.ar, it.img);
+            it.img = path;
+          }catch(err){
+            toast(L('imgUploadFail'),'warn');
+          }
+        }
+      }
+    }
+    btn.textContent = L('btnSaveMenu');
+    renderMenu();
+  }
+});
+
 /* ===== تبويب الفروع ===== */
 function renderBranches(){
-  el('branchWrap').innerHTML = branches().map((b,i)=>`
+  const wrap = el('branchWrap');
+  const brs = branches();
+  if(!brs.length){
+    wrap.innerHTML = '<div class="note">لا توجد فروع بعد — أضف أول فرع.</div>';
+    return;
+  }
+  wrap.innerHTML = brs.map((b,i)=>`
     <div class="br-card">
       <div class="br-head">
-        <b>🍝 ${esc(brName(b))}<span class="br-code">${branchCode(b)}</span></b>
+        <b>${esc(b.nameAr)} <span class="br-code">B${b.num}</span></b>
         <span class="item-ops">
-          ${i>0?`<button class="edit" data-bact="up" data-i="${i}">⬆️</button>`:''}
-          ${i<branches().length-1?`<button class="edit" data-bact="down" data-i="${i}">⬇️</button>`:''}
-          <button class="edit" data-bact="edit" data-i="${i}">✏️</button>
-          <button class="del" data-bact="del" data-i="${i}">🗑</button>
+          <button class="edit" data-act="editBranch" data-i="${i}">✏️</button>
+          <button class="del" data-act="delBranch" data-i="${i}" ${brs.length<=1?'disabled':''}>🗑</button>
         </span>
       </div>
       <div class="br-info">
-        ${esc(brAddr(b))}<br>
-        ${L('brWa')}<span class="ltr">${esc(b.wa)}</span> • ${L('brNum')}<span class="ltr">${b.num}</span> • ${L('brCoords')}<span class="ltr">${b.lat}, ${b.lng}</span><br>
-        <span class="sec-line">${esc(brNameOther(b))} — ${esc(brAddrOther(b))}</span>
+        ${esc(b.nameEn||'')}<br>
+        ${esc(b.addrAr||'')}<br>
+        <span class="sec-line">${esc(b.addrEn||'')}</span><br>
+        ${L('brNum')}${b.num} • ${L('brWa')}${esc(b.wa||'')}<br>
+        ${b.lat && b.lng ? L('brCoords')+b.lat.toFixed(4)+', '+b.lng.toFixed(4)+'<br>' : ''}
+        <span class="sec-line">ساعات: ${b.hours.map((d,j)=>{
+          if(d.closed) return L('days')[j]+': '+L('dayClosed');
+          return L('days')[j]+': '+d.o.h+':'+String(d.o.m).padStart(2,'0')+' – '+d.c.h+':'+String(d.c.m).padStart(2,'0');
+        }).join(' • ')}</span>
       </div>
     </div>`).join('');
 }
 el('branchWrap').addEventListener('click', async e=>{
-  const b = e.target.closest('button[data-bact]'); if(!b) return;
-  const i = +b.dataset.i, act = b.dataset.bact;
-  const arr = branches();
-  if(act==='up'){ [arr[i-1],arr[i]]=[arr[i],arr[i-1]]; renderBranches(); }
-  if(act==='down'){ [arr[i+1],arr[i]]=[arr[i],arr[i+1]]; renderBranches(); }
-  if(act==='del'){
-    if(arr.length<=1){ toast(L('warnLastBranch'),'warn'); return; }
-    const ok = await askConfirm(L('delBranchMsg', arr[i].nameAr), L('confirmDefault'), '🗑', L('btnDelFinal'));
-    if(ok){ arr.splice(i,1); renderBranches(); toast(L('deletedBranch'),'warn',L('dontForget')); }
+  const b = e.target.closest('button[data-act]'); if(!b) return;
+  const i = +b.dataset.i, act = b.dataset.act;
+  if(act === 'editBranch') openBranchModal(i);
+  if(act === 'delBranch'){
+    if(branches().length <= 1){ toast(L('warnLastBranch'),'warn'); return; }
+    const br = branches()[i];
+    const ok = await askConfirm(L('delBranchMsg')(br.nameAr), L('confirmDefault'), '🗑', L('btnDelFinal'));
+    if(ok){ branches().splice(i,1); renderBranches(); toast(L('deletedBranch'),'warn',L('dontForget')); }
   }
-  if(act==='edit'){ openBranchModal(i); }
 });
 el('addBranch').addEventListener('click', ()=> openBranchModal(null));
-function minSelect(cls, i, val){
-  return `<select class="${cls}" data-d="${i}">${MIN_OPTS.map(m=>`<option value="${m}" ${m===val?'selected':''}>${pad2(m)}</option>`).join('')}</select>`;
-}
 function hoursFieldset(b){
-  const days = L('days');
-  const H = STATE.SETTINGS.hours || { open:{h:13,m:0}, close:{h:2,m:0} };
-  const dO = normHM(H.open), dC = normHM(H.close);
-  const sched = (Array.isArray(b && b.hours) && b.hours.length===7)
-    ? b.hours.map(d=> ({ o: normHM(d.o), c: normHM(d.c), closed: !!d.closed }))
-    : [0,1,2,3,4,5,6].map(()=> ({ o:{h:dO.h,m:dO.m}, c:{h:dC.h,m:dC.m} }));
-  return `
-    <fieldset>
-      <legend>${L('legendHours')}</legend>
-      ${sched.map((d,i)=>`
-        <div class="day-row">
-          <span class="day-name">${days[i]}</span>
-          <label class="day-closed"><input type="checkbox" class="d_closed" data-d="${i}" ${d.closed?'checked':''}> ${L('dayClosed')}</label>
-          <span class="day-times">
-            ${L('openLbl')}
-            <input type="number" min="1" max="12" class="d_oh" data-d="${i}" value="${h12of(d.o.h)}">
-            <select class="d_oa" data-d="${i}"><option value="am" ${d.o.h<12?'selected':''}>${L('am')}</option><option value="pm" ${d.o.h>=12?'selected':''}>${L('pm')}</option></select>
-            ${minSelect('d_om', i, d.o.m)}
-            ${L('closeLbl')}
-            <input type="number" min="1" max="12" class="d_ch" data-d="${i}" value="${h12of(d.c.h)}">
-            <select class="d_ca" data-d="${i}"><option value="am" ${d.c.h<12?'selected':''}>${L('am')}</option><option value="pm" ${d.c.h>=12?'selected':''}>${L('pm')}</option></select>
-            ${minSelect('d_cm', i, d.c.m)}
-          </span>
-        </div>`).join('')}
-    </fieldset>`;
+  const hours = b && b.hours ? b.hours : Array.from({length:7}, ()=>({o:{h:9,m:0}, c:{h:23,m:0}, closed:false}));
+  return `<fieldset>
+    <legend>${L('legendHours')}</legend>
+    ${L('days').map((dn,i)=>{
+      const d = hours[i] || {o:{h:9,m:0}, c:{h:23,m:0}, closed:false};
+      return `<div class="day-row">
+        <span class="day-name">${dn}</span>
+        <label class="day-closed"><input type="checkbox" class="d_closed" data-d="${i}" ${d.closed?'checked':''}> ${L('dayClosed')}</label>
+        <span class="day-times">
+          ${L('openLbl')}
+          <input type="number" min="1" max="12" class="d_oh" data-d="${i}" value="${h12of(d.o.h)}">
+          <select class="d_oa" data-d="${i}"><option value="am" ${d.o.h<12?'selected':''}>${L('am')}</option><option value="pm" ${d.o.h>=12?'selected':''}>${L('pm')}</option></select>
+          ${minSelect('d_om', i, d.o.m)}
+          ${L('closeLbl')}
+          <input type="number" min="1" max="12" class="d_ch" data-d="${i}" value="${h12of(d.c.h)}">
+          <select class="d_ca" data-d="${i}"><option value="am" ${d.c.h<12?'selected':''}>${L('am')}</option><option value="pm" ${d.c.h>=12?'selected':''}>${L('pm')}</option></select>
+          ${minSelect('d_cm', i, d.c.m)}
+        </span>
+      </div>`;
+    }).join('')}
+  </fieldset>`;
 }
 function readHours(){
   const hours = [];
@@ -1288,7 +1285,7 @@ function openBranchModal(i){
     const dup = branches().some(x => x.num === numVal && x !== b);
     if(dup){ toast(L('warnNumDup'),'warn'); return false; }
     if(b && b.num !== numVal){
-      const ok = await askConfirm(L('warnNumChange', 'B'+numVal), L('confirmDefault'), '⚠️', L('yesContinue'));
+      const ok = await askConfirm(L('warnNumChange')('B'+numVal), L('confirmDefault'), '⚠️', L('yesContinue'));
       if(!ok) return false;
     }
     if(!el('f_nameAr').value.trim()){ toast(L('warnName'),'warn'); return false; }
@@ -1378,7 +1375,7 @@ el('deliveryWrap').addEventListener('click', async e=>{
   if(act==='edit'){ openDeliveryModal(i); }
   if(act==='del'){
     const x = STATE.SETTINGS.delivery[i];
-    const ok = await askConfirm(L('delDeliveryMsg', x.nameAr), L('confirmDefault'), '🗑', L('btnDelFinal'));
+    const ok = await askConfirm(L('delDeliveryMsg')(x.nameAr), L('confirmDefault'), '🗑', L('btnDelFinal'));
     if(ok){ STATE.SETTINGS.delivery.splice(i,1); renderDeliveryAdmin(); toast(L('deletedDelivery'),'warn',L('dontForget')); }
   }
 });
@@ -1459,7 +1456,7 @@ el('socialWrap').addEventListener('click', async e=>{
   if(act==='edit') openSocialModal(i);
   if(act==='del'){
     const x = STATE.SETTINGS.social[i];
-    const ok = await askConfirm(L('delSocialMsg', x.nameAr), L('confirmDefault'), '🗑', L('btnDelFinal'));
+    const ok = await askConfirm(L('delSocialMsg')(x.nameAr), L('confirmDefault'), '🗑', L('btnDelFinal'));
     if(ok){ STATE.SETTINGS.social.splice(i,1); renderSocialAdmin(); toast(L('deletedSocial'),'warn',L('dontForget')); }
   }
 });
@@ -1657,15 +1654,6 @@ el('saveAd').addEventListener('click', async ()=>{
   btn.textContent = L('btnSaveAd');
 });
 
-/* ===== نص settings.js المولّد ===== */
-function settingsText(){
-  return `/* =====================================================
-   ملف الإعدادات — مكرونجي (يُولَّد من لوحة التحكم)
-===================================================== */
-window.APP_SETTINGS = ${JSON.stringify(STATE.SETTINGS, null, 2)};
-`;
-}
-
 /* ===== التصدير الاحتياطي ===== */
 el('btnExport').addEventListener('click', ()=>{
   const data = { exportedAt: new Date().toISOString(), MENU: STATE.MENU, SETTINGS: STATE.SETTINGS };
@@ -1686,6 +1674,30 @@ function renderAll(){
   renderSettings();
   renderAd();
 }
+
+/* ===== استعادة الجلسة وبدء التشغيل ===== */
+(function init(){
+  const saved = sessionStorage.getItem('mk_admin');
+  if(saved){
+    try{
+      CFG = JSON.parse(saved);
+      loadAll().catch(e=>{
+        if(e.http === 401 || e.http === 403){ showRenew(); }
+        else { showBanner('loginErr', L('errGeneric') + e.message); }
+      });
+      return;
+    }catch{}
+  }
+  // لم يسجّل الدخول — ابقِ على شاشة الدخول
+  document.querySelectorAll('[data-al]').forEach(n=>{
+    const k = n.getAttribute('data-al'); const v = L(k);
+    if(v !== k && typeof v === 'string') n.textContent = v;
+  });
+  el('helpList').innerHTML = L('helpHtml');
+  el('inRepo').value = el('inRepo').value || 'Makaronjy';
+  el('inBranch').value = el('inBranch').value || 'main';
+  applyAdminLang();
+})();
 
 /* ===== تطبيق اللغة عند الإقلاع ===== */
 applyAdminLang();
