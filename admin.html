@@ -34,13 +34,11 @@ body{font-family:'Cairo',sans-serif;background:var(--cream);color:var(--ink);
   box-shadow:0 6px 16px rgba(224,145,47,.4)}
 .primary:active{transform:scale(.97)}
 .primary:disabled{opacity:.6;cursor:default}
-.help{text-align:start;margin-top:.9rem;font-size:.75rem;color:var(--muted)}
-.help summary{cursor:pointer;font-weight:900;color:var(--brown2)}
-.help ol{padding-inline-start:1.2rem;margin-top:.4rem;line-height:1.9}
 .banner{display:none;align-items:flex-start;gap:.5rem;border-radius:12px;padding:.6rem .8rem;
-  font-size:.78rem;font-weight:800;line-height:1.7;margin-top:.7rem;text-align:start}
+  font-size:.78rem;font-weight:800;line-height:1.7;margin-top:.7rem;text-align:start;word-break:break-word}
 .banner.show{display:flex;animation:shakeOnce .45s ease}
 .banner.error{background:#fee2e2;border:1.5px solid #ef4444;color:#b91c1c}
+.banner.error small{display:block;margin-top:.4rem;font-weight:700;opacity:.85;font-size:.7rem;line-height:1.5}
 @keyframes shakeOnce{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}50%{transform:translateX(5px)}75%{transform:translateX(-3px)}}
 .lang-btn{display:inline-flex;align-items:center;background:#ffffff14;border:1px solid #ffffff2b;border-radius:50px;
   padding:3px;gap:2px;cursor:pointer;transition:.25s;flex-shrink:0}
@@ -102,7 +100,6 @@ main{max-width:900px;margin:auto;padding:1rem 1rem 4rem}
   padding:.55rem .7rem;font-family:inherit;font-size:.9rem;font-weight:700;background:#fff;outline:none}
 .form-grid select:focus,.full select:focus{border-color:var(--gold)}
 .ltr{direction:ltr;text-align:left}
-/* ===== معاينة صورة الصنف ===== */
 .img-prev{aspect-ratio:4/3;border-radius:12px;overflow:hidden;margin-top:.3rem;
   background-color:#e8a04c;background-image:url('img/bg.png');background-size:cover;background-position:center;
   display:flex;align-items:center;justify-content:center;border:1.5px solid var(--line)}
@@ -128,7 +125,6 @@ fieldset label{display:inline-flex;align-items:center;gap:.35rem;font-size:.76re
 .day-times input{width:52px !important;border:1.5px solid var(--line);border-radius:8px;padding:.3rem .3rem;
   font-family:inherit;font-weight:800;text-align:center;margin:0 !important}
 .day-times select{border:1.5px solid var(--line);border-radius:8px;padding:.3rem .2rem;font-family:inherit;font-weight:800;font-size:.72rem;background:#fff}
-/* منع زوم التركيز التلقائي في آيفون */
 .card input,.form-grid input,.form-grid textarea,.full input,.full textarea,.day-times input,.day-times select,.full select{font-size:1rem}
 .wa-preview{display:none;font-size:.72rem;font-weight:800;margin-top:.35rem;line-height:1.8}
 .wa-preview.ok{display:block;color:#2d6a4f}
@@ -178,7 +174,6 @@ fieldset label{display:inline-flex;align-items:center;gap:.35rem;font-size:.76re
   background:linear-gradient(135deg,var(--gold),var(--gold2));display:grid;place-items:center;font-size:1.8rem}
 .ad-preview b{color:var(--brown);font-size:.95rem;display:block;margin-bottom:.2rem}
 .ad-preview p{color:var(--muted);font-size:.78rem;font-weight:700;line-height:1.7}
-/* ===== صور التطبيق ===== */
 .imgs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.8rem;margin-top:.5rem}
 .img-card{background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:.7rem;text-align:center;display:flex;flex-direction:column;gap:.5rem}
 .img-card .img-prev{height:120px;aspect-ratio:auto;background-color:var(--cream);background-image:none;border-radius:10px;overflow:hidden;display:grid;place-items:center;border:1px dashed var(--line)}
@@ -201,15 +196,14 @@ fieldset label{display:inline-flex;align-items:center;gap:.35rem;font-size:.76re
   padding:.95rem 1rem;background:#fbfbfc;color:#20242e;font-family:inherit;font-size:1rem;font-weight:700;
   outline:none;margin:0 0 1.15rem;transition:.2s}
 #loginScreen input:focus{border-color:#b45309;box-shadow:0 0 0 3px rgba(180,83,9,.13)}
-#loginScreen .adv{margin:0 0 1.15rem;text-align:start}
-#loginScreen .adv summary{cursor:pointer;font-size:.75rem;font-weight:800;color:#8b909a}
-#loginScreen .adv input{margin-bottom:.8rem}
+#loginScreen input[type="hidden"]{display:none}
 #loginScreen .primary{width:100%;border:none;border-radius:18px;padding:1.05rem;background:#b45309;background-image:none;
   color:#fff;font-family:inherit;font-size:1.15rem;font-weight:800;cursor:pointer;
   box-shadow:0 10px 24px rgba(180,83,9,.32);transition:.2s}
 #loginScreen .primary:active{transform:scale(.98)}
+#loginScreen .banner.error{margin-top:1rem;border-radius:16px}
 #loginScreen .hint{margin:.9rem 0 0;font-size:.68rem;font-weight:700;color:#9aa0a8;line-height:1.7}
-#loginScreen .help{margin-top:.6rem;font-size:.72rem}
+#loginScreen .owner-note{display:block;margin-top:.5rem;font-size:.72rem;font-weight:700;color:#a06b1c;background:#fff6e6;padding:.55rem .8rem;border-radius:12px;line-height:1.8}
 </style>
 </head>
 <body>
@@ -222,23 +216,17 @@ fieldset label{display:inline-flex;align-items:center;gap:.35rem;font-size:.76re
       <h1 data-al="loginTitle">لوحة تحكم مكرونجي</h1>
     </div>
 
-    <label><span data-al="lblOwner">اسم المستخدم</span><input id="inOwner" value=""></label>
-    <label><span data-al="lblToken">كلمة السر</span><input id="inToken" type="password" placeholder="••••••••"></label>
+    <label><span data-al="lblOwner">اسم المستخدم على GitHub</span><input id="inOwner" value="" placeholder="makaronjy"></label>
+    <label><span data-al="lblToken">التوكن (Fine-grained PAT)</span><input id="inToken" type="password" placeholder="github_pat_..."></label>
 
-    <details class="adv">
-      <summary data-al="advSummary">خيارات متقدمة (المستودع والفرع)</summary>
-      <label><span data-al="lblRepo">المستودع (Repo)</span><input id="inRepo" value="Makaronjy"></label>
-      <label><span data-al="lblBranch">فرع المستودع (Branch)</span><input id="inBranch" value="main"></label>
-    </details>
+    <!-- حقلان مخفيان للمستودع والفرع بالقيم الافتراضية -->
+    <input type="hidden" id="inRepo" value="Makaronjy">
+    <input type="hidden" id="inBranch" value="main">
 
     <button id="btnLogin" class="primary" data-al="btnLogin">دخول</button>
     <div id="loginErr" class="banner error"></div>
 
-    <details class="help">
-      <summary data-al="helpSummary">كيف أنشئ التوكن؟</summary>
-      <ol id="helpList"></ol>
-    </details>
-    <p class="hint" data-al="loginHint"></p>
+    <p class="owner-note" data-al="ownerNote">⚠️ التوكن يجب أن يحمل صلاحية <b>Contents: Read and write</b> على هذا المستودع.</p>
   </div>
 </div>
 
@@ -360,7 +348,7 @@ document.addEventListener('touchmove', e=>{ if(e.touches.length > 1) e.preventDe
 document.addEventListener('dblclick', e=> e.preventDefault());
 
 /* =====================================================
-   لوحة تحكم مكرونجي — BUILD v7
+   لوحة تحكم مكرونجي — BUILD v7.1
 ===================================================== */
 let CFG = null;
 let STATE = null;
@@ -371,13 +359,16 @@ let ALANG = localStorage.getItem('mk_admin_lang') || 'ar';
 const ASTR = {
   ar: {
     loginTitle:'لوحة تحكم مكرونجي',
-    loginHint:'بيانات الوصول تُحفظ في جلسة المتصفح فقط، وتُمسح تلقائياً عند إغلاق التبويب.',
-    lblOwner:'اسم المستخدم', lblRepo:'المستودع (Repo)', lblBranch:'فرع المستودع (Branch)', lblToken:'كلمة السر',
-    advSummary:'خيارات متقدمة (المستودع والفرع)',
-    btnLogin:'دخول', helpSummary:'كيف أنشئ التوكن؟',
-    helpHtml:'<li>GitHub ← Settings ← Developer settings ← Fine-grained tokens.</li><li>Generate new token ← اختر هذا المستودع فقط.</li><li>صلاحية Contents: Read and write — والمدة التي تريدها.</li><li>انسخ التوكن والصقه أعلاه.</li>',
-    errComplete:'أكمل جميع الحقول.', errToken:'التوكن مرفوض — تأكد من صلاحية Contents: Read and write.',
-    errNotFound:'المستودع أو الملف غير موجود — تحقق من الاسم وفرع المستودع.', errGeneric:'خطأ: ',
+    lblOwner:'اسم المستخدم على GitHub', lblToken:'التوكن (Fine-grained PAT)',
+    btnLogin:'دخول',
+    ownerNote:'⚠️ التوكن يجب أن يحمل صلاحية Contents: Read and write على هذا المستودع.',
+    errComplete:'أكمل جميع الحقول.',
+    errAuth:'المصادقة فشلت. تحقق من اسم المستخدم والتوكن.',
+    errToken:'التوكن مرفوض — تأكد من صلاحية Contents: Read and write.',
+    errNotFound:'المستودع أو الملف غير موجود — تحقق من الاسم.',
+    errPermission:'لا يملك التوكن صلاحية الوصول إلى هذا المستودع.',
+    errNetwork:'تعذّر الاتصال بـ GitHub — تحقق من الإنترنت.',
+    errGeneric:'خطأ: ',
     renewTitle:'⚠️ انتهت صلاحية التوكن', renewHint:'انتهت صلاحية التوكن أو لا يملك الصلاحية. جدّده من GitHub ثم أدخله هنا للمتابعة — بياناتك لم تُفقد.',
     lblNewToken:'توكن جديد', btnRenew:'حفظ والمتابعة', errRenewEmpty:'أدخل التوكن الجديد.', errRenewBad:'التوكن ما زال مرفوضاً.',
     headerTitle:'لوحة تحكم مكرونجي', btnExport:'⬇️ تصدير احتياطي', btnLogout:'خروج',
@@ -472,13 +463,16 @@ const ASTR = {
   },
   en: {
     loginTitle:'Makaronjy Admin Panel',
-    loginHint:'Access data is kept in the browser session only and cleared when the tab closes.',
-    lblOwner:'Username', lblRepo:'Repository', lblBranch:'Branch', lblToken:'Password',
-    advSummary:'Advanced (repository & branch)',
-    btnLogin:'Login', helpSummary:'How do I create the token?',
-    helpHtml:'<li>GitHub → Settings → Developer settings → Fine-grained tokens.</li><li>Generate new token → select this repository only.</li><li>Permission: Contents: Read and write — and choose the duration.</li><li>Copy the token and paste above.</li>',
-    errComplete:'Please complete all fields.', errToken:'Token rejected — check Contents: Read and write permission.',
-    errNotFound:'Repository or file not found — check the name and branch.', errGeneric:'Error: ',
+    lblOwner:'GitHub username', lblToken:'Token (Fine-grained PAT)',
+    btnLogin:'Login',
+    ownerNote:'⚠️ The token must have Contents: Read and write permission on this repository.',
+    errComplete:'Please complete all fields.',
+    errAuth:'Authentication failed. Check your username and token.',
+    errToken:'Token rejected — check Contents: Read and write permission.',
+    errNotFound:'Repository or file not found — check the name.',
+    errPermission:'The token does not have access to this repository.',
+    errNetwork:'Could not connect to GitHub — check your internet.',
+    errGeneric:'Error: ',
     renewTitle:'⚠️ Token expired', renewHint:'The token expired or lacks permission. Renew it on GitHub then paste here — your data is intact.',
     lblNewToken:'New token', btnRenew:'Save and continue', errRenewEmpty:'Enter the new token.', errRenewBad:'Token still rejected.',
     headerTitle:'Makaronjy Admin', btnExport:'⬇️ Backup', btnLogout:'Logout',
@@ -582,7 +576,7 @@ function applyAdminLang(){
   document.documentElement.dir = 'rtl';
   document.querySelectorAll('[data-al]').forEach(n=>{
     const k = n.getAttribute('data-al'); const v = L(k);
-    if(v !== k) n.textContent = v;
+    if(v !== k) n.innerHTML = v;
   });
   document.querySelectorAll('.lang-seg[data-alang]').forEach(s=>{
     s.classList.toggle('active', s.getAttribute('data-alang') === ALANG);
@@ -655,16 +649,31 @@ el('modalSave').addEventListener('click', async ()=>{
   if(res !== false) closeModal();
 });
 
-/* ===== لافتات الأخطاء ===== */
-function showBanner(id, msg){
+/* ===== لافتات الأخطاء المحسّنة ===== */
+function showBanner(id, msg, detail){
   const b = el(id);
-  b.innerHTML = '<span>⚠️</span><span></span>';
-  b.lastElementChild.textContent = msg;
+  b.innerHTML = '<span>⚠️</span><div><span class="msg"></span>' + (detail ? '<small>' + esc(detail) + '</small>' : '') + '</div>';
+  b.querySelector('.msg').textContent = msg;
   b.classList.remove('show');
   void b.offsetWidth;
   b.classList.add('show');
 }
 function hideBanner(id){ el(id).classList.remove('show'); }
+
+/* ===== تصنيف أخطاء GitHub ===== */
+function classifyGhError(e){
+  const status = e.http || 0;
+  const msg = (e.message || '').toLowerCase();
+  if(status === 0) return { key:'errNetwork', detail: e.message || 'No connection' };
+  if(status === 401) return { key:'errAuth', detail: 'Bad credentials — check token' };
+  if(status === 403){
+    if(msg.includes('rate limit')) return { key:'errGeneric', detail: 'Rate limit exceeded — wait a minute' };
+    if(msg.includes('resource not accessible') || msg.includes('permission')) return { key:'errPermission', detail: 'Token lacks required permission' };
+    return { key:'errPermission', detail: e.message };
+  }
+  if(status === 404) return { key:'errNotFound', detail: e.message };
+  return { key:'errGeneric', detail: e.message || ('HTTP ' + status) };
+}
 
 /* ===== GitHub API ===== */
 const GH_API = 'https://api.github.com';
@@ -679,7 +688,11 @@ async function gh(path, opts={}){
   if(!r.ok){
     const e = new Error('HTTP ' + r.status);
     e.http = r.status;
-    try{ const j = await r.json(); e.message = j.message || e.message; }catch{}
+    try{
+      const j = await r.json();
+      e.message = j.message || e.message;
+      e.ghDoc = j.documentation_url;
+    }catch{}
     throw e;
   }
   const ct = r.headers.get('content-type') || '';
@@ -721,7 +734,7 @@ async function uploadItemImage(nameAr, file){
   }
 }
 
-/* ===== رفع صور التطبيق (logo, welcome, bg, closed) ===== */
+/* ===== رفع صور التطبيق ===== */
 async function uploadAppImage(path, file){
   const buf = await file.arrayBuffer();
   let bytes = '';
@@ -864,23 +877,29 @@ async function loadAll(){
 }
 
 el('btnLogin').addEventListener('click', async ()=>{
-  const owner = el('inOwner').value.trim(), repo = el('inRepo').value.trim(),
-        branch = el('inBranch').value.trim() || 'main', token = el('inToken').value.trim();
+  const owner = el('inOwner').value.trim();
+  const repo = el('inRepo').value.trim() || 'Makaronjy';
+  const branch = el('inBranch').value.trim() || 'main';
+  const token = el('inToken').value.trim();
   hideBanner('loginErr');
-  if(!owner || !repo || !token){ showBanner('loginErr', L('errComplete')); return; }
+  if(!owner || !token){ showBanner('loginErr', L('errComplete')); return; }
   CFG = { owner, repo, branch, token };
   sessionStorage.setItem('mk_admin', JSON.stringify(CFG));
-  el('btnLogin').textContent = L('publishing');
+  const btn = el('btnLogin');
+  btn.textContent = L('publishing');
+  btn.disabled = true;
   try{
     await loadAll();
     applyAdminLang();
     toast(L('loggedIn'),'success',L('loggedSub'));
   }catch(e){
-    if(e.http === 401 || e.http === 403){ showBanner('loginErr', L('errToken')); }
-    else if(e.http === 404){ showBanner('loginErr', L('errNotFound')); }
-    else { showBanner('loginErr', L('errGeneric') + e.message); }
+    const cls = classifyGhError(e);
+    showBanner('loginErr', L(cls.key), cls.detail);
+    sessionStorage.removeItem('mk_admin');
+    CFG = null;
   }
-  el('btnLogin').textContent = L('btnLogin');
+  btn.disabled = false;
+  btn.textContent = L('btnLogin');
 });
 
 /* ===== شاشة تجديد التوكن ===== */
@@ -893,15 +912,22 @@ el('btnRenew').addEventListener('click', async ()=>{
   if(!newTok){ showBanner('renewErr', L('errRenewEmpty')); return; }
   CFG.token = newTok;
   sessionStorage.setItem('mk_admin', JSON.stringify(CFG));
-  el('btnRenew').textContent = L('publishing');
+  const btn = el('btnRenew');
+  btn.textContent = L('publishing');
+  btn.disabled = true;
   try{
     await loadAll();
     toast(L('loggedIn'),'success',L('loggedSub'));
   }catch(e){
-    if(e.http === 401 || e.http === 403){ showBanner('renewErr', L('errRenewBad')); }
-    else { showBanner('renewErr', L('errGeneric') + e.message); }
+    const cls = classifyGhError(e);
+    if(e.http === 401 || e.http === 403){
+      showBanner('renewErr', L('errRenewBad'), cls.detail);
+    } else {
+      showBanner('renewErr', L(cls.key), cls.detail);
+    }
   }
-  el('btnRenew').textContent = L('btnRenew');
+  btn.disabled = false;
+  btn.textContent = L('btnRenew');
 });
 
 /* ===== النشر ===== */
@@ -996,12 +1022,21 @@ el('menuWrap').addEventListener('click', async e=>{
   if(act === 'addItem') openItemModal(si, null);
 });
 
-document.querySelector('#tab-menu > div.note + div').parentElement.querySelector('.save-bar button')
-  ? null : null;
 el('saveMenu').addEventListener('click', async ()=>{
   const btn = el('saveMenu'); btn.textContent = L('publishing');
   try{
+    for(const sec of STATE.MENU){
+      for(const it of sec.items){
+        if(it.img instanceof File){
+          try{
+            const path = await uploadItemImage(it.ar, it.img);
+            it.img = path;
+          }catch(err){ toast(L('imgUploadFail'),'warn'); }
+        }
+      }
+    }
     await publishMenu('تحديث المنيو من لوحة التحكم 🍝');
+    renderMenu();
     toast(L('publishedMenu'),'success',L('subLive'));
   }catch(e){
     if(e.http===401||e.http===403) showRenew(); else toast(L('publishFail') + e.message,'error');
@@ -1129,7 +1164,7 @@ function openItemModal(si, ii){
   const imgFile = el('it_imgFile');
   function renderImgBox(){
     if(itemModalImage){
-      const isRemote = itemModalImage.startsWith('http') || itemModalImage.startsWith('img/');
+      const isRemote = typeof itemModalImage === 'string' && (itemModalImage.startsWith('http') || itemModalImage.startsWith('img/'));
       const src = isRemote ? itemModalImage : URL.createObjectURL(itemModalImage);
       imgBox.innerHTML = `<img src="${src}" alt="">`;
     } else {
@@ -1157,28 +1192,6 @@ function openItemModal(si, ii){
     r.addEventListener('change', ()=>{ openItemModal(si, ii); });
   });
 }
-
-document.querySelector('#tab-menu .save-bar button').addEventListener('click', async ()=>{
-  if(!el('saveMenu').disabled){
-    // upload any pending item images first
-    const btn = el('saveMenu');
-    btn.textContent = L('imgUploading');
-    for(const sec of STATE.MENU){
-      for(const it of sec.items){
-        if(it.img instanceof File){
-          try{
-            const path = await uploadItemImage(it.ar, it.img);
-            it.img = path;
-          }catch(err){
-            toast(L('imgUploadFail'),'warn');
-          }
-        }
-      }
-    }
-    btn.textContent = L('btnSaveMenu');
-    renderMenu();
-  }
-});
 
 /* ===== تبويب الفروع ===== */
 function renderBranches(){
@@ -1682,26 +1695,17 @@ function renderAll(){
     try{
       CFG = JSON.parse(saved);
       loadAll().catch(e=>{
+        const cls = classifyGhError(e);
         if(e.http === 401 || e.http === 403){ showRenew(); }
-        else { showBanner('loginErr', L('errGeneric') + e.message); }
+        else { showBanner('loginErr', L(cls.key), cls.detail); }
       });
       return;
     }catch{}
   }
   // لم يسجّل الدخول — ابقِ على شاشة الدخول
-  document.querySelectorAll('[data-al]').forEach(n=>{
-    const k = n.getAttribute('data-al'); const v = L(k);
-    if(v !== k && typeof v === 'string') n.textContent = v;
-  });
-  el('helpList').innerHTML = L('helpHtml');
-  el('inRepo').value = el('inRepo').value || 'Makaronjy';
-  el('inBranch').value = el('inBranch').value || 'main';
   applyAdminLang();
 })();
-
-/* ===== تطبيق اللغة عند الإقلاع ===== */
-applyAdminLang();
 </script>
 </body>
 </html>
-<!-- ===== END OF FILE v7 ===== -->
+<!-- ===== END OF FILE v7.1 ===== -->
