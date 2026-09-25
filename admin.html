@@ -1,4 +1,4 @@
-<!-- ===== ADMIN COMPLETE BUILD v12 ===== -->
+<!-- ===== ADMIN COMPLETE BUILD v13 ===== -->
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -32,8 +32,7 @@ window.addEventListener('load', function(){
 </script>
 <style>
 :root{
-  --rust:#b45309; --rust-d:#8f4307;
-  --bg:#ebebeb; --card:#f5f5f6; --panel:#fbfbfc; --line:#e3e4e8;
+  --rust:#b45309; --bg:#ebebeb; --card:#f5f5f6; --panel:#fbfbfc; --line:#e3e4e8;
   --ink:#20242e; --muted:#8b909a;
   --red:#c1121f; --red-bg:#fee2e2;
   --green:#2d6a4f; --green-bg:#e8f5e9;
@@ -43,8 +42,6 @@ window.addEventListener('load', function(){
 body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;touch-action:manipulation}
 .hidden{display:none !important}
 .ltr{direction:ltr;text-align:left}
-
-/* ===== شاشتا الدخول والتجديد ===== */
 .screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1.2rem;background:var(--bg)}
 .screen .card{background:var(--card);border:none;border-radius:26px;padding:2rem 1.5rem 1.8rem;
   width:min(430px,94vw);box-shadow:0 12px 40px rgba(0,0,0,.08);text-align:center}
@@ -60,22 +57,16 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--ink);min-he
 .screen h1.r-title{color:var(--ink);font-size:1.3rem;font-weight:900;margin-bottom:.8rem}
 .screen .hint{color:var(--muted);font-size:.78rem;font-weight:700;line-height:1.8;margin-bottom:1.2rem}
 .renew-link{display:inline-block;margin-top:1rem;font-size:.8rem;font-weight:800;color:var(--rust);text-decoration:underline}
-
-/* ===== الأزرار ===== */
 .primary{width:100%;border:none;border-radius:14px;padding:.85rem;background:var(--rust);color:#fff;
   font-family:inherit;font-weight:900;font-size:.9rem;cursor:pointer;box-shadow:0 6px 18px rgba(180,83,9,.25);transition:.2s}
 .primary:active{transform:scale(.98)}
 .primary:disabled{opacity:.6;cursor:default}
-
-/* ===== لافتات الأخطاء ===== */
 .banner{display:none;align-items:flex-start;gap:.5rem;border-radius:14px;padding:.6rem .8rem;
   font-size:.78rem;font-weight:800;line-height:1.7;margin-top:.9rem;text-align:start;word-break:break-word}
 .banner.show{display:flex;animation:shakeOnce .45s ease}
 .banner.error{background:var(--red-bg);border:1.5px solid #ef4444;color:#b91c1c}
 .banner.error small{display:block;margin-top:.35rem;font-weight:700;opacity:.85;font-size:.7rem}
 @keyframes shakeOnce{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}50%{transform:translateX(5px)}75%{transform:translateX(-3px)}}
-
-/* ===== الشريط العلوي ===== */
 .topbar{position:sticky;top:0;z-index:30;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.07);
   display:flex;align-items:center;justify-content:space-between;gap:.6rem;padding:.6rem 1rem;flex-wrap:wrap}
 .tb-title{display:flex;align-items:baseline;gap:.5rem}
@@ -90,20 +81,15 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--ink);min-he
   padding:3px;gap:2px;cursor:pointer;flex-shrink:0}
 .lang-seg{padding:.3rem .7rem;border-radius:50px;font-family:inherit;font-weight:900;font-size:.7rem;letter-spacing:.5px;color:var(--muted);transition:.2s}
 .lang-seg.active{background:var(--rust);color:#fff}
-
-/* ===== التبويبات ===== */
 .tabs{display:flex;gap:.4rem;padding:.7rem 1rem 0;overflow-x:auto;background:var(--bg);border-bottom:1px solid var(--line)}
 .tabs::-webkit-scrollbar{display:none}
 .tab{flex-shrink:0;border:1px solid var(--line);background:#fff;border-radius:12px 12px 0 0;padding:.55rem 1rem;
   font-family:inherit;font-weight:900;font-size:.8rem;color:var(--muted);cursor:pointer;transition:.2s}
 .tab.active{background:var(--rust);color:#fff;border-color:var(--rust)}
-
 main{max-width:900px;margin:auto;padding:1rem 1rem 4rem}
 .note{background:var(--amber-bg);border:1px solid #f0dcb8;border-radius:12px;padding:.6rem .9rem;font-size:.72rem;
   font-weight:700;color:var(--amber);line-height:1.8;margin-bottom:1rem}
 .save-bar{position:sticky;bottom:0;background:linear-gradient(0deg,var(--bg) 70%,transparent);padding:1rem 0 .5rem;z-index:10}
-
-/* ===== الأقسام والأصناف ===== */
 .sec-card{background:#fff;border:1px solid var(--line);border-radius:16px;margin-bottom:1rem;overflow:hidden}
 .sec-card.is-hidden{opacity:.55;border-style:dashed}
 .sec-head{display:flex;align-items:center;justify-content:space-between;gap:.5rem;background:var(--rust);
@@ -123,16 +109,12 @@ main{max-width:900px;margin:auto;padding:1rem 1rem 4rem}
 .add-item{width:100%;border:1.5px dashed var(--rust);background:var(--panel);color:var(--rust);border-radius:0;
   padding:.55rem;font-family:inherit;font-weight:900;font-size:.78rem;cursor:pointer;transition:.2s}
 .add-item:hover{background:var(--amber-bg)}
-
-/* ===== الفروع ===== */
 .br-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:.9rem 1rem;margin-bottom:.9rem}
 .br-head{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.4rem}
 .br-head b{color:var(--ink);font-size:.92rem;font-weight:900}
 .br-code{background:var(--rust);color:#fff;border-radius:6px;padding:.05rem .45rem;font-size:.68rem;font-weight:900;margin-inline-start:.35rem}
 .br-info{color:var(--muted);font-size:.72rem;font-weight:700;line-height:1.9}
 .br-info .sec-line{opacity:.85}
-
-/* ===== النماذج ===== */
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:.7rem}
 @media(max-width:560px){.form-grid{grid-template-columns:1fr}}
 .form-grid label,.full{display:block;font-size:.74rem;font-weight:800;color:var(--muted);margin-bottom:.7rem}
@@ -161,8 +143,6 @@ fieldset label{display:inline-flex;align-items:center;gap:.35rem;font-size:.76re
 .wa-preview.bad{display:block;color:var(--red)}
 .best-preview{background:var(--green-bg);border:1.5px solid #128c5e33;border-radius:12px;padding:.7rem .9rem;
   font-size:.78rem;font-weight:800;color:var(--green);line-height:2}
-
-/* ===== الصور ===== */
 .img-prev{aspect-ratio:4/3;border-radius:12px;overflow:hidden;margin-top:.3rem;
   background-color:#f1f2f4;background-image:url('img/bg.png');background-size:cover;background-position:center;
   display:flex;align-items:center;justify-content:center;border:1px solid var(--line)}
@@ -180,8 +160,6 @@ fieldset label{display:inline-flex;align-items:center;gap:.35rem;font-size:.76re
 .img-card .img-prev img{width:100%;height:100%;object-fit:contain;padding:6%}
 .img-card b{font-size:.72rem;color:var(--muted);line-height:1.6}
 .img-card .img-ops{display:flex;flex-direction:column;gap:.35rem}
-
-/* ===== النوافذ ===== */
 .modal{position:fixed;inset:0;background:rgba(20,20,25,.45);backdrop-filter:blur(5px);z-index:50;
   display:flex;align-items:center;justify-content:center;padding:1rem}
 .modal-card{background:#fff;border:1px solid var(--line);border-radius:20px;width:min(560px,94vw);
@@ -198,8 +176,6 @@ fieldset label{display:inline-flex;align-items:center;gap:.35rem;font-size:.76re
 #cfMsg{color:var(--muted);font-size:.82rem;font-weight:700;line-height:1.8;margin-bottom:1rem}
 #cfYes{background:var(--red);color:#fff}
 #cfNo{background:#fff;border:1px solid var(--line);color:var(--muted)}
-
-/* ===== Toasts ===== */
 #toasts{position:fixed;bottom:1.2rem;inset-inline:0;display:flex;flex-direction:column;align-items:center;gap:.5rem;z-index:99;pointer-events:none}
 .toast{pointer-events:auto;width:min(400px,92vw);background:#fff;border:1px solid var(--line);border-radius:14px;
   padding:.7rem .9rem;display:flex;gap:.6rem;align-items:flex-start;box-shadow:0 10px 30px rgba(0,0,0,.15);
@@ -221,8 +197,6 @@ fieldset label{display:inline-flex;align-items:center;gap:.35rem;font-size:.76re
 .toast.error .t-bar{background:var(--red)}
 .toast.info .t-bar{background:#1565c0}
 .toast.warn .t-bar{background:var(--amber)}
-
-/* ===== الإعلان والسوشيال ===== */
 .ad-preview{background:#fff;border:1px solid var(--line);border-radius:16px;padding:1rem;text-align:center;margin-bottom:1rem}
 .ad-preview .medal{width:64px;height:64px;margin:0 auto .6rem;border-radius:50%;background:var(--rust);display:grid;place-items:center;font-size:1.8rem}
 .ad-preview b{color:var(--ink);font-size:.95rem;display:block;margin-bottom:.2rem}
@@ -286,7 +260,7 @@ fieldset label{display:inline-flex;align-items:center;gap:.35rem;font-size:.76re
   </nav>
   <main>
     <section id="tab-menu">
-      <div class="note" data-al="menuNote">التعديلات تصل للزبائن تلقائياً خلال ≤60 ثانية بدون تحديث الصفحة. صورة الصنف تُرفع تلقائياً باسمه داخل img/items/ وتظهر فوراً. الإخفاء = كل الفروع، والنفد ❌ = يومي لكل فرع.</div>
+      <div class="note" data-al="menuNote">التعديلات تصل للزبائن تلقائياً خلال ≤60 ثانية بدون تحديث الصفحة. صورة الصنف تُرفع باسم id الصنف داخل img/items/ وتظهر فوراً. التوفر = حقل only، والنفد ❌ = حقل so لكل فرع.</div>
       <div id="menuWrap"></div>
       <div class="save-bar"><button id="saveMenu" class="primary" data-al="btnSaveMenu">💾 حفظ ونشر المنيو</button></div>
     </section>
@@ -360,17 +334,15 @@ document.addEventListener('touchmove', e=>{ if(e.touches.length > 1) e.preventDe
 document.addEventListener('dblclick', e=> e.preventDefault());
 
 /* =====================================================
-   لوحة تحكم مكرونجي — BUILD v12
+   لوحة تحكم مكرونجي — BUILD v13 (مطابق لصيغة app.js الفعلية)
 ===================================================== */
 
-/* ##### ثوابت اختيارية (للدخول بدون لصق التوكن كل مرة) ##### */
-const ADMIN_USER = 'mahmoud';    /* اسم مستخدم الدخول الثابت — غيّره إن أردت */
-const ADMIN_PASS = '123456';     /* كلمة السر الثابتة — غيّرها إن أردت */
-const GH_OWNER   = 'makaronjy';  /* المالك الافتراضي */
-const GH_REPO    = 'Makaronjy';  /* اسم المستودع */
-const GH_BRANCH  = 'main';       /* الفرع */
-const GH_TOKEN   = '';           /* اختياري: توكن ثابت داخل الملف */
-/* #################################################### */
+const ADMIN_USER = 'mahmoud';
+const ADMIN_PASS = '123456';
+const GH_OWNER   = 'makaronjy';
+const GH_REPO    = 'Makaronjy';
+const GH_BRANCH  = 'main';
+const GH_TOKEN   = '';
 
 let CFG = null;
 let STATE = null;
@@ -394,7 +366,7 @@ const ASTR = {
     btnExport:'⬇️ تصدير احتياطي', btnLogout:'خروج',
     tabMenu:'🍝 المنيو', tabBranches:'🍝 الفروع', tabBest:'⭐ الأكثر مبيعاً',
     tabDelivery:'🛵 التوصيل والسوشيال', tabSettings:'⚙️ الإعدادات', tabAd:'📢 الإعلان',
-    menuNote:'التعديلات تصل للزبائن تلقائياً خلال ≤60 ثانية بدون تحديث الصفحة. صورة الصنف تُرفع تلقائياً باسمه داخل img/items/ وتظهر فوراً. الإخفاء = كل الفروع، والنفد ❌ = يومي لكل فرع.',
+    menuNote:'التعديلات تصل للزبائن تلقائياً خلال ≤60 ثانية بدون تحديث الصفحة. صورة الصنف تُرفع باسم id الصنف داخل img/items/ وتظهر فوراً. التوفر = حقل only، والنفد ❌ = حقل so لكل فرع.',
     btnSaveMenu:'💾 حفظ ونشر المنيو', publishing:'جارٍ النشر...', publishedMenu:'تم نشر المنيو',
     subLive:'يصل للزبائن خلال ≤60 ثانية بدون تحديث', publishFail:'فشل النشر: ',
     hide:'🙈 إخفاء', show:'👁 إظهار', hidden:'(مخفي)', addItem:'➕ إضافة صنف', addSec:'➕ إضافة قسم',
@@ -685,14 +657,13 @@ function b64OfFile(file){
     return btoa(bytes);
   });
 }
-async function uploadItemImage(nameAr, file){
-  const safe = nameAr.replace(/[\/\\:*?"<>|]/g,'_').trim() || 'item';
-  const ext = (file.type.split('/')[1] || 'png').replace('jpeg','jpg');
-  const path = 'img/items/' + safe + '.' + ext;
+/* صورة الصنف: بنفس مسار app.js تماماً → img/items/{id}.png */
+async function uploadItemImgById(id, file){
+  const path = 'img/items/' + id + '.png';
   const cur = await getFile(path).catch(()=>({sha:null}));
   await gh('/repos/' + CFG.owner + '/' + CFG.repo + '/contents/' + path, {
     method:'PUT', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ message:'رفع صورة صنف: ' + nameAr, content: await b64OfFile(file), branch: CFG.branch, sha: cur.sha })
+    body: JSON.stringify({ message:'رفع صورة صنف: ' + id, content: await b64OfFile(file), branch: CFG.branch, sha: cur.sha })
   });
   return path;
 }
@@ -712,6 +683,7 @@ function parseJs(text){
 
 /* ===== الحالة ===== */
 function branches(){ return STATE.SETTINGS.branches || (STATE.SETTINGS.branches = []); }
+function brName(b){ return (ALANG==='ar' ? b.nameAr : b.nameEn) || ('B'+b.num); }
 function findItemAdmin(id){ for(const s of STATE.MENU) for(const it of s.items) if(it.id === id) return it; return null; }
 function nextBranchNum(){ const used = branches().map(b=>b.num).filter(Number.isFinite); let n = 1; while(used.includes(n)) n++; return n; }
 function migrateBranchNums(){
@@ -787,17 +759,13 @@ el('btnLogin').addEventListener('click', async ()=>{
   const p = el('inPass').value.trim();
   hideBanner('loginErr');
   if(!u || !p){ showBanner('loginErr', L('errComplete')); return; }
-
   const tokenLike = /^(github_pat_|ghp_|gho_|ghu_|ghs_|ghr_)/i.test(p);
   const isLocal   = (u.toLowerCase() === String(ADMIN_USER).toLowerCase()) && (p === ADMIN_PASS);
   const isEmbed   = (GH_TOKEN !== '') && (p === GH_TOKEN);
-
   if(!isLocal && !tokenLike && !isEmbed){ showBanner('loginErr', L('errCreds')); return; }
-
   const owner = isLocal ? GH_OWNER : (u || GH_OWNER);
   const token = isLocal ? (GH_TOKEN || '') : p;
   if(!token){ showBanner('loginErr', L('errNoToken')); return; }
-
   CFG = { owner: owner, repo: GH_REPO, branch: GH_BRANCH, token: token };
   sessionStorage.setItem('mk_admin', JSON.stringify(CFG));
   const btn = el('btnLogin');
@@ -851,10 +819,11 @@ function settingsText(){ return 'window.APP_SETTINGS = ' + JSON.stringify(STATE.
 async function publishSettings(msg){ const r = await putFile('settings.js', settingsText(), STATE.shas.settings, msg); STATE.shas.settings = r.content ? r.content.sha : r.sha; }
 async function publishMenu(msg){ const r = await putFile('menu.js', menuText(), STATE.shas.menu, msg); STATE.shas.menu = r.content ? r.content.sha : r.sha; }
 
-/* ===== المنيو ===== */
+/* ===== المنيو (بصيغة app.js: only / miss / so / imgv) ===== */
 function renderMenu(){
   const wrap = el('menuWrap');
   if(!STATE.MENU.length){ wrap.innerHTML = '<div class="note">لا توجد أقسام بعد — أضف أول قسم.</div>'; return; }
+  const brs = branches();
   wrap.innerHTML = STATE.MENU.map((sec, si)=>`
     <div class="sec-card ${sec.hidden?'is-hidden':''}">
       <div class="sec-head">
@@ -867,14 +836,14 @@ function renderMenu(){
       </div>
       <div class="items">
         ${sec.items.map((it,ii)=>{
-          const availAll = it.avail === 'all';
-          const availNames = !availAll ? branches().filter(b=>!it.avail.includes(b.id)).map(b=>(ALANG==='ar'?b.nameAr:b.nameEn)||('B'+b.num)).join('، ') : '';
-          const soldAll = it.sold === 'all';
-          const soldSome = Array.isArray(it.sold) && it.sold.length ? branches().filter(b=>it.sold.includes(b.id)).map(b=>(ALANG==='ar'?b.nameAr:b.nameEn)||('B'+b.num)).join('، ') : '';
+          const onlyArr = Array.isArray(it.only) ? it.only : null;
+          const unavailNames = (onlyArr && onlyArr.length) ? brs.filter(b=>!onlyArr.includes(b.id)).map(brName).join('، ') : '';
+          const soArr = Array.isArray(it.so) ? it.so : [];
+          const soldNames = soArr.length ? (soArr.length >= brs.length && brs.length ? null : soArr.map(id=>{ const b = brs.find(x=>x.id===id); return b ? brName(b) : id; }).join('، ')) : '';
           const missMode = it.miss || 'gray';
           const name = (ALANG==='ar') ? it.ar : (it.en || it.ar);
-          const tag = (!availAll && availNames) ? L('availTag')(availNames, missMode==='hide'?L('modeHide'):L('modeGray')) : '';
-          const soldTag = soldAll ? L('soldAll') : (soldSome ? L('soldSome') + soldSome : '');
+          const tag = unavailNames ? L('availTag')(unavailNames, missMode==='hide'?L('modeHide'):L('modeGray')) : '';
+          const soldTag = soArr.length ? (soldNames === null ? L('soldAll') : L('soldSome') + soldNames) : '';
           return `<div class="item-row ${it.hidden?'is-hidden':''}">
             <div class="item-info">
               <b>${esc(name)} ${it.hidden?'<span style="opacity:.6;font-weight:700;font-size:.7rem">'+L('hidden')+'</span>':''}</b>
@@ -911,13 +880,22 @@ el('menuWrap').addEventListener('click', async e=>{
   }
   if(act === 'addItem') openItemModal(si, null);
 });
+
+/* صور الأصناف المعلّقة حتى النشر */
+const pendingItemImgs = {};
+
 el('saveMenu').addEventListener('click', async ()=>{
   const btn = el('saveMenu'); btn.textContent = L('publishing');
   try{
     for(const sec of STATE.MENU) for(const it of sec.items){
-      if(it.img instanceof File){
-        try{ it.img = await uploadItemImage(it.ar, it.img); }catch(err){ toast(L('imgUploadFail'),'warn'); }
+      const pend = pendingItemImgs[it.id];
+      if(!pend) continue;
+      if(pend === 'delete'){ it.imgv = 0; }
+      else{
+        try{ await uploadItemImgById(it.id, pend); it.imgv = Date.now(); }
+        catch(err){ toast(L('imgUploadFail'),'warn'); }
       }
+      delete pendingItemImgs[it.id];
     }
     await publishMenu('تحديث المنيو من لوحة التحكم 🍝');
     renderMenu();
@@ -939,20 +917,25 @@ function openSectionModal(i){
     const ar = el('sec_ar').value.trim(), en = el('sec_en').value.trim(), ic = el('sec_i').value.trim() || '🍝';
     if(!ar){ toast(L('warnSecName'),'warn'); return false; }
     if(s){ s.t = ar; s.tEn = en || ar; s.i = ic; }
-    else STATE.MENU.push({ id:'s'+Date.now(), i: ic, t: ar, tEn: en || ar, hidden:false, items: [] });
+    else STATE.MENU.push({ id:'sec-'+Date.now(), i: ic, t: ar, tEn: en || ar, hidden:false, items: [] });
     renderMenu(); toast(L('savedSec'),'success',L('dontForget'));
   });
 }
 
-let itemModalImage = null;
+let itemModalFile = null;
+let itemModalDelete = false;
 function openItemModal(si, ii){
   const it = ii===null ? null : STATE.MENU[si].items[ii];
-  itemModalImage = it && it.img ? it.img : null;
-  const availVal = (!it || it.avail === 'all') ? 'all' : (Array.isArray(it.avail) ? it.avail.join(',') : 'all');
-  const missVal = it ? (it.miss || 'gray') : 'gray';
-  const soldVal = !it ? 'none' : (it.sold === 'all' ? 'all' : (Array.isArray(it.sold) ? it.sold.join(',') : 'none'));
+  itemModalFile = null; itemModalDelete = false;
   const brs = branches();
-  const availCustomChecked = (availVal !== 'all') ? ' checked' : '';
+  /* only: قائمة الفروع المتاحة — فارغة/غير موجودة = كل الفروع */
+  const onlyVal = (!it || !Array.isArray(it.only) || !it.only.length) ? 'all' : it.only.join(',');
+  const missVal = it ? (it.miss || 'gray') : 'gray';
+  /* so: قائمة فروع النفد */
+  const soArr = (it && Array.isArray(it.so)) ? it.so : [];
+  const soldVal = soArr.length ? ((brs.length && soArr.length >= brs.length) ? 'all' : soArr.join(',')) : 'none';
+  const curImg = (it && it.imgv) ? ('img/items/' + it.id + '.png?v=' + it.imgv) : null;
+  const availCustomChecked = (onlyVal !== 'all') ? ' checked' : '';
   const soldAllChecked = (soldVal === 'all') ? ' checked' : '';
   const soldCustomChecked = (soldVal !== 'none' && soldVal !== 'all') ? ' checked' : '';
   const availCustomHtml = brs.length
@@ -962,20 +945,18 @@ function openItemModal(si, ii){
   const soldCustomHtml = brs.length
     ? `<label><input type="radio" name="it_sold" value="custom"${soldCustomChecked}> تخصيص</label>` : '';
   const availBoxes = brs.map(b=>{
-    const ck = availVal.split(',').includes(b.id) ? ' checked' : '';
-    const nm = esc((ALANG==='ar'?b.nameAr:b.nameEn)||('B'+b.num));
-    return `<label><input type="checkbox" class="it_br" value="${b.id}"${ck}> ${nm}</label>`;
+    const ck = onlyVal.split(',').includes(b.id) ? ' checked' : '';
+    return `<label><input type="checkbox" class="it_br" value="${b.id}"${ck}> ${esc(brName(b))}</label>`;
   }).join('');
   const soldBoxes = brs.map(b=>{
-    const ck = soldVal.split(',').includes(b.id) ? ' checked' : '';
-    const nm = esc((ALANG==='ar'?b.nameAr:b.nameEn)||('B'+b.num));
-    return `<label><input type="checkbox" class="it_sold_br" value="${b.id}"${ck}> ${nm}</label>`;
+    const ck = soArr.includes(b.id) ? ' checked' : '';
+    return `<label><input type="checkbox" class="it_sold_br" value="${b.id}"${ck}> ${esc(brName(b))}</label>`;
   }).join('');
   openModal(ii===null ? L('addItemTitle') : L('editItemTitle'), `
     <div class="form-grid">
       <label>${L('lblNameAr')}<input id="it_ar" value="${esc(it?it.ar:'')}"></label>
       <label>${L('lblNameEn')}<input id="it_en" class="ltr" value="${esc(it?it.en:'')}"></label>
-      <label class="full">${L('lblDescAr')}<textarea id="it_descAr" rows="2">${esc(it?it.descAr||'':'')}</textarea></label>
+      <label class="full">${L('lblDescAr')}<textarea id="it_descAr" rows="2">${esc(it?it.desc||'':'')}</textarea></label>
       <label class="full">${L('lblDescEn')}<textarea id="it_descEn" rows="2">${esc(it?it.descEn||'':'')}</textarea></label>
       <label>${L('lblPrices')}<input id="it_prices" class="ltr" value="${esc(it?it.prices.join(','):'')}" placeholder="15 أو 15,18,22"></label>
       <label>${L('lblCal')}<input id="it_cal" type="number" min="0" value="${esc(it&&it.cal?it.cal:'')}"></label>
@@ -996,9 +977,9 @@ function openItemModal(si, ii){
     </fieldset>
     <fieldset>
       <legend>${L('legendAvail')}</legend>
-      <label><input type="radio" name="it_avail" value="all" ${(availVal==='all')?' checked':''}> ${L('allBranches')}</label>
+      <label><input type="radio" name="it_avail" value="all" ${(onlyVal==='all')?' checked':''}> ${L('allBranches')}</label>
       ${availCustomHtml}
-      <div id="availCustomWrap" style="display:${(brs.length && availVal!=='all')?'block':'none'}">
+      <div id="availCustomWrap" style="display:${(brs.length && onlyVal!=='all')?'block':'none'}">
         <div class="miss-wrap">${availBoxes}</div>
         <label style="margin-top:.4rem"><small>${L('missLegend')}</small></label>
         <label><input type="radio" name="it_miss" value="gray" ${(missVal==='gray')?' checked':''}> ${L('missGray')}</label>
@@ -1019,42 +1000,54 @@ function openItemModal(si, ii){
     const cal = parseInt(el('it_cal').value, 10) || 0;
     if(!ar || !prices.length){ toast(L('warnItem'),'warn'); return false; }
     const availRadio = document.querySelector('input[name="it_avail"]:checked').value;
-    let avail = 'all', miss = 'gray';
+    let only = [];
+    let miss = 'gray';
     if(availRadio === 'custom'){
-      const checked = [...document.querySelectorAll('.it_br:checked')].map(c=>c.value);
-      if(!checked.length){ toast(L('warnAvail'),'warn'); return false; }
-      avail = checked;
+      only = [...document.querySelectorAll('.it_br:checked')].map(c=>c.value);
+      if(!only.length){ toast(L('warnAvail'),'warn'); return false; }
       miss = document.querySelector('input[name="it_miss"]:checked').value;
     }
     const soldRadio = document.querySelector('input[name="it_sold"]:checked').value;
-    let sold = 'none';
-    if(soldRadio === 'all') sold = 'all';
-    else if(soldRadio === 'custom') sold = [...document.querySelectorAll('.it_sold_br:checked')].map(c=>c.value);
+    let so = [];
+    if(soldRadio === 'all') so = brs.map(b=>b.id);
+    else if(soldRadio === 'custom') so = [...document.querySelectorAll('.it_sold_br:checked')].map(c=>c.value);
+    const id = it ? it.id : ('it-'+Date.now());
     const data = {
-      id: it ? it.id : ('it'+Date.now()), i: it && it.i ? it.i : ar.charAt(0),
+      id: id,
       ar, en: en || ar,
-      descAr: el('it_descAr').value.trim(), descEn: el('it_descEn').value.trim(),
-      prices, cal, img: itemModalImage || null, imgMode: el('it_imgMode').value,
-      avail, miss, sold, hidden: it ? it.hidden : false
+      desc: el('it_descAr').value.trim(),
+      descEn: el('it_descEn').value.trim(),
+      prices, cal,
+      imgv: it ? (it.imgv || 0) : 0,
+      imgMode: el('it_imgMode').value,
+      hidden: it ? it.hidden : false
     };
+    if(only.length) data.only = only;
+    if(only.length) data.miss = miss;
+    if(so.length) data.so = so;
+    if(itemModalFile) pendingItemImgs[id] = itemModalFile;
+    else if(itemModalDelete) pendingItemImgs[id] = 'delete';
     if(it) Object.assign(it, data); else STATE.MENU[si].items.push(data);
     renderMenu(); toast(L('savedItem'),'success',L('dontForget'));
   });
   const imgBox = el('it_imgBox'), imgFile = el('it_imgFile');
   function renderImgBox(){
-    if(itemModalImage){
-      const remote = typeof itemModalImage === 'string' && (itemModalImage.startsWith('http') || itemModalImage.startsWith('img/'));
-      imgBox.innerHTML = `<img src="${remote ? itemModalImage : URL.createObjectURL(itemModalImage)}" alt="">`;
-    } else imgBox.innerHTML = `<div class="none">${L('imgPreviewNone')}</div>`;
+    if(itemModalFile){
+      imgBox.innerHTML = `<img src="${URL.createObjectURL(itemModalFile)}" alt="">`;
+    } else if(itemModalDelete || !curImg){
+      imgBox.innerHTML = `<div class="none">${L('imgPreviewNone')}</div>`;
+    } else {
+      imgBox.innerHTML = `<img src="${curImg}" alt="">`;
+    }
   }
   renderImgBox();
   el('it_imgPick').addEventListener('click', ()=> imgFile.click());
-  el('it_imgDel').addEventListener('click', ()=>{ itemModalImage = null; renderImgBox(); });
+  el('it_imgDel').addEventListener('click', ()=>{ itemModalFile = null; itemModalDelete = true; renderImgBox(); });
   imgFile.addEventListener('change', ()=>{
     const f = imgFile.files[0]; if(!f) return;
     if(!/image\/(png|jpeg|webp)/.test(f.type)){ toast(L('imgBadType'),'warn'); return; }
     if(f.size > 4*1024*1024){ toast(L('imgTooBig'),'warn'); return; }
-    itemModalImage = f; renderImgBox();
+    itemModalFile = f; itemModalDelete = false; renderImgBox();
   });
   document.querySelectorAll('input[name="it_avail"]').forEach(r=> r.addEventListener('change', ()=>{
     el('availCustomWrap').style.display = (document.querySelector('input[name="it_avail"]:checked').value === 'custom') ? 'block' : 'none';
@@ -1164,7 +1157,8 @@ function openBranchModal(i){
       addrAr: el('f_addrAr').value.trim(), addrEn: el('f_addrEn').value.trim(),
       num: numVal, wa, lat, lng, map: el('f_map').value.trim(), hours: readHours()
     };
-    if(b) Object.assign(b, data); else branches().push(Object.assign({ id:'b'+Date.now() }, data));
+    if(b) Object.assign(b, data);
+    else branches().push(Object.assign({ id:'b-'+Date.now() }, data));
     renderBranches(); toast(L('savedBranch'),'success',L('dontForget'));
   });
   const inp = el('f_wa'), msg = el('f_waMsg');
@@ -1254,7 +1248,7 @@ function openDeliveryModal(i){
     const nameAr = el('f_dar').value.trim(), url = el('f_durl').value.trim();
     if(!nameAr){ toast(L('warnDelName'),'warn'); return false; }
     if(!/^https:\/\/.+/i.test(url)){ toast(L('warnDelUrl'),'warn'); return false; }
-    const data = { id: x ? x.id : ('d'+Date.now()), nameAr, nameEn: el('f_den').value.trim(), url, color: el('f_dcolor').value, img: el('f_dimg').value.trim() };
+    const data = { id: x ? x.id : ('d-'+Date.now()), nameAr, nameEn: el('f_den').value.trim(), url, color: el('f_dcolor').value, img: el('f_dimg').value.trim() };
     if(x) Object.assign(x, data); else STATE.SETTINGS.delivery.push(data);
     renderDeliveryAdmin(); toast(L('savedDelivery'),'success',L('dontForget'));
   });
@@ -1332,7 +1326,7 @@ function openSocialModal(i){
       if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){ toast(L('warnSocialEmail'),'warn'); return false; }
       url = 'mailto:' + em;
     }else if(!/^https:\/\/.+/i.test(url)){ toast(L('warnSocialUrl'),'warn'); return false; }
-    const data = { id: x ? x.id : ('s'+Date.now()), key, nameAr, nameEn, url };
+    const data = { id: x ? x.id : ('s-'+Date.now()), key, nameAr, nameEn, url };
     if(x) Object.assign(x, data); else list.push(data);
     renderSocialAdmin(); toast(L('savedSocial'),'success',L('dontForget'));
   });
@@ -1515,9 +1509,8 @@ function renderAll(){
   applyAdminLang();
 })();
 
-/* علامة اكتمال السكربت (يفحصها مراقب الإقلاع) */
 window.__ADMIN_BOOTED = true;
 </script>
 </body>
 </html>
-<!-- ===== END OF FILE v12 ===== -->
+<!-- ===== END OF FILE v13 ===== -->
