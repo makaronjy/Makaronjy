@@ -1,4 +1,4 @@
-<!-- ===== ADMIN COMPLETE BUILD v18 ===== -->
+<!-- ===== ADMIN COMPLETE BUILD v19 ===== -->
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -155,7 +155,7 @@ fieldset label{display:inline-flex;align-items:center;gap:.35rem;font-size:.76re
 .img-prev{aspect-ratio:4/3;border-radius:12px;overflow:hidden;margin-top:.3rem;
   background-color:#f1f2f4;background-image:url('img/bg.png');background-size:cover;background-position:center;
   display:flex;align-items:center;justify-content:center;border:1px solid var(--line)}
-.img-prev img{max-width:100%;max-height:100%;object-fit:contain;padding:6%}
+.img-prev img{max-width:100%;max-height:100%;object-fit:contain;padding:6%;cursor:pointer}
 .img-prev .none{color:var(--rust);font-weight:900;font-size:.85rem;text-align:center;padding:1rem;line-height:1.7}
 .img-ops{display:flex;gap:.4rem;margin-top:.4rem}
 .img-btn{flex:1;border:none;border-radius:10px;padding:.6rem .3rem;font-family:inherit;font-weight:900;font-size:.75rem;
@@ -166,9 +166,15 @@ fieldset label{display:inline-flex;align-items:center;gap:.35rem;font-size:.76re
 .imgs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.8rem;margin-top:.5rem}
 .img-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:.7rem;text-align:center;display:flex;flex-direction:column;gap:.5rem}
 .img-card .img-prev{height:120px;aspect-ratio:auto;background-color:var(--card);background-image:none;border-radius:10px;display:grid;place-items:center;border:1px dashed var(--line)}
-.img-card .img-prev img{width:100%;height:100%;object-fit:contain;padding:6%}
 .img-card b{font-size:.72rem;color:var(--muted);line-height:1.6}
 .img-card .img-ops{display:flex;flex-direction:column;gap:.35rem}
+/* محرر مجموعات الإضافات */
+.mod-group{background:var(--panel);border:1px dashed var(--line);border-radius:14px;padding:.8rem;margin-bottom:.8rem}
+.mg_opts{display:flex;flex-direction:column;gap:.4rem;margin-top:.5rem}
+.mg_opt{display:flex;align-items:center;gap:.5rem;background:#fff;border:1px solid var(--line);border-radius:10px;padding:.4rem .6rem}
+.mg_opt b{flex:1;font-size:.78rem;font-weight:800;color:var(--ink)}
+.mg_opt input{width:90px !important;margin:0 !important;border:1px solid var(--line);border-radius:8px;padding:.3rem .4rem;
+  font-family:inherit;font-weight:800;font-size:.75rem;background:var(--panel);color:var(--ink)}
 .modal{position:fixed;inset:0;background:rgba(20,20,25,.45);backdrop-filter:blur(5px);z-index:50;
   display:flex;align-items:center;justify-content:center;padding:1rem}
 .modal-card{background:#fff;border:1px solid var(--line);border-radius:20px;width:min(560px,94vw);
@@ -264,6 +270,7 @@ fieldset label{display:inline-flex;align-items:center;gap:.35rem;font-size:.76re
   </div>
   <nav class="tabs">
     <button class="tab active" data-tab="menu" data-al="tabMenu">🍝 المنيو</button>
+    <button class="tab" data-tab="display" data-al="tabDisplay">🖥 خيارات العرض</button>
     <button class="tab" data-tab="branches" data-al="tabBranches">🍝 الفروع</button>
     <button class="tab" data-tab="best" data-al="tabBest">⭐ الأكثر مبيعاً</button>
     <button class="tab" data-tab="delivery" data-al="tabDelivery">🛵 التوصيل والسوشيال</button>
@@ -275,6 +282,23 @@ fieldset label{display:inline-flex;align-items:center;gap:.35rem;font-size:.76re
       <div class="note" data-al="menuNote">التعديلات تصل للزبائن تلقائياً خلال ≤60 ثانية بدون تحديث الصفحة. صورة الصنف تُرفع باسم id الصنف داخل img/items/ وتظهر فوراً. التوفر = حقل only، والنفد ❌ = حقل so لكل فرع.</div>
       <div id="menuWrap"></div>
       <div class="save-bar"><button id="saveMenu" class="primary" data-al="btnSaveMenu">💾 حفظ ونشر المنيو</button></div>
+    </section>
+    <section id="tab-display" class="hidden">
+      <div class="note" data-al="displayNote">هنا تتحكم بشكل قائمة الطعام عند الزبائن: النمط الشبكي الحالي (افتراضي) أو نمط القائمة بصفوف وصفحة تفاصيل بالإضافات. التغيير يصل للزبائن خلال ≤60 ثانية.</div>
+      <div class="sec-card" style="padding:.9rem 1rem">
+        <fieldset>
+          <legend data-al="lblDisplayMode">نمط عرض الأصناف في التطبيق</legend>
+          <label><input type="radio" name="dispMode" id="dispGrid" value="grid"> <span data-al="modeGrid">شبكي (بطاقات بصورة علوية) — الافتراضي</span></label>
+          <label><input type="radio" name="dispMode" id="dispList" value="list"> <span data-al="modeList">قائمة (صفوف بصورة جانبية + صفحة تفاصيل)</span></label>
+        </fieldset>
+        <fieldset>
+          <legend data-al="lblCardOpts">عناصر البطاقة / الصف</legend>
+          <label><input type="checkbox" id="dispDesc"> <span data-al="optShowDesc">إظهار الوصف</span></label>
+          <label><input type="checkbox" id="dispCal"> <span data-al="optShowCal">إظهار السعرات</span></label>
+        </fieldset>
+        <div class="note" style="margin:.6rem 0 0" data-al="displayHint">نمط القائمة: الضغط على الصف يفتح صفحة التفاصيل (صورة كبيرة + مجموعات الإضافات + عدّاد كمية + إضافة للسلة). الإضافات تُدار من نافذة تعديل كل صنف.</div>
+      </div>
+      <div class="save-bar"><button id="saveDisplay" class="primary" data-al="btnSaveDisplay">💾 حفظ ونشر خيارات العرض</button></div>
     </section>
     <section id="tab-branches" class="hidden">
       <div class="note" data-al="branchNote">رقم واتساب كل فرع إجباري: مفتاح الدولة ثم 9 أرقام، بدون + وبدون صفر في البداية — مثال: 9665XXXXXXXX. رقم الفرع يحدد رمز المعرف (B1، B2...). الساعات تدعم أنصاف الساعات.</div>
@@ -346,8 +370,8 @@ document.addEventListener('touchmove', e=>{ if(e.touches.length > 1) e.preventDe
 document.addEventListener('dblclick', e=> e.preventDefault());
 
 /* =====================================================
-   لوحة تحكم مكرونجي — BUILD v18
-   (زر الرجوع يغلق النوافذ: التأكيد أولاً ثم التعديل)
+   لوحة تحكم مكرونجي — BUILD v19
+   (تبويب خيارات العرض + محرر الإضافات + معاينات كاملة)
 ===================================================== */
 
 const ADMIN_USER = 'mahmoud';
@@ -378,8 +402,16 @@ const ASTR = {
     headerTitle:'لوحة تحكم مكرونجي', appVersion:'v5.0',
     btnRefresh:'🔄 تحديث من المستودع', refreshing:'جارٍ التحديث...', refreshed:'تم التحديث من المستودع ✔', refreshFail:'فشل التحديث: ',
     btnExport:'⬇️ تصدير احتياطي', btnLogout:'خروج',
-    tabMenu:'🍝 المنيو', tabBranches:'🍝 الفروع', tabBest:'⭐ الأكثر مبيعاً',
+    tabMenu:'🍝 المنيو', tabDisplay:'🖥 خيارات العرض', tabBranches:'🍝 الفروع', tabBest:'⭐ الأكثر مبيعاً',
     tabDelivery:'🛵 التوصيل والسوشيال', tabSettings:'⚙️ الإعدادات', tabAd:'📢 الإعلان',
+    displayNote:'هنا تتحكم بشكل قائمة الطعام عند الزبائن: النمط الشبكي الحالي (افتراضي) أو نمط القائمة بصفوف وصفحة تفاصيل بالإضافات. التغيير يصل للزبائن خلال ≤60 ثانية.',
+    lblDisplayMode:'نمط عرض الأصناف في التطبيق',
+    modeGrid:'شبكي (بطاقات بصورة علوية) — الافتراضي',
+    modeList:'قائمة (صفوف بصورة جانبية + صفحة تفاصيل)',
+    lblCardOpts:'عناصر البطاقة / الصف',
+    optShowDesc:'إظهار الوصف', optShowCal:'إظهار السعرات',
+    displayHint:'نمط القائمة: الضغط على الصف يفتح صفحة التفاصيل (صورة كبيرة + مجموعات الإضافات + عدّاد كمية + إضافة للسلة). الإضافات تُدار من نافذة تعديل كل صنف.',
+    btnSaveDisplay:'💾 حفظ ونشر خيارات العرض', savedDisplay:'تم نشر خيارات العرض',
     menuNote:'التعديلات تصل للزبائن تلقائياً خلال ≤60 ثانية بدون تحديث الصفحة. صورة الصنف تُرفع باسم id الصنف داخل img/items/ وتظهر فوراً. التوفر = حقل only، والنفد ❌ = حقل so لكل فرع.',
     btnSaveMenu:'💾 حفظ ونشر المنيو', publishing:'جارٍ النشر...', publishedMenu:'تم نشر المنيو',
     subLive:'يصل للزبائن خلال ≤60 ثانية بدون تحديث', publishFail:'فشل النشر: ',
@@ -393,6 +425,13 @@ const ASTR = {
     imgUploading:'جارٍ رفع الصورة...', imgUploaded:'تم رفع صورة الصنف ✔', imgDeleted:'تم حذف صورة الصنف ✔',
     imgBadType:'صيغة غير مدعومة — استخدم PNG أو JPG أو WEBP', imgTooBig:'حجم الصورة كبير جداً (الحد 4MB)',
     imgUploadFail:'تعذّر رفع الصورة — سيُحفظ الصنف وسيُعاد رفعها عند التعديل القادم',
+    legendMods:'الإضافات الاختيارية (يُطلب عادة مع هذا الصنف)',
+    modsAddGroup:'➕ إضافة مجموعة خيارات',
+    modsGroupTitle:'عنوان المجموعة (عربي)', modsGroupTitleEn:'عنوان المجموعة (إنجليزي)',
+    modsType:'نوع الاختيار', modsTypeSingle:'خيار واحد (راديو)', modsTypeMulti:'عدة خيارات بحد أقصى',
+    modsMax:'الحد الأقصى (0 = بلا حد)',
+    modsPick:'أضف صنفاً كخيار…', modsAdd:'➕ إضافة', modsDelGroup:'🗑 حذف المجموعة',
+    modsPricePh:'سعر الخيار (فارغ = سعر الصنف)',
     lblPrices:'الأسعار (فواصل: 12 أو 2,3,5)', lblCal:'السعرات (فارغ = صفر)',
     legendAvail:'التوفر في الفروع (دائم)', allBranches:'كل الفروع', missLegend:'في الفروع غير المتاحة اجعله:',
     missGray:'بطاقة رمادية «غير متوفر في هذا الفرع»', missHide:'مخفي تماماً',
@@ -451,7 +490,7 @@ const ASTR = {
     lblAdTitleAr:'العنوان بالعربي', lblAdTitleEn:'العنوان بالإنجليزي',
     lblAdTextAr:'النص بالعربي', lblAdTextEn:'النص بالإنجليزي',
     adPrevTitle:'إعلان تجريبي', adPrevText:'هذا نص الإعلان كما سيظهر في التطبيق.',
-    legendImages:'صور التطبيق', imagesNote:'اختر صورة جديدة ثم «تأكيد» لرفعها فوراً. الصورة ستحلّ محل القديمة وتظهر مباشرة في التطبيق.',
+    legendImages:'صور التطبيق', imagesNote:'اختر صورة جديدة ثم «تأكيد» لرفعها فوراً. الصورة ستحلّ محل القديمة وتظهر مباشرة في التطبيق. اضغط على المعاينة لفتح الصورة كاملة.',
     imgLogo:'شعار التطبيق (لوغو)', imgBg:'خلفية بطاقات الصنف', imgWelcome:'شاشة الترحيب', imgClosed:'شاشة الإغلاق',
     imgPick:'📷 اختر صورة', imgConfirm:'✔ تأكيد الرفع', imgCancel:'إلغاء',
     imgUploadingApp:'جارٍ الرفع...', imgUploadedApp:'تم رفع الصورة ✔', imgUploadFailApp:'فشل الرفع: ',
@@ -477,8 +516,16 @@ const ASTR = {
     headerTitle:'Makaronjy Admin', appVersion:'v5.0',
     btnRefresh:'🔄 Refresh from repo', refreshing:'Refreshing...', refreshed:'Refreshed from repo ✔', refreshFail:'Refresh failed: ',
     btnExport:'⬇️ Backup', btnLogout:'Logout',
-    tabMenu:'🍝 Menu', tabBranches:'🍝 Branches', tabBest:'⭐ Best Sellers',
+    tabMenu:'🍝 Menu', tabDisplay:'🖥 Display Options', tabBranches:'🍝 Branches', tabBest:'⭐ Best Sellers',
     tabDelivery:'🛵 Delivery & Social', tabSettings:'⚙️ Settings', tabAd:'📢 Announcement',
+    displayNote:'Control how customers see the menu: current grid (default) or list rows with a details page. Changes reach customers within ≤60 seconds.',
+    lblDisplayMode:'Item display mode in the app',
+    modeGrid:'Grid (cards with top image) — default',
+    modeList:'List (rows with side image + details page)',
+    lblCardOpts:'Card / row elements',
+    optShowDesc:'Show description', optShowCal:'Show calories',
+    displayHint:'List mode: tapping a row opens the details page (hero image + add-on groups + quantity + add to cart). Add-ons are managed inside each item\'s edit window.',
+    btnSaveDisplay:'💾 Save & publish display options', savedDisplay:'Display options published',
     menuNote:'Changes reach customers within ≤60 seconds without refresh.',
     btnSaveMenu:'💾 Save & publish menu', publishing:'Publishing...', publishedMenu:'Menu published',
     subLive:'Reaches customers within ≤60s', publishFail:'Publish failed: ',
@@ -491,6 +538,13 @@ const ASTR = {
     imgChange:'📷 Add / change', imgDelete:'🗑 Delete',
     imgUploading:'Uploading...', imgUploaded:'Uploaded ✔', imgDeleted:'Deleted ✔',
     imgBadType:'Unsupported format', imgTooBig:'Too large (max 4MB)', imgUploadFail:'Upload failed',
+    legendMods:'Optional add-ons (usually ordered with this item)',
+    modsAddGroup:'➕ Add options group',
+    modsGroupTitle:'Group title (AR)', modsGroupTitleEn:'Group title (EN)',
+    modsType:'Selection type', modsTypeSingle:'Single choice (radio)', modsTypeMulti:'Multiple choices with max',
+    modsMax:'Max choices (0 = unlimited)',
+    modsPick:'Add an item as option…', modsAdd:'➕ Add', modsDelGroup:'🗑 Delete group',
+    modsPricePh:'Option price (empty = item price)',
     lblPrices:'Prices', lblCal:'Calories',
     legendAvail:'Availability', allBranches:'All branches', missLegend:'For unavailable branches:',
     missGray:'Grey card', missHide:'Hidden', legendSold:'Sold out ❌',
@@ -536,7 +590,7 @@ const ASTR = {
     lblAdEnabled:'Enabled', lblAdOnce:'Once per day', lblAdIcon:'Icon', lblAdBtnAr:'Button (AR)', lblAdBtnEn:'Button (EN)',
     lblAdTitleAr:'Title (AR)', lblAdTitleEn:'Title (EN)', lblAdTextAr:'Text (AR)', lblAdTextEn:'Text (EN)',
     adPrevTitle:'Sample', adPrevText:'Preview.',
-    legendImages:'App images', imagesNote:'Pick then Confirm to upload.',
+    legendImages:'App images', imagesNote:'Pick then Confirm to upload. Tap a preview to open the full image.',
     imgLogo:'Logo', imgBg:'Background', imgWelcome:'Welcome', imgClosed:'Closed',
     imgPick:'📷 Pick', imgConfirm:'✔ Confirm', imgCancel:'Cancel',
     imgUploadingApp:'Uploading...', imgUploadedApp:'Uploaded ✔', imgUploadFailApp:'Failed: ',
@@ -557,9 +611,7 @@ function mv(id){ const n = el(id); return n ? n.value : ''; }
 function radioVal(name, dflt){ const n = document.querySelector('input[name="'+name+'"]:checked'); return n ? n.value : dflt; }
 function checkedVals(cls){ return [...document.querySelectorAll('.'+cls+':checked')].map(c=>c.value); }
 
-/* =====================================================
-   حاجز زر الرجوع: النوافذ تُغلق بالترتيب (الأعلى أولاً)
-===================================================== */
+/* ===== حاجز زر الرجوع ===== */
 let guardDepth = 0;
 let suppressCount = 0;
 function modalOpen(){ return !el('modal').classList.contains('hidden'); }
@@ -577,15 +629,19 @@ function consumeGuard(){
 window.addEventListener('popstate', ()=>{
   if(suppressCount > 0){ suppressCount--; return; }
   if(guardDepth > 0) guardDepth--;
-  /* إغلاق الأعلى فقط بدون استهلاك (المتصفح استهلك الحالة بالفعل) */
   if(confirmOpen()){ settleConfirm(false, false); return; }
   if(modalOpen()){ hideModalOnly(); return; }
 });
-/* مفتاح Escape للكمبيوتر بنفس المنطق */
 document.addEventListener('keydown', e=>{
   if(e.key !== 'Escape') return;
   if(confirmOpen()){ settleConfirm(false); return; }
   if(modalOpen()){ closeModal(); return; }
+});
+
+/* فتح المعاينات بالحجم الكامل */
+document.addEventListener('click', e=>{
+  const im = e.target.closest('.img-prev img');
+  if(im && im.getAttribute('src')) window.open(im.getAttribute('src'), '_blank');
 });
 
 function applyAdminLang(){
@@ -618,7 +674,7 @@ function toast(title, kind='info', sub=''){
   setTimeout(()=>{ div.classList.add('out'); setTimeout(()=>div.remove(), 350); }, 3400);
 }
 
-/* ===== نافذة التأكيد (طبقة مستقلة فوق أي نافذة) ===== */
+/* ===== نافذة التأكيد ===== */
 let confirmResolve = null;
 function askConfirm(msg, title, ico, yesLbl){
   return new Promise(resolve=>{
@@ -776,6 +832,7 @@ function parseJs(text){
 function branches(){ return STATE.SETTINGS.branches || (STATE.SETTINGS.branches = []); }
 function brName(b){ return (ALANG==='ar' ? b.nameAr : b.nameEn) || ('B'+b.num); }
 function findItemAdmin(id){ for(const s of STATE.MENU) for(const it of s.items) if(it.id === id) return it; return null; }
+function findSectionOfItem(id){ for(const s of STATE.MENU) if(s.items.some(x=>x.id===id)) return s; return null; }
 function nextBranchNum(){ const used = branches().map(b=>b.num).filter(Number.isFinite); let n = 1; while(used.includes(n)) n++; return n; }
 function migrateBranchNums(){
   branches().forEach((b,i)=>{ if(!Number.isFinite(b.num)) b.num = i + 1; });
@@ -836,6 +893,7 @@ async function loadAll(){
   if(!STATE.SETTINGS.delivery) STATE.SETTINGS.delivery = [];
   if(STATE.SETTINGS.social === undefined) STATE.SETTINGS.social = [];
   if(!STATE.SETTINGS.imagesVersion) STATE.SETTINGS.imagesVersion = 0;
+  if(!STATE.SETTINGS.display) STATE.SETTINGS.display = { mode:'grid', showDesc:true, showCal:true };
   if(STATE.SETTINGS.bgs) delete STATE.SETTINGS.bgs;
   migrateBranchNums(); migrateHours(); migrateBestSellers(); migrateSocial();
   el('renewScreen').classList.add('hidden');
@@ -937,10 +995,11 @@ function renderMenu(){
           const name = (ALANG==='ar') ? it.ar : (it.en || it.ar);
           const tag = unavailNames ? LF('availTag', unavailNames, missMode==='hide'?L('modeHide'):L('modeGray')) : '';
           const soldTag = soArr.length ? (soldNames === null ? L('soldAll') : L('soldSome') + soldNames) : '';
+          const modsCount = Array.isArray(it.mods) ? it.mods.reduce((s,g)=> s + (g.opts||[]).length, 0) : 0;
           return `<div class="item-row ${it.hidden?'is-hidden':''}">
             <div class="item-info">
               <b>${esc(name)} ${it.hidden?'<span style="opacity:.6;font-weight:700;font-size:.7rem">'+L('hidden')+'</span>':''}</b>
-              <small>${esc((it.prices && it.prices[0] ? it.prices[0] : 0) + ' ' + L('riyal'))}${it.cal?(' • '+it.cal+' '+L('calWord')):''}${esc(tag)}${esc(soldTag)}</small>
+              <small>${esc((it.prices && it.prices[0] ? it.prices[0] : 0) + ' ' + L('riyal'))}${it.cal?(' • '+it.cal+' '+L('calWord')):''}${modsCount?(' • ➕ '+modsCount):''}${esc(tag)}${esc(soldTag)}</small>
             </div>
             <span class="item-ops">
               <button class="edit" data-act="editItem" data-si="${si}" data-ii="${ii}">✏️</button>
@@ -1064,6 +1123,11 @@ function openItemModal(si, ii){
       <input type="file" accept="image/png,image/jpeg,image/webp" hidden id="it_imgFile">
     </fieldset>
     <fieldset>
+      <legend>${L('legendMods')}</legend>
+      <div id="modsBox"></div>
+      <button type="button" class="add-item" id="modsAddGroup" style="border-radius:12px">${L('modsAddGroup')}</button>
+    </fieldset>
+    <fieldset>
       <legend>${L('legendAvail')}</legend>
       <label><input type="radio" name="it_avail" value="all" ${(onlyVal==='all')?' checked':''}> ${L('allBranches')}</label>
       ${availCustomHtml}
@@ -1112,20 +1176,104 @@ function openItemModal(si, ii){
     };
     if(only.length){ data.only = only; data.miss = miss; }
     if(so.length){ data.so = so; }
+    const mods = readModsEditor();
+    if(mods.length) data.mods = mods;
     if(itemModalFile) pendingItemImgs[id] = itemModalFile;
     else if(itemModalDelete) pendingItemImgs[id] = 'delete';
-    if(it){ delete it.only; delete it.miss; delete it.so; Object.assign(it, data); }
+    if(it){ delete it.only; delete it.miss; delete it.so; delete it.mods; Object.assign(it, data); }
     else STATE.MENU[si].items.push(data);
     renderMenu(); toast(L('savedItem'),'success',L('dontForget'));
   });
+
+  /* ===== محرر مجموعات الإضافات ===== */
+  const box = el('modsBox');
+  function candidateOptsHtml(){
+    return STATE.MENU.map((sec, sIdx)=>{
+      if(sIdx === si) return '';
+      const items = sec.items.filter(x=> x.hidden !== true);
+      if(!items.length) return '';
+      return `<optgroup label="${esc(sec.i + ' ' + ((ALANG==='ar')?sec.t:sec.tEn))}">${items.map(x=>`<option value="${x.id}">${esc(x.ar)} — ${x.prices[0]}</option>`).join('')}</optgroup>`;
+    }).join('');
+  }
+  function optRowHtml(ref, price){
+    const rit = findItemAdmin(ref);
+    if(!rit) return '';
+    const sec = findSectionOfItem(ref);
+    return `<div class="mg_opt" data-ref="${esc(ref)}">
+      <b>${esc(rit.ar)} <small style="color:var(--muted);font-weight:700">(${esc(sec ? sec.t : '')})</small></b>
+      <input type="number" min="0" step="1" class="mo_price" placeholder="${esc(L('modsPricePh'))}" value="${(typeof price==='number' ? price : '')}">
+      <button type="button" class="img-btn del mo_del" style="flex:0 0 auto;padding:.4rem .6rem">🗑</button>
+    </div>`;
+  }
+  function groupHtml(g){
+    g = g || {};
+    const gid = g.id || ('mg-' + Date.now() + '-' + Math.floor(Math.random()*9999));
+    return `<div class="mod-group" data-gid="${esc(gid)}">
+      <div class="form-grid">
+        <label>${L('modsGroupTitle')}<input class="mg_tAr" value="${esc(g.tAr||'')}"></label>
+        <label>${L('modsGroupTitleEn')}<input class="mg_tEn ltr" value="${esc(g.tEn||'')}"></label>
+        <label>${L('modsType')}<select class="mg_type"><option value="single" ${(g.type||'single')==='single'?'selected':''}>${L('modsTypeSingle')}</option><option value="multi" ${g.type==='multi'?'selected':''}>${L('modsTypeMulti')}</option></select></label>
+        <label>${L('modsMax')}<input type="number" min="0" class="mg_max" value="${g.max||0}"></label>
+      </div>
+      <div class="mg_opts">${(g.opts||[]).map(o=> optRowHtml(o.ref, o.price)).join('')}</div>
+      <div class="form-grid" style="margin-top:.5rem">
+        <label>${L('modsPick')}<select class="mg_pick"><option value="">—</option>${candidateOptsHtml()}</select></label>
+        <label>&nbsp;<button type="button" class="img-btn mg_add">${L('modsAdd')}</button></label>
+      </div>
+      <button type="button" class="img-btn del mg_del" style="margin-top:.5rem">${L('modsDelGroup')}</button>
+    </div>`;
+  }
+  function readModsEditor(){
+    const groups = [];
+    box.querySelectorAll('.mod-group').forEach(g=>{
+      const tAr = g.querySelector('.mg_tAr').value.trim();
+      const tEn = g.querySelector('.mg_tEn').value.trim();
+      const type = g.querySelector('.mg_type').value;
+      const max = parseInt(g.querySelector('.mg_max').value, 10) || 0;
+      const opts = [];
+      g.querySelectorAll('.mg_opt').forEach(o=>{
+        const ref = o.dataset.ref;
+        const pv = o.querySelector('.mo_price').value.trim();
+        const entry = { ref: ref };
+        if(pv !== '' && isFinite(parseFloat(pv))) entry.price = parseFloat(pv);
+        opts.push(entry);
+      });
+      if(tAr && opts.length){
+        groups.push({ id: g.dataset.gid, tAr: tAr, tEn: tEn, type: type, max: (type==='multi' ? max : 0), opts: opts });
+      }
+    });
+    return groups;
+  }
+  box.innerHTML = (it && Array.isArray(it.mods) && it.mods.length) ? it.mods.map(g=> groupHtml(g)).join('') : '';
+  el('modsAddGroup').addEventListener('click', ()=>{ box.insertAdjacentHTML('beforeend', groupHtml(null)); });
+  box.addEventListener('click', e=>{
+    const add = e.target.closest('.mg_add');
+    if(add){
+      const grp = add.closest('.mod-group');
+      const sel = grp.querySelector('.mg_pick');
+      const ref = sel.value;
+      if(!ref) return;
+      if(!grp.querySelector('.mg_opt[data-ref="'+ref+'"]')){
+        grp.querySelector('.mg_opts').insertAdjacentHTML('beforeend', optRowHtml(ref, undefined));
+      }
+      sel.value = '';
+      return;
+    }
+    const odel = e.target.closest('.mo_del');
+    if(odel){ odel.closest('.mg_opt').remove(); return; }
+    const gdel = e.target.closest('.mg_del');
+    if(gdel){ gdel.closest('.mod-group').remove(); return; }
+  });
+
+  /* ===== معاينة صورة الصنف ===== */
   const imgBox = el('it_imgBox'), imgFile = el('it_imgFile');
   function renderImgBox(){
     if(itemModalFile){
-      imgBox.innerHTML = `<img src="${URL.createObjectURL(itemModalFile)}" alt="">`;
+      imgBox.innerHTML = `<img src="${URL.createObjectURL(itemModalFile)}" alt="" style="width:100%;height:100%;object-fit:contain;padding:6%">`;
     } else if(itemModalDelete || !curImg){
       imgBox.innerHTML = `<div class="none">${L('imgPreviewNone')}</div>`;
     } else {
-      imgBox.innerHTML = `<img src="${curImg}" alt="">`;
+      imgBox.innerHTML = `<img src="${curImg}" alt="" style="width:100%;height:100%;object-fit:contain;padding:6%">`;
     }
   }
   renderImgBox();
@@ -1258,6 +1406,30 @@ el('saveBranches').addEventListener('click', async ()=>{
   try{
     await publishSettings('تحديث الفروع من لوحة التحكم 🍝');
     toast(L('published'),'success',L('subLive'));
+    btn.disabled = false; btn.textContent = label;
+  }catch(e){ handlePublishError(e, btn, label); }
+});
+
+/* ===== خيارات العرض (جديد) ===== */
+function renderDisplay(){
+  const d = STATE.SETTINGS.display || {};
+  const mode = (d.mode === 'list') ? 'list' : 'grid';
+  el('dispGrid').checked = (mode === 'grid');
+  el('dispList').checked = (mode === 'list');
+  el('dispDesc').checked = d.showDesc !== false;
+  el('dispCal').checked = d.showCal !== false;
+}
+el('saveDisplay').addEventListener('click', async ()=>{
+  STATE.SETTINGS.display = {
+    mode: el('dispList').checked ? 'list' : 'grid',
+    showDesc: el('dispDesc').checked,
+    showCal: el('dispCal').checked
+  };
+  const btn = el('saveDisplay'); const label = L('btnSaveDisplay');
+  btn.textContent = L('publishing'); btn.disabled = true;
+  try{
+    await publishSettings('تحديث خيارات العرض من لوحة التحكم 🖥');
+    toast(L('savedDisplay'),'success',L('subLive'));
     btn.disabled = false; btn.textContent = label;
   }catch(e){ handlePublishError(e, btn, label); }
 });
@@ -1465,7 +1637,7 @@ function renderSettings(){
           const pend = imgPending[im.key];
           const src = pend ? pend.url : (im.path + '?v=' + (s.imagesVersion||0) + '&r=' + imgRenderStamp);
           return `<div class="img-card">
-            <div class="img-prev"><img src="${src}" alt=""></div>
+            <div class="img-prev"><img src="${src}" alt="" style="width:100%;height:100%;object-fit:contain;padding:6%"></div>
             <b>${L(im.label)}</b>
             <div class="img-ops">
               <button type="button" class="img-btn" data-iact="pick" data-img="${im.key}">${L('imgPick')}</button>
@@ -1517,103 +1689,4 @@ el('settingsForm').addEventListener('change', e=>{
   imgPending[key] = { file:f, url:URL.createObjectURL(f) };
   renderSettings();
 });
-el('saveSettings').addEventListener('click', async ()=>{
-  const s = STATE.SETTINGS;
-  s.brand.nameAr = mv('s_nameAr').trim() || s.brand.nameAr;
-  s.brand.nameEn = mv('s_nameEn').trim() || s.brand.nameEn;
-  s.brand.tagAr = mv('s_tagAr').trim();
-  s.brand.tagEn = mv('s_tagEn').trim();
-  const btn = el('saveSettings'); const label = L('btnSaveSettings');
-  btn.textContent = L('publishing'); btn.disabled = true;
-  try{
-    await publishSettings('تحديث الإعدادات من لوحة التحكم ⚙️');
-    toast(L('published'),'success',L('subLive'));
-    btn.disabled = false; btn.textContent = label;
-  }catch(e){ handlePublishError(e, btn, label); }
-});
-
-/* ===== الإعلان ===== */
-function renderAdPreview(){
-  const a = STATE.SETTINGS.ad;
-  const ti = (ALANG==='ar') ? (a.titleAr || a.titleEn) : (a.titleEn || a.titleAr);
-  const tx = (ALANG==='ar') ? (a.textAr || a.textEn) : (a.textEn || a.textAr);
-  el('adPreview').innerHTML = `<div class="medal">${esc(a.icon || '🍝')}</div><b>${esc(ti || L('adPrevTitle'))}</b><p>${esc(tx || L('adPrevText'))}</p>`;
-}
-function renderAd(){
-  const a = STATE.SETTINGS.ad;
-  el('adForm').innerHTML = `
-    <fieldset>
-      <label><input type="checkbox" id="a_enabled" ${a.enabled?'checked':''}> ${L('lblAdEnabled')}</label>
-      <label><input type="checkbox" id="a_once" ${a.oncePerDay!==false?'checked':''}> ${L('lblAdOnce')}</label>
-    </fieldset>
-    <div class="form-grid">
-      <label>${L('lblAdIcon')}<input id="a_icon" value="${esc(a.icon || '🍝')}"></label>
-      <label>${L('lblAdBtnAr')}<input id="a_btnAr" value="${esc(a.btnAr || 'حسناً 🍝')}"></label>
-      <label>${L('lblAdTitleAr')}<input id="a_titleAr" value="${esc(a.titleAr)}"></label>
-      <label>${L('lblAdBtnEn')}<input id="a_btnEn" class="ltr" value="${esc(a.btnEn || 'Got it 🍝')}"></label>
-      <label>${L('lblAdTitleEn')}<input id="a_titleEn" class="ltr" value="${esc(a.titleEn)}"></label>
-    </div>
-    <div class="full"><label>${L('lblAdTextAr')}<textarea id="a_textAr" rows="2">${esc(a.textAr)}</textarea></label></div>
-    <div class="full"><label>${L('lblAdTextEn')}<textarea id="a_textEn" rows="2">${esc(a.textEn)}</textarea></label></div>`;
-  renderAdPreview();
-}
-el('saveAd').addEventListener('click', async ()=>{
-  const a = STATE.SETTINGS.ad;
-  a.enabled = el('a_enabled').checked;
-  a.oncePerDay = el('a_once').checked;
-  a.icon = mv('a_icon').trim() || '🍝';
-  a.titleAr = mv('a_titleAr').trim();
-  a.titleEn = mv('a_titleEn').trim();
-  a.textAr = mv('a_textAr').trim();
-  a.textEn = mv('a_textEn').trim();
-  a.btnAr = mv('a_btnAr').trim() || 'حسناً 🍝';
-  a.btnEn = mv('a_btnEn').trim() || 'Got it 🍝';
-  const btn = el('saveAd'); const label = L('btnSaveAd');
-  btn.textContent = L('publishing'); btn.disabled = true;
-  try{
-    await publishSettings('تحديث الإعلان من لوحة التحكم 📢');
-    toast(L('published'),'success',L('subLive'));
-    btn.disabled = false; btn.textContent = label;
-  }catch(e){ handlePublishError(e, btn, label); }
-});
-
-/* ===== التصدير الاحتياطي ===== */
-el('btnExport').addEventListener('click', ()=>{
-  const data = { exportedAt: new Date().toISOString(), MENU: STATE.MENU, SETTINGS: STATE.SETTINGS };
-  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'makaronjy-backup-' + Date.now() + '.json';
-  a.click();
-  URL.revokeObjectURL(a.href);
-  toast(L('exported'),'info');
-});
-
-function renderAll(){
-  renderMenu(); renderBranches(); renderBest(); renderDeliveryAdmin(); renderSettings(); renderAd();
-}
-
-/* ===== الإقلاع واستعادة الجلسة ===== */
-(function init(){
-  const saved = sessionStorage.getItem('mk_admin');
-  if(saved){
-    try{
-      CFG = JSON.parse(saved);
-      loadAll().catch(e=>{
-        if(e.http === 401 || e.http === 403) showRenew();
-        else{
-          const cls = classifyGhError(e);
-          showBanner('loginErr', L('errPublish'), L(cls.key) + (cls.detail ? ' — ' + cls.detail : ''));
-        }
-      });
-      return;
-    }catch{}
-  }
-  applyAdminLang();
-})();
-
-window.__ADMIN_BOOTED = true;
-</script>
-</body>
-</html>
-<!-- ===== END OF FILE v18 ===== -->
+el('saveSettings').addEventListe
