@@ -240,7 +240,11 @@ window.MENU = [
         "cal": 0,
         "desc": "مياه نقية",
         "descEn": "Pure water",
-        "imgv": 1789349395713
+        "imgv": 1789349395713,
+        "imgMode": "cut",
+        "so": [
+          "b-badiah"
+        ]
       },
       {
         "id": "drink-pepsi",
