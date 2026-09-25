@@ -1,4 +1,4 @@
-<!-- ===== ADMIN COMPLETE BUILD v17 ===== -->
+<!-- ===== ADMIN COMPLETE BUILD v18 ===== -->
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -346,8 +346,8 @@ document.addEventListener('touchmove', e=>{ if(e.touches.length > 1) e.preventDe
 document.addEventListener('dblclick', e=> e.preventDefault());
 
 /* =====================================================
-   لوحة تحكم مكرونجي — BUILD v17
-   (إصلاح إرسال التوكن مع طلبات الكتابة PUT)
+   لوحة تحكم مكرونجي — BUILD v18
+   (زر الرجوع يغلق النوافذ: التأكيد أولاً ثم التعديل)
 ===================================================== */
 
 const ADMIN_USER = 'mahmoud';
@@ -557,6 +557,37 @@ function mv(id){ const n = el(id); return n ? n.value : ''; }
 function radioVal(name, dflt){ const n = document.querySelector('input[name="'+name+'"]:checked'); return n ? n.value : dflt; }
 function checkedVals(cls){ return [...document.querySelectorAll('.'+cls+':checked')].map(c=>c.value); }
 
+/* =====================================================
+   حاجز زر الرجوع: النوافذ تُغلق بالترتيب (الأعلى أولاً)
+===================================================== */
+let guardDepth = 0;
+let suppressCount = 0;
+function modalOpen(){ return !el('modal').classList.contains('hidden'); }
+function confirmOpen(){ return !el('confirmModal').classList.contains('hidden'); }
+function pushGuard(){
+  try{ history.pushState({ mkAdminGuard: 1 }, ''); guardDepth++; }catch(e){ guardDepth++; }
+}
+function consumeGuard(){
+  if(guardDepth <= 0) return;
+  guardDepth--;
+  suppressCount++;
+  try{ history.back(); }catch(e){ suppressCount--; }
+  setTimeout(()=>{ if(suppressCount > 0) suppressCount--; }, 600);
+}
+window.addEventListener('popstate', ()=>{
+  if(suppressCount > 0){ suppressCount--; return; }
+  if(guardDepth > 0) guardDepth--;
+  /* إغلاق الأعلى فقط بدون استهلاك (المتصفح استهلك الحالة بالفعل) */
+  if(confirmOpen()){ settleConfirm(false, false); return; }
+  if(modalOpen()){ hideModalOnly(); return; }
+});
+/* مفتاح Escape للكمبيوتر بنفس المنطق */
+document.addEventListener('keydown', e=>{
+  if(e.key !== 'Escape') return;
+  if(confirmOpen()){ settleConfirm(false); return; }
+  if(modalOpen()){ closeModal(); return; }
+});
+
 function applyAdminLang(){
   document.documentElement.lang = ALANG;
   document.querySelectorAll('[data-al]').forEach(n=>{
@@ -587,36 +618,47 @@ function toast(title, kind='info', sub=''){
   setTimeout(()=>{ div.classList.add('out'); setTimeout(()=>div.remove(), 350); }, 3400);
 }
 
+/* ===== نافذة التأكيد (طبقة مستقلة فوق أي نافذة) ===== */
+let confirmResolve = null;
 function askConfirm(msg, title, ico, yesLbl){
   return new Promise(resolve=>{
+    confirmResolve = resolve;
     el('cfIco').textContent = ico || '⚠️';
     el('cfTitle').textContent = title || L('confirmDefault');
     el('cfMsg').textContent = msg;
     el('cfYes').textContent = yesLbl || L('btnDelFinal');
     el('cfNo').textContent = L('modalCancel');
     el('confirmModal').classList.remove('hidden');
-    const yes = ()=>{ cleanup(); resolve(true); };
-    const no = ()=>{ cleanup(); resolve(false); };
-    const close = (e)=>{ if(e.target === el('confirmModal')) no(); };
-    function cleanup(){
-      el('confirmModal').classList.add('hidden');
-      el('cfYes').removeEventListener('click', yes);
-      el('cfNo').removeEventListener('click', no);
-      el('confirmModal').removeEventListener('click', close);
-    }
-    el('cfYes').addEventListener('click', yes);
-    el('cfNo').addEventListener('click', no);
-    el('confirmModal').addEventListener('click', close);
+    pushGuard();
   });
 }
+function settleConfirm(val, consume = true){
+  if(!confirmOpen() && !confirmResolve) return;
+  el('confirmModal').classList.add('hidden');
+  const r = confirmResolve; confirmResolve = null;
+  if(consume) consumeGuard();
+  if(r) r(val);
+}
+el('cfYes').addEventListener('click', ()=> settleConfirm(true));
+el('cfNo').addEventListener('click', ()=> settleConfirm(false));
+el('confirmModal').addEventListener('click', e=>{ if(e.target === el('confirmModal')) settleConfirm(false); });
 
+/* ===== نافذة النماذج ===== */
 function openModal(title, bodyHtml, onSave){
   el('modalTitle').textContent = title;
   el('modalBody').innerHTML = bodyHtml;
   modalOnSave = onSave;
   el('modal').classList.remove('hidden');
+  pushGuard();
 }
-function closeModal(){ el('modal').classList.add('hidden'); modalOnSave = null; }
+function hideModalOnly(){
+  el('modal').classList.add('hidden');
+  modalOnSave = null;
+}
+function closeModal(){
+  hideModalOnly();
+  consumeGuard();
+}
 el('modalCancel').addEventListener('click', closeModal);
 el('modal').addEventListener('click', e=>{ if(e.target === el('modal')) closeModal(); });
 el('modalSave').addEventListener('click', async ()=>{
@@ -659,7 +701,7 @@ function handlePublishError(e, btn, label){
   if(btn){ btn.disabled = false; btn.textContent = label; }
 }
 
-/* ===== GitHub (الإصلاح: دمج الرؤوس بدلاً من استبدالها) ===== */
+/* ===== GitHub ===== */
 const GH_API = 'https://api.github.com';
 async function gh(path, opts={}){
   const headers = {
@@ -1574,4 +1616,4 @@ window.__ADMIN_BOOTED = true;
 </script>
 </body>
 </html>
-<!-- ===== END OF FILE v17 ===== -->
+<!-- ===== END OF FILE v18 ===== -->
