@@ -1,4 +1,4 @@
-<!-- ===== ADMIN COMPLETE BUILD v14 ===== -->
+<!-- ===== ADMIN COMPLETE BUILD v15 ===== -->
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -208,7 +208,7 @@ fieldset label{display:inline-flex;align-items:center;gap:.35rem;font-size:.76re
 </head>
 <body>
 
-<!-- ===== شاشة الدخول (الواجهة الجديدة) ===== -->
+<!-- ===== شاشة الدخول ===== -->
 <div id="loginScreen" class="screen">
   <div class="card">
     <div class="login-head">
@@ -337,8 +337,7 @@ document.addEventListener('touchmove', e=>{ if(e.touches.length > 1) e.preventDe
 document.addEventListener('dblclick', e=> e.preventDefault());
 
 /* =====================================================
-   لوحة تحكم مكرونجي — BUILD v14
-   (منطق لوحتك القديمة العاملة + واجهة دخول جديدة نظيفة)
+   لوحة تحكم مكرونجي — BUILD v15 (إصلاح ترميز UTF-8 عند القراءة)
 ===================================================== */
 
 const ADMIN_USER = 'mahmoud';
@@ -644,9 +643,17 @@ async function gh(path, opts={}){
   const ct = r.headers.get('content-type') || '';
   return ct.includes('json') ? r.json() : { text: await r.text(), sha: r.headers.get('etag') };
 }
+/* ===== الإصلاح: فك Base64 ثم تحويل البايتات إلى نص UTF-8 سليم ===== */
+function b64ToUtf8(b64){
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+  if(window.TextDecoder) return new TextDecoder('utf-8').decode(bytes);
+  return decodeURIComponent(escape(bin));
+}
 async function getFile(path){
   const r = await gh('/repos/' + CFG.owner + '/' + CFG.repo + '/contents/' + path + '?ref=' + CFG.branch);
-  return { text: atob(r.content), sha: r.sha };
+  return { text: b64ToUtf8(r.content), sha: r.sha };
 }
 async function putFile(path, content, sha, msg){
   return gh('/repos/' + CFG.owner + '/' + CFG.repo + '/contents/' + path, {
@@ -756,7 +763,7 @@ async function loadAll(){
   renderAll();
 }
 
-/* ===== الدخول (نفس منطق لوحتك القديمة العاملة + واجهة جديدة) ===== */
+/* ===== الدخول ===== */
 el('btnLogin').addEventListener('click', async ()=>{
   const owner = el('inOwner').value.trim();
   const repo  = el('inRepo').value.trim() || GH_REPO;
@@ -1515,4 +1522,4 @@ window.__ADMIN_BOOTED = true;
 </script>
 </body>
 </html>
-<!-- ===== END OF FILE v14 ===== -->
+<!-- ===== END OF FILE v15 ===== -->
