@@ -1,4 +1,4 @@
-<!-- ===== ADMIN COMPLETE BUILD v13 ===== -->
+<!-- ===== ADMIN COMPLETE BUILD v14 ===== -->
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -52,6 +52,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--ink);min-he
 .screen input{width:100%;direction:ltr;text-align:right;border:1px solid var(--line);border-radius:16px;
   padding:.95rem 1rem;background:var(--panel);color:var(--ink);font-family:inherit;font-size:1rem;font-weight:700;
   outline:none;margin:0 0 1.15rem;transition:.2s}
+.screen input[type="hidden"]{display:none}
 .screen input:focus{border-color:var(--rust);box-shadow:0 0 0 3px rgba(180,83,9,.13)}
 .screen .primary{border-radius:18px;padding:1.05rem;font-size:1.15rem}
 .screen h1.r-title{color:var(--ink);font-size:1.3rem;font-weight:900;margin-bottom:.8rem}
@@ -207,15 +208,17 @@ fieldset label{display:inline-flex;align-items:center;gap:.35rem;font-size:.76re
 </head>
 <body>
 
-<!-- ===== شاشة الدخول ===== -->
+<!-- ===== شاشة الدخول (الواجهة الجديدة) ===== -->
 <div id="loginScreen" class="screen">
   <div class="card">
     <div class="login-head">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3C9.79 3 8 4.79 8 7C6.34 7 5 8.34 5 10C5 11.66 6.34 13 8 13H16C17.66 13 19 11.66 19 10C19 8.34 17.66 7 16 7C16 4.79 14.21 3 12 3M8 15V18C8 19.1 9.79 20 12 20C14.21 20 16 19.1 16 18V15H8Z"/></svg>
       <h1 data-al="loginTitle">لوحة تحكم مكرونجي</h1>
     </div>
-    <label><span data-al="lblUser">اسم المستخدم</span><input id="inUser" autocomplete="username"></label>
-    <label><span data-al="lblPass">كلمة السر</span><input id="inPass" type="password" autocomplete="current-password" placeholder="••••••••"></label>
+    <label><span data-al="lblOwner">اسم المستخدم</span><input id="inOwner" autocomplete="username"></label>
+    <label><span data-al="lblToken">كلمة السر</span><input id="inToken" type="password" autocomplete="current-password" placeholder="••••••••"></label>
+    <input type="hidden" id="inRepo" value="Makaronjy">
+    <input type="hidden" id="inBranch" value="main">
     <button id="btnLogin" class="primary" data-al="btnLogin">دخول</button>
     <div id="loginErr" class="banner error"></div>
   </div>
@@ -334,7 +337,8 @@ document.addEventListener('touchmove', e=>{ if(e.touches.length > 1) e.preventDe
 document.addEventListener('dblclick', e=> e.preventDefault());
 
 /* =====================================================
-   لوحة تحكم مكرونجي — BUILD v13 (مطابق لصيغة app.js الفعلية)
+   لوحة تحكم مكرونجي — BUILD v14
+   (منطق لوحتك القديمة العاملة + واجهة دخول جديدة نظيفة)
 ===================================================== */
 
 const ADMIN_USER = 'mahmoud';
@@ -351,7 +355,7 @@ let ALANG = localStorage.getItem('mk_admin_lang') || 'ar';
 
 const ASTR = {
   ar: {
-    loginTitle:'لوحة تحكم مكرونجي', lblUser:'اسم المستخدم', lblPass:'كلمة السر', btnLogin:'دخول',
+    loginTitle:'لوحة تحكم مكرونجي', lblOwner:'اسم المستخدم', lblToken:'كلمة السر', btnLogin:'دخول',
     errComplete:'أكمل جميع الحقول.', errCreds:'اسم المستخدم أو كلمة السر غير صحيحة.',
     errNoToken:'لا يوجد توكن للنشر — الصق التوكن ككلمة سر أو ضع الثابت GH_TOKEN داخل الملف.',
     errPublish:'تعذّر تحميل البيانات من المستودع.',
@@ -449,7 +453,7 @@ const ASTR = {
     modalSave:'حفظ', modalCancel:'إلغاء'
   },
   en: {
-    loginTitle:'Makaronjy Admin Panel', lblUser:'Username', lblPass:'Password', btnLogin:'Login',
+    loginTitle:'Makaronjy Admin Panel', lblOwner:'Username', lblToken:'Password', btnLogin:'Login',
     errComplete:'Please complete all fields.', errCreds:'Wrong username or password.',
     errNoToken:'No publishing token — paste the token as password or set GH_TOKEN inside the file.',
     errPublish:'Could not load data from the repository.',
@@ -657,7 +661,6 @@ function b64OfFile(file){
     return btoa(bytes);
   });
 }
-/* صورة الصنف: بنفس مسار app.js تماماً → img/items/{id}.png */
 async function uploadItemImgById(id, file){
   const path = 'img/items/' + id + '.png';
   const cur = await getFile(path).catch(()=>({sha:null}));
@@ -753,20 +756,22 @@ async function loadAll(){
   renderAll();
 }
 
-/* ===== الدخول: ثلاث طرق قبول ===== */
+/* ===== الدخول (نفس منطق لوحتك القديمة العاملة + واجهة جديدة) ===== */
 el('btnLogin').addEventListener('click', async ()=>{
-  const u = el('inUser').value.trim();
-  const p = el('inPass').value.trim();
+  const owner = el('inOwner').value.trim();
+  const repo  = el('inRepo').value.trim() || GH_REPO;
+  const branch= el('inBranch').value.trim() || GH_BRANCH;
+  const token = el('inToken').value.trim();
   hideBanner('loginErr');
-  if(!u || !p){ showBanner('loginErr', L('errComplete')); return; }
-  const tokenLike = /^(github_pat_|ghp_|gho_|ghu_|ghs_|ghr_)/i.test(p);
-  const isLocal   = (u.toLowerCase() === String(ADMIN_USER).toLowerCase()) && (p === ADMIN_PASS);
-  const isEmbed   = (GH_TOKEN !== '') && (p === GH_TOKEN);
+  if(!owner || !token){ showBanner('loginErr', L('errComplete')); return; }
+  const tokenLike = /^(github_pat_|ghp_|gho_|ghu_|ghs_|ghr_)/i.test(token);
+  const isLocal   = (owner.toLowerCase() === String(ADMIN_USER).toLowerCase()) && (token === ADMIN_PASS);
+  const isEmbed   = (GH_TOKEN !== '') && (token === GH_TOKEN);
   if(!isLocal && !tokenLike && !isEmbed){ showBanner('loginErr', L('errCreds')); return; }
-  const owner = isLocal ? GH_OWNER : (u || GH_OWNER);
-  const token = isLocal ? (GH_TOKEN || '') : p;
-  if(!token){ showBanner('loginErr', L('errNoToken')); return; }
-  CFG = { owner: owner, repo: GH_REPO, branch: GH_BRANCH, token: token };
+  const finalOwner = isLocal ? GH_OWNER : owner;
+  const finalToken = isLocal ? (GH_TOKEN || '') : token;
+  if(!finalToken){ showBanner('loginErr', L('errNoToken')); return; }
+  CFG = { owner: finalOwner, repo: repo, branch: branch, token: finalToken };
   sessionStorage.setItem('mk_admin', JSON.stringify(CFG));
   const btn = el('btnLogin');
   btn.textContent = L('publishing'); btn.disabled = true;
@@ -780,7 +785,7 @@ el('btnLogin').addEventListener('click', async ()=>{
   }
   btn.disabled = false; btn.textContent = L('btnLogin');
 });
-['inUser','inPass'].forEach(id=> el(id).addEventListener('keydown', e=>{ if(e.key === 'Enter') el('btnLogin').click(); }));
+['inOwner','inToken'].forEach(id=> el(id).addEventListener('keydown', e=>{ if(e.key === 'Enter') el('btnLogin').click(); }));
 
 /* ===== التجديد ===== */
 function showRenew(){
@@ -819,7 +824,7 @@ function settingsText(){ return 'window.APP_SETTINGS = ' + JSON.stringify(STATE.
 async function publishSettings(msg){ const r = await putFile('settings.js', settingsText(), STATE.shas.settings, msg); STATE.shas.settings = r.content ? r.content.sha : r.sha; }
 async function publishMenu(msg){ const r = await putFile('menu.js', menuText(), STATE.shas.menu, msg); STATE.shas.menu = r.content ? r.content.sha : r.sha; }
 
-/* ===== المنيو (بصيغة app.js: only / miss / so / imgv) ===== */
+/* ===== المنيو ===== */
 function renderMenu(){
   const wrap = el('menuWrap');
   if(!STATE.MENU.length){ wrap.innerHTML = '<div class="note">لا توجد أقسام بعد — أضف أول قسم.</div>'; return; }
@@ -839,7 +844,7 @@ function renderMenu(){
           const onlyArr = Array.isArray(it.only) ? it.only : null;
           const unavailNames = (onlyArr && onlyArr.length) ? brs.filter(b=>!onlyArr.includes(b.id)).map(brName).join('، ') : '';
           const soArr = Array.isArray(it.so) ? it.so : [];
-          const soldNames = soArr.length ? (soArr.length >= brs.length && brs.length ? null : soArr.map(id=>{ const b = brs.find(x=>x.id===id); return b ? brName(b) : id; }).join('، ')) : '';
+          const soldNames = soArr.length ? ((brs.length && soArr.length >= brs.length) ? null : soArr.map(id=>{ const b = brs.find(x=>x.id===id); return b ? brName(b) : id; }).join('، ')) : '';
           const missMode = it.miss || 'gray';
           const name = (ALANG==='ar') ? it.ar : (it.en || it.ar);
           const tag = unavailNames ? L('availTag')(unavailNames, missMode==='hide'?L('modeHide'):L('modeGray')) : '';
@@ -881,7 +886,6 @@ el('menuWrap').addEventListener('click', async e=>{
   if(act === 'addItem') openItemModal(si, null);
 });
 
-/* صور الأصناف المعلّقة حتى النشر */
 const pendingItemImgs = {};
 
 el('saveMenu').addEventListener('click', async ()=>{
@@ -928,10 +932,8 @@ function openItemModal(si, ii){
   const it = ii===null ? null : STATE.MENU[si].items[ii];
   itemModalFile = null; itemModalDelete = false;
   const brs = branches();
-  /* only: قائمة الفروع المتاحة — فارغة/غير موجودة = كل الفروع */
   const onlyVal = (!it || !Array.isArray(it.only) || !it.only.length) ? 'all' : it.only.join(',');
   const missVal = it ? (it.miss || 'gray') : 'gray';
-  /* so: قائمة فروع النفد */
   const soArr = (it && Array.isArray(it.so)) ? it.so : [];
   const soldVal = soArr.length ? ((brs.length && soArr.length >= brs.length) ? 'all' : soArr.join(',')) : 'none';
   const curImg = (it && it.imgv) ? ('img/items/' + it.id + '.png?v=' + it.imgv) : null;
@@ -1022,12 +1024,12 @@ function openItemModal(si, ii){
       imgMode: el('it_imgMode').value,
       hidden: it ? it.hidden : false
     };
-    if(only.length) data.only = only;
-    if(only.length) data.miss = miss;
-    if(so.length) data.so = so;
+    if(only.length){ data.only = only; data.miss = miss; }
+    if(so.length){ data.so = so; }
     if(itemModalFile) pendingItemImgs[id] = itemModalFile;
     else if(itemModalDelete) pendingItemImgs[id] = 'delete';
-    if(it) Object.assign(it, data); else STATE.MENU[si].items.push(data);
+    if(it){ delete it.only; delete it.miss; delete it.so; Object.assign(it, data); }
+    else STATE.MENU[si].items.push(data);
     renderMenu(); toast(L('savedItem'),'success',L('dontForget'));
   });
   const imgBox = el('it_imgBox'), imgFile = el('it_imgFile');
@@ -1513,4 +1515,4 @@ window.__ADMIN_BOOTED = true;
 </script>
 </body>
 </html>
-<!-- ===== END OF FILE v13 ===== -->
+<!-- ===== END OF FILE v14 ===== -->
