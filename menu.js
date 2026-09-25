@@ -16,11 +16,7 @@ window.MENU = [
         "desc": "مكرونة أقلام حمراء مع نص حبة دجاج مشوي",
         "descEn": "Red penne pasta with half grilled chicken",
         "imgv": 1789344170794,
-        "imgMode": "cut",
-        "only": [
-          "b-badiah"
-        ],
-        "miss": "hide"
+        "imgMode": "cut"
       },
       {
         "id": "pasta-red-chest",
