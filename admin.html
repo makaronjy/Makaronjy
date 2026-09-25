@@ -1,4 +1,4 @@
-<!-- ===== ADMIN COMPLETE BUILD v15 ===== -->
+<!-- ===== ADMIN COMPLETE BUILD v16 ===== -->
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -10,13 +10,21 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&display=swap" rel="stylesheet">
 <script>
-/* مراقب الإقلاع — يظهر رسالة فقط إذا كان الملف ناقصاً أو تالفاً */
+/* مراقب الأخطاء والإقلاع — يظهر رسالة فقط عند وجود خطأ */
 window.addEventListener('error', function(e){
   if(window.__ADMIN_ERR_SHOWN) return;
   window.__ADMIN_ERR_SHOWN = true;
   var d = document.createElement('div');
   d.style.cssText = 'position:fixed;left:0;right:0;bottom:0;background:#b91c1c;color:#fff;padding:.7rem .8rem;font-size:.75rem;font-weight:800;z-index:99999;text-align:center;line-height:1.7';
   d.textContent = '⛠ خطأ في ملف اللوحة: ' + (e.message || 'غير معروف') + ' — أعد استبدال admin.html بالنسخة الكاملة دفعة واحدة.';
+  document.documentElement.appendChild(d);
+});
+window.addEventListener('unhandledrejection', function(ev){
+  if(window.__ADMIN_ERR_SHOWN) return;
+  window.__ADMIN_ERR_SHOWN = true;
+  var d = document.createElement('div');
+  d.style.cssText = 'position:fixed;left:0;right:0;bottom:0;background:#b91c1c;color:#fff;padding:.7rem .8rem;font-size:.75rem;font-weight:800;z-index:99999;text-align:center;line-height:1.7';
+  d.textContent = '⛠ خطأ تشغيل: ' + ((ev.reason && ev.reason.message) || ev.reason || 'غير معروف');
   document.documentElement.appendChild(d);
 });
 window.addEventListener('load', function(){
@@ -232,6 +240,7 @@ fieldset label{display:inline-flex;align-items:center;gap:.35rem;font-size:.76re
     <label><span data-al="lblNewToken">توكن جديد</span><input id="inRenewToken" type="password" placeholder="github_pat_..."></label>
     <button id="btnRenew" class="primary" data-al="btnRenew">حفظ والمتابعة</button>
     <div id="renewErr" class="banner error"></div>
+    <p class="hint" style="margin-top:.9rem;margin-bottom:0" data-al="renewNote">تأكد أن صلاحية التوكن Contents: Read and write على هذا المستودع.</p>
     <a class="renew-link" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener" data-al="renewLink">توكن جديد</a>
   </div>
 </div>
@@ -337,7 +346,7 @@ document.addEventListener('touchmove', e=>{ if(e.touches.length > 1) e.preventDe
 document.addEventListener('dblclick', e=> e.preventDefault());
 
 /* =====================================================
-   لوحة تحكم مكرونجي — BUILD v15 (إصلاح ترميز UTF-8 عند القراءة)
+   لوحة تحكم مكرونجي — BUILD v16
 ===================================================== */
 
 const ADMIN_USER = 'mahmoud';
@@ -359,9 +368,10 @@ const ASTR = {
     errNoToken:'لا يوجد توكن للنشر — الصق التوكن ككلمة سر أو ضع الثابت GH_TOKEN داخل الملف.',
     errPublish:'تعذّر تحميل البيانات من المستودع.',
     errNetwork:'تعذّر الاتصال بالخادم — تحقق من الإنترنت.', errNotFound:'المستودع أو الملف غير موجود.',
-    errPermission:'رمز الوصول لا يملك الصلاحية الكافية.', errAuth:'رمز الوصول مرفوض.', errGeneric:'خطأ: ',
+    errPermission:'التوكن لا يملك صلاحية الكتابة — أنشئ توكن بصلاحية Contents: Read and write.', errAuth:'رمز الوصول مرفوض.', errGeneric:'خطأ: ',
     renewTitle:'⚠️ انتهت صلاحية التوكن',
     renewHint:'انتهت صلاحية التوكن أو لا يملك الصلاحية. جدّده من GitHub ثم أدخله هنا للمتابعة — بياناتك لم تُفقد وسيكتمل الحفظ تلقائياً.',
+    renewNote:'تأكد أن صلاحية التوكن Contents: Read and write على هذا المستودع.',
     lblNewToken:'توكن جديد', btnRenew:'حفظ والمتابعة', renewLink:'توكن جديد',
     errRenewEmpty:'أدخل التوكن الجديد.', errRenewBad:'التوكن ما زال مرفوضاً.',
     headerTitle:'لوحة تحكم مكرونجي', appVersion:'v5.0',
@@ -457,9 +467,10 @@ const ASTR = {
     errNoToken:'No publishing token — paste the token as password or set GH_TOKEN inside the file.',
     errPublish:'Could not load data from the repository.',
     errNetwork:'Could not connect to the server.', errNotFound:'Repository or file not found.',
-    errPermission:'The access code lacks permission.', errAuth:'Access code rejected.', errGeneric:'Error: ',
+    errPermission:'Token lacks write permission — create one with Contents: Read and write.', errAuth:'Access code rejected.', errGeneric:'Error: ',
     renewTitle:'⚠️ Token expired',
     renewHint:'The token expired or lacks permission. Renew it on GitHub then paste here — your data is intact and saving will resume.',
+    renewNote:'Make sure the token permission is Contents: Read and write on this repository.',
     lblNewToken:'New token', btnRenew:'Save and continue', renewLink:'New token',
     errRenewEmpty:'Enter the new token.', errRenewBad:'Token still rejected.',
     headerTitle:'Makaronjy Admin', appVersion:'v5.0',
@@ -540,6 +551,13 @@ const ASTR = {
 const el = id => document.getElementById(id);
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function L(k, a){ const d = ASTR[ALANG] || ASTR.ar; const v = d[k] ?? ASTR.ar[k] ?? k; return typeof v === 'function' ? v(a) : v; }
+/* استدعاء نصوص القاموس التي على شكل دالة — بصيغة آمنة */
+function LF(k, ...a){ const d = ASTR[ALANG] || ASTR.ar; const v = d[k] ?? ASTR.ar[k]; return typeof v === 'function' ? v(...a) : v; }
+/* قراءة حقل نموذج بشكل آمن (لا تنهار إن نقص الحقل) */
+function mv(id){ const n = el(id); return n ? n.value : ''; }
+function radioVal(name, dflt){ const n = document.querySelector('input[name="'+name+'"]:checked'); return n ? n.value : dflt; }
+function checkedVals(cls){ return [...document.querySelectorAll('.'+cls+':checked')].map(c=>c.value); }
+
 function applyAdminLang(){
   document.documentElement.lang = ALANG;
   document.querySelectorAll('[data-al]').forEach(n=>{
@@ -604,8 +622,12 @@ el('modalCancel').addEventListener('click', closeModal);
 el('modal').addEventListener('click', e=>{ if(e.target === el('modal')) closeModal(); });
 el('modalSave').addEventListener('click', async ()=>{
   if(!modalOnSave) return;
-  const res = await modalOnSave();
-  if(res !== false) closeModal();
+  try{
+    const res = await modalOnSave();
+    if(res !== false) closeModal();
+  }catch(err){
+    toast(L('errGeneric') + ((err && err.message) ? err.message : err), 'error');
+  }
 });
 
 function showBanner(id, msg, detail){
@@ -628,6 +650,16 @@ function classifyGhError(e){
   if(status === 404) return { key:'errNotFound', detail: e.message };
   return { key:'errGeneric', detail: e.message || ('HTTP ' + status) };
 }
+/* رسالة موحدة عند فشل النشر بسبب الصلاحية */
+function handlePublishError(e, btn, label){
+  if(e.http === 401 || e.http === 403){
+    toast(e.http === 401 ? L('errAuth') : L('errPermission'), 'error');
+    showRenew();
+  } else {
+    toast(L('publishFail') + e.message, 'error');
+  }
+  if(btn){ btn.disabled = false; btn.textContent = label; }
+}
 
 /* ===== GitHub ===== */
 const GH_API = 'https://api.github.com';
@@ -643,7 +675,6 @@ async function gh(path, opts={}){
   const ct = r.headers.get('content-type') || '';
   return ct.includes('json') ? r.json() : { text: await r.text(), sha: r.headers.get('etag') };
 }
-/* ===== الإصلاح: فك Base64 ثم تحويل البايتات إلى نص UTF-8 سليم ===== */
 function b64ToUtf8(b64){
   const bin = atob(b64);
   const bytes = new Uint8Array(bin.length);
@@ -821,7 +852,7 @@ el('btnRefresh').addEventListener('click', async ()=>{
   const b = el('btnRefresh'), old = b.textContent;
   b.textContent = L('refreshing'); b.disabled = true;
   try{ await loadAll(); toast(L('refreshed'),'success'); }
-  catch(e){ if(e.http===401||e.http===403) showRenew(); else toast(L('refreshFail') + e.message,'error'); }
+  catch(e){ if(e.http===401||e.http===403){ toast(L('errAuth'),'error'); showRenew(); } else toast(L('refreshFail') + e.message,'error'); }
   b.disabled = false; b.textContent = old;
 });
 
@@ -854,12 +885,12 @@ function renderMenu(){
           const soldNames = soArr.length ? ((brs.length && soArr.length >= brs.length) ? null : soArr.map(id=>{ const b = brs.find(x=>x.id===id); return b ? brName(b) : id; }).join('، ')) : '';
           const missMode = it.miss || 'gray';
           const name = (ALANG==='ar') ? it.ar : (it.en || it.ar);
-          const tag = unavailNames ? L('availTag')(unavailNames, missMode==='hide'?L('modeHide'):L('modeGray')) : '';
+          const tag = unavailNames ? LF('availTag', unavailNames, missMode==='hide'?L('modeHide'):L('modeGray')) : '';
           const soldTag = soArr.length ? (soldNames === null ? L('soldAll') : L('soldSome') + soldNames) : '';
           return `<div class="item-row ${it.hidden?'is-hidden':''}">
             <div class="item-info">
               <b>${esc(name)} ${it.hidden?'<span style="opacity:.6;font-weight:700;font-size:.7rem">'+L('hidden')+'</span>':''}</b>
-              <small>${esc(it.prices[0] + ' ' + L('riyal'))}${it.cal?(' • '+it.cal+' '+L('calWord')):''}${esc(tag)}${esc(soldTag)}</small>
+              <small>${esc((it.prices && it.prices[0] ? it.prices[0] : 0) + ' ' + L('riyal'))}${it.cal?(' • '+it.cal+' '+L('calWord')):''}${esc(tag)}${esc(soldTag)}</small>
             </div>
             <span class="item-ops">
               <button class="edit" data-act="editItem" data-si="${si}" data-ii="${ii}">✏️</button>
@@ -877,7 +908,7 @@ el('menuWrap').addEventListener('click', async e=>{
   if(act === 'editSec') openSectionModal(si);
   if(act === 'delSec'){
     const sec = STATE.MENU[si];
-    const ok = await askConfirm(L('delSecMsg')(sec.t), L('confirmDefault'), '🗑', L('btnDelFinal'));
+    const ok = await askConfirm(LF('delSecMsg', sec.t), L('confirmDefault'), '🗑', L('btnDelFinal'));
     if(ok){ STATE.MENU.splice(si,1); renderMenu(); toast(L('deletedSec'),'warn',L('dontForget')); }
   }
   if(act === 'hideSec'){
@@ -887,7 +918,7 @@ el('menuWrap').addEventListener('click', async e=>{
   if(act === 'editItem') openItemModal(sIdx, ii);
   if(act === 'delItem'){
     const it = STATE.MENU[sIdx].items[ii];
-    const ok = await askConfirm(L('delItemMsg')(it.ar), L('confirmDefault'), '🗑', L('btnDelFinal'));
+    const ok = await askConfirm(LF('delItemMsg', it.ar), L('confirmDefault'), '🗑', L('btnDelFinal'));
     if(ok){ STATE.MENU[sIdx].items.splice(ii,1); renderMenu(); toast(L('deletedItem'),'warn',L('dontForget')); }
   }
   if(act === 'addItem') openItemModal(si, null);
@@ -896,7 +927,8 @@ el('menuWrap').addEventListener('click', async e=>{
 const pendingItemImgs = {};
 
 el('saveMenu').addEventListener('click', async ()=>{
-  const btn = el('saveMenu'); btn.textContent = L('publishing');
+  const btn = el('saveMenu'); const label = L('btnSaveMenu');
+  btn.textContent = L('publishing'); btn.disabled = true;
   try{
     for(const sec of STATE.MENU) for(const it of sec.items){
       const pend = pendingItemImgs[it.id];
@@ -911,10 +943,10 @@ el('saveMenu').addEventListener('click', async ()=>{
     await publishMenu('تحديث المنيو من لوحة التحكم 🍝');
     renderMenu();
     toast(L('publishedMenu'),'success',L('subLive'));
+    btn.disabled = false; btn.textContent = label;
   }catch(e){
-    if(e.http===401||e.http===403) showRenew(); else toast(L('publishFail') + e.message,'error');
+    handlePublishError(e, btn, label);
   }
-  btn.textContent = L('btnSaveMenu');
 });
 
 function openSectionModal(i){
@@ -925,7 +957,7 @@ function openSectionModal(i){
       <label>${L('lblSecNameEn')}<input id="sec_en" class="ltr" value="${esc(s?s.tEn:'')}"></label>
       <label>${L('lblSecIcon')}<input id="sec_i" value="${esc(s?s.i:'🍝')}" maxlength="4"></label>
     </div>`, async ()=>{
-    const ar = el('sec_ar').value.trim(), en = el('sec_en').value.trim(), ic = el('sec_i').value.trim() || '🍝';
+    const ar = mv('sec_ar').trim(), en = mv('sec_en').trim(), ic = mv('sec_i').trim() || '🍝';
     if(!ar){ toast(L('warnSecName'),'warn'); return false; }
     if(s){ s.t = ar; s.tEn = en || ar; s.i = ic; }
     else STATE.MENU.push({ id:'sec-'+Date.now(), i: ic, t: ar, tEn: en || ar, hidden:false, items: [] });
@@ -944,15 +976,12 @@ function openItemModal(si, ii){
   const soArr = (it && Array.isArray(it.so)) ? it.so : [];
   const soldVal = soArr.length ? ((brs.length && soArr.length >= brs.length) ? 'all' : soArr.join(',')) : 'none';
   const curImg = (it && it.imgv) ? ('img/items/' + it.id + '.png?v=' + it.imgv) : null;
-  const availCustomChecked = (onlyVal !== 'all') ? ' checked' : '';
-  const soldAllChecked = (soldVal === 'all') ? ' checked' : '';
-  const soldCustomChecked = (soldVal !== 'none' && soldVal !== 'all') ? ' checked' : '';
   const availCustomHtml = brs.length
-    ? `<label><input type="radio" name="it_avail" value="custom"${availCustomChecked}> تخصيص</label>` : '';
+    ? `<label><input type="radio" name="it_avail" value="custom"${(onlyVal!=='all')?' checked':''}> تخصيص</label>` : '';
   const soldAllHtml = brs.length
-    ? `<label><input type="radio" name="it_sold" value="all"${soldAllChecked}> نفد في كل الفروع</label>` : '';
+    ? `<label><input type="radio" name="it_sold" value="all"${(soldVal==='all')?' checked':''}> نفد في كل الفروع</label>` : '';
   const soldCustomHtml = brs.length
-    ? `<label><input type="radio" name="it_sold" value="custom"${soldCustomChecked}> تخصيص</label>` : '';
+    ? `<label><input type="radio" name="it_sold" value="custom"${(soldVal!=='none'&&soldVal!=='all')?' checked':''}> تخصيص</label>` : '';
   const availBoxes = brs.map(b=>{
     const ck = onlyVal.split(',').includes(b.id) ? ' checked' : '';
     return `<label><input type="checkbox" class="it_br" value="${b.id}"${ck}> ${esc(brName(b))}</label>`;
@@ -967,7 +996,7 @@ function openItemModal(si, ii){
       <label>${L('lblNameEn')}<input id="it_en" class="ltr" value="${esc(it?it.en:'')}"></label>
       <label class="full">${L('lblDescAr')}<textarea id="it_descAr" rows="2">${esc(it?it.desc||'':'')}</textarea></label>
       <label class="full">${L('lblDescEn')}<textarea id="it_descEn" rows="2">${esc(it?it.descEn||'':'')}</textarea></label>
-      <label>${L('lblPrices')}<input id="it_prices" class="ltr" value="${esc(it?it.prices.join(','):'')}" placeholder="15 أو 15,18,22"></label>
+      <label>${L('lblPrices')}<input id="it_prices" class="ltr" value="${esc(it&&it.prices?it.prices.join(','):'')}" placeholder="15 أو 15,18,22"></label>
       <label>${L('lblCal')}<input id="it_cal" type="number" min="0" value="${esc(it&&it.cal?it.cal:'')}"></label>
     </div>
     <div class="full"><label>${L('lblImgMode')}
@@ -1004,31 +1033,31 @@ function openItemModal(si, ii){
         <div class="miss-wrap">${soldBoxes}</div>
       </div>
     </fieldset>`, async ()=>{
-    const ar = el('it_ar').value.trim(), en = el('it_en').value.trim();
-    const prices = el('it_prices').value.trim().split(',').map(s=>parseFloat(s.trim())).filter(isFinite);
-    const cal = parseInt(el('it_cal').value, 10) || 0;
+    const ar = mv('it_ar').trim(), en = mv('it_en').trim();
+    const prices = mv('it_prices').trim().split(',').map(s=>parseFloat(s.trim())).filter(isFinite);
+    const cal = parseInt(mv('it_cal'), 10) || 0;
     if(!ar || !prices.length){ toast(L('warnItem'),'warn'); return false; }
-    const availRadio = document.querySelector('input[name="it_avail"]:checked').value;
+    const availRadio = radioVal('it_avail','all');
     let only = [];
     let miss = 'gray';
     if(availRadio === 'custom'){
-      only = [...document.querySelectorAll('.it_br:checked')].map(c=>c.value);
+      only = checkedVals('it_br');
       if(!only.length){ toast(L('warnAvail'),'warn'); return false; }
-      miss = document.querySelector('input[name="it_miss"]:checked').value;
+      miss = radioVal('it_miss','gray');
     }
-    const soldRadio = document.querySelector('input[name="it_sold"]:checked').value;
+    const soldRadio = radioVal('it_sold','none');
     let so = [];
     if(soldRadio === 'all') so = brs.map(b=>b.id);
-    else if(soldRadio === 'custom') so = [...document.querySelectorAll('.it_sold_br:checked')].map(c=>c.value);
+    else if(soldRadio === 'custom') so = checkedVals('it_sold_br');
     const id = it ? it.id : ('it-'+Date.now());
     const data = {
       id: id,
       ar, en: en || ar,
-      desc: el('it_descAr').value.trim(),
-      descEn: el('it_descEn').value.trim(),
+      desc: mv('it_descAr').trim(),
+      descEn: mv('it_descEn').trim(),
       prices, cal,
       imgv: it ? (it.imgv || 0) : 0,
-      imgMode: el('it_imgMode').value,
+      imgMode: mv('it_imgMode') || 'cut',
       hidden: it ? it.hidden : false
     };
     if(only.length){ data.only = only; data.miss = miss; }
@@ -1059,11 +1088,10 @@ function openItemModal(si, ii){
     itemModalFile = f; itemModalDelete = false; renderImgBox();
   });
   document.querySelectorAll('input[name="it_avail"]').forEach(r=> r.addEventListener('change', ()=>{
-    el('availCustomWrap').style.display = (document.querySelector('input[name="it_avail"]:checked').value === 'custom') ? 'block' : 'none';
+    el('availCustomWrap').style.display = (radioVal('it_avail','all') === 'custom') ? 'block' : 'none';
   }));
   document.querySelectorAll('input[name="it_sold"]').forEach(r=> r.addEventListener('change', ()=>{
-    const v = document.querySelector('input[name="it_sold"]:checked').value;
-    el('soldCustomWrap').style.display = (v === 'custom') ? 'block' : 'none';
+    el('soldCustomWrap').style.display = (radioVal('it_sold','none') === 'custom') ? 'block' : 'none';
   }));
 }
 
@@ -1094,7 +1122,7 @@ el('branchWrap').addEventListener('click', async e=>{
   if(act === 'delBranch'){
     if(branches().length <= 1){ toast(L('warnLastBranch'),'warn'); return; }
     const br = branches()[i];
-    const ok = await askConfirm(L('delBranchMsg')(br.nameAr), L('confirmDefault'), '🗑', L('btnDelFinal'));
+    const ok = await askConfirm(LF('delBranchMsg', br.nameAr), L('confirmDefault'), '🗑', L('btnDelFinal'));
     if(ok){ branches().splice(i,1); renderBranches(); toast(L('deletedBranch'),'warn',L('dontForget')); }
   }
 });
@@ -1149,22 +1177,22 @@ function openBranchModal(i){
       <input id="f_wa" class="ltr" placeholder="9665XXXXXXXX" value="${esc(b?b.wa:'')}">
       <small id="f_waMsg" class="wa-preview"></small></label></div>
     ${hoursFieldset(b)}`, async ()=>{
-    const wa = el('f_wa').value.trim();
-    const lat = parseFloat(el('f_lat').value), lng = parseFloat(el('f_lng').value);
-    const numVal = parseInt(el('f_num').value, 10);
+    const wa = mv('f_wa').trim();
+    const lat = parseFloat(mv('f_lat')), lng = parseFloat(mv('f_lng'));
+    const numVal = parseInt(mv('f_num'), 10);
     if(!validWa(wa)){ toast(L('waBad'),'error'); return false; }
     if(!isFinite(lat) || !isFinite(lng)){ toast(L('warnCoords'),'warn'); return false; }
     if(!isFinite(numVal) || numVal < 1){ toast(L('warnNum'),'warn'); return false; }
     if(branches().some(x => x.num === numVal && x !== b)){ toast(L('warnNumDup'),'warn'); return false; }
     if(b && b.num !== numVal){
-      const ok = await askConfirm(L('warnNumChange')('B'+numVal), L('confirmDefault'), '⚠️', L('yesContinue'));
+      const ok = await askConfirm(LF('warnNumChange', 'B'+numVal), L('confirmDefault'), '⚠️', L('yesContinue'));
       if(!ok) return false;
     }
-    if(!el('f_nameAr').value.trim()){ toast(L('warnName'),'warn'); return false; }
+    if(!mv('f_nameAr').trim()){ toast(L('warnName'),'warn'); return false; }
     const data = {
-      nameAr: el('f_nameAr').value.trim(), nameEn: el('f_nameEn').value.trim(),
-      addrAr: el('f_addrAr').value.trim(), addrEn: el('f_addrEn').value.trim(),
-      num: numVal, wa, lat, lng, map: el('f_map').value.trim(), hours: readHours()
+      nameAr: mv('f_nameAr').trim(), nameEn: mv('f_nameEn').trim(),
+      addrAr: mv('f_addrAr').trim(), addrEn: mv('f_addrEn').trim(),
+      num: numVal, wa, lat, lng, map: mv('f_map').trim(), hours: readHours()
     };
     if(b) Object.assign(b, data);
     else branches().push(Object.assign({ id:'b-'+Date.now() }, data));
@@ -1175,10 +1203,13 @@ function openBranchModal(i){
   waFeedback(inp, msg);
 }
 el('saveBranches').addEventListener('click', async ()=>{
-  const btn = el('saveBranches'); btn.textContent = L('publishing');
-  try{ await publishSettings('تحديث الفروع من لوحة التحكم 🍝'); toast(L('published'),'success',L('subLive')); }
-  catch(e){ if(e.http===401||e.http===403) showRenew(); else toast(L('publishFail') + e.message,'error'); }
-  btn.textContent = L('btnSaveBranches');
+  const btn = el('saveBranches'); const label = L('btnSaveBranches');
+  btn.textContent = L('publishing'); btn.disabled = true;
+  try{
+    await publishSettings('تحديث الفروع من لوحة التحكم 🍝');
+    toast(L('published'),'success',L('subLive'));
+    btn.disabled = false; btn.textContent = label;
+  }catch(e){ handlePublishError(e, btn, label); }
 });
 
 /* ===== الأكثر مبيعاً ===== */
@@ -1209,10 +1240,13 @@ el('saveBest').addEventListener('click', async ()=>{
   if(ids.some(x=>!x)){ toast(L('warnBestEmpty'),'warn'); return; }
   if(new Set(ids).size !== 4){ toast(L('warnBestDup'),'warn'); return; }
   STATE.SETTINGS.bestSellers = ids;
-  const btn = el('saveBest'); btn.textContent = L('publishing');
-  try{ await publishSettings('تحديث الأكثر مبيعاً من لوحة التحكم ⭐'); toast(L('savedBest'),'success',L('subLive')); }
-  catch(e){ if(e.http===401||e.http===403) showRenew(); else toast(L('publishFail') + e.message,'error'); }
-  btn.textContent = L('btnSaveBest');
+  const btn = el('saveBest'); const label = L('btnSaveBest');
+  btn.textContent = L('publishing'); btn.disabled = true;
+  try{
+    await publishSettings('تحديث الأكثر مبيعاً من لوحة التحكم ⭐');
+    toast(L('savedBest'),'success',L('subLive'));
+    btn.disabled = false; btn.textContent = label;
+  }catch(e){ handlePublishError(e, btn, label); }
 });
 
 /* ===== التوصيل والسوشيال ===== */
@@ -1237,7 +1271,7 @@ el('deliveryWrap').addEventListener('click', async e=>{
   if(act==='edit') openDeliveryModal(i);
   if(act==='del'){
     const x = STATE.SETTINGS.delivery[i];
-    const ok = await askConfirm(L('delDeliveryMsg')(x.nameAr), L('confirmDefault'), '🗑', L('btnDelFinal'));
+    const ok = await askConfirm(LF('delDeliveryMsg', x.nameAr), L('confirmDefault'), '🗑', L('btnDelFinal'));
     if(ok){ STATE.SETTINGS.delivery.splice(i,1); renderDeliveryAdmin(); toast(L('deletedDelivery'),'warn',L('dontForget')); }
   }
 });
@@ -1254,10 +1288,10 @@ function openDeliveryModal(i){
       <label>${L('lblDelColor')}<input id="f_dcolor" type="color" value="${esc(x && x.color ? x.color : '#b45309')}"></label>
       <label>${L('lblDelImg')}<input id="f_dimg" class="ltr" placeholder="img/d-jahez.png" value="${esc(x && x.img ? x.img : '')}"></label>
     </div>`, ()=>{
-    const nameAr = el('f_dar').value.trim(), url = el('f_durl').value.trim();
+    const nameAr = mv('f_dar').trim(), url = mv('f_durl').trim();
     if(!nameAr){ toast(L('warnDelName'),'warn'); return false; }
     if(!/^https:\/\/.+/i.test(url)){ toast(L('warnDelUrl'),'warn'); return false; }
-    const data = { id: x ? x.id : ('d-'+Date.now()), nameAr, nameEn: el('f_den').value.trim(), url, color: el('f_dcolor').value, img: el('f_dimg').value.trim() };
+    const data = { id: x ? x.id : ('d-'+Date.now()), nameAr, nameEn: mv('f_den').trim(), url, color: mv('f_dcolor'), img: mv('f_dimg').trim() };
     if(x) Object.assign(x, data); else STATE.SETTINGS.delivery.push(data);
     renderDeliveryAdmin(); toast(L('savedDelivery'),'success',L('dontForget'));
   });
@@ -1305,7 +1339,7 @@ el('socialWrap').addEventListener('click', async e=>{
   if(act==='edit') openSocialModal(i);
   if(act==='del'){
     const x = STATE.SETTINGS.social[i];
-    const ok = await askConfirm(L('delSocialMsg')(x.nameAr), L('confirmDefault'), '🗑', L('btnDelFinal'));
+    const ok = await askConfirm(LF('delSocialMsg', x.nameAr), L('confirmDefault'), '🗑', L('btnDelFinal'));
     if(ok){ STATE.SETTINGS.social.splice(i,1); renderSocialAdmin(); toast(L('deletedSocial'),'warn',L('dontForget')); }
   }
 });
@@ -1325,9 +1359,9 @@ function openSocialModal(i){
       <label>${L('lblSocialNameEn')}<input id="f_sen" class="ltr" value="${esc(x?x.nameEn:'')}"></label>
       <label id="f_surlLbl">${L('lblSocialUrl')}<input id="f_surl" class="ltr" placeholder="https://..." value="${esc(x?x.url:'')}"></label>
     </div>`, ()=>{
-    const key = el('f_skey').value;
-    let nameAr = el('f_sar').value.trim(), nameEn = el('f_sen').value.trim();
-    let url = el('f_surl').value.trim();
+    const key = mv('f_skey');
+    let nameAr = mv('f_sar').trim(), nameEn = mv('f_sen').trim();
+    let url = mv('f_surl').trim();
     if(key!=='custom' && !nameAr){ nameAr = SOCIAL_PLATFORMS[key].ar; nameEn = SOCIAL_PLATFORMS[key].en; }
     if(key==='custom' && !nameAr){ toast(L('warnSocialName'),'warn'); return false; }
     if(key==='email'){
@@ -1346,10 +1380,13 @@ function openSocialModal(i){
   });
 }
 el('saveDelivery').addEventListener('click', async ()=>{
-  const btn = el('saveDelivery'); btn.textContent = L('publishing');
-  try{ await publishSettings('تحديث التوصيل والسوشيال من لوحة التحكم 🛵'); toast(L('savedDelivery'),'success',L('subLive')); }
-  catch(e){ if(e.http===401||e.http===403) showRenew(); else toast(L('publishFail') + e.message,'error'); }
-  btn.textContent = L('btnSaveDelivery');
+  const btn = el('saveDelivery'); const label = L('btnSaveDelivery');
+  btn.textContent = L('publishing'); btn.disabled = true;
+  try{
+    await publishSettings('تحديث التوصيل والسوشيال من لوحة التحكم 🛵');
+    toast(L('savedDelivery'),'success',L('subLive'));
+    btn.disabled = false; btn.textContent = label;
+  }catch(e){ handlePublishError(e, btn, label); }
 });
 
 /* ===== الإعدادات وصور التطبيق ===== */
@@ -1414,7 +1451,8 @@ el('settingsForm').addEventListener('click', e=>{
       toast(L('imgUploadedApp'),'success',L('subLive'));
     }catch(err){
       b.disabled = false; b.textContent = L('imgConfirm');
-      if(err.http===401||err.http===403) showRenew(); else toast(L('imgUploadFailApp')+err.message,'error');
+      if(err.http===401||err.http===403){ toast(L('errPermission'),'error'); showRenew(); }
+      else toast(L('imgUploadFailApp')+err.message,'error');
     }
   })(); }
 });
@@ -1431,14 +1469,17 @@ el('settingsForm').addEventListener('change', e=>{
 });
 el('saveSettings').addEventListener('click', async ()=>{
   const s = STATE.SETTINGS;
-  s.brand.nameAr = el('s_nameAr').value.trim() || s.brand.nameAr;
-  s.brand.nameEn = el('s_nameEn').value.trim() || s.brand.nameEn;
-  s.brand.tagAr = el('s_tagAr').value.trim();
-  s.brand.tagEn = el('s_tagEn').value.trim();
-  const btn = el('saveSettings'); btn.textContent = L('publishing');
-  try{ await publishSettings('تحديث الإعدادات من لوحة التحكم ⚙️'); toast(L('published'),'success',L('subLive')); }
-  catch(e){ if(e.http===401||e.http===403) showRenew(); else toast(L('publishFail') + e.message,'error'); }
-  btn.textContent = L('btnSaveSettings');
+  s.brand.nameAr = mv('s_nameAr').trim() || s.brand.nameAr;
+  s.brand.nameEn = mv('s_nameEn').trim() || s.brand.nameEn;
+  s.brand.tagAr = mv('s_tagAr').trim();
+  s.brand.tagEn = mv('s_tagEn').trim();
+  const btn = el('saveSettings'); const label = L('btnSaveSettings');
+  btn.textContent = L('publishing'); btn.disabled = true;
+  try{
+    await publishSettings('تحديث الإعدادات من لوحة التحكم ⚙️');
+    toast(L('published'),'success',L('subLive'));
+    btn.disabled = false; btn.textContent = label;
+  }catch(e){ handlePublishError(e, btn, label); }
 });
 
 /* ===== الإعلان ===== */
@@ -1470,17 +1511,20 @@ el('saveAd').addEventListener('click', async ()=>{
   const a = STATE.SETTINGS.ad;
   a.enabled = el('a_enabled').checked;
   a.oncePerDay = el('a_once').checked;
-  a.icon = el('a_icon').value.trim() || '🍝';
-  a.titleAr = el('a_titleAr').value.trim();
-  a.titleEn = el('a_titleEn').value.trim();
-  a.textAr = el('a_textAr').value.trim();
-  a.textEn = el('a_textEn').value.trim();
-  a.btnAr = el('a_btnAr').value.trim() || 'حسناً 🍝';
-  a.btnEn = el('a_btnEn').value.trim() || 'Got it 🍝';
-  const btn = el('saveAd'); btn.textContent = L('publishing');
-  try{ await publishSettings('تحديث الإعلان من لوحة التحكم 📢'); toast(L('published'),'success',L('subLive')); }
-  catch(e){ if(e.http===401||e.http===403) showRenew(); else toast(L('publishFail') + e.message,'error'); }
-  btn.textContent = L('btnSaveAd');
+  a.icon = mv('a_icon').trim() || '🍝';
+  a.titleAr = mv('a_titleAr').trim();
+  a.titleEn = mv('a_titleEn').trim();
+  a.textAr = mv('a_textAr').trim();
+  a.textEn = mv('a_textEn').trim();
+  a.btnAr = mv('a_btnAr').trim() || 'حسناً 🍝';
+  a.btnEn = mv('a_btnEn').trim() || 'Got it 🍝';
+  const btn = el('saveAd'); const label = L('btnSaveAd');
+  btn.textContent = L('publishing'); btn.disabled = true;
+  try{
+    await publishSettings('تحديث الإعلان من لوحة التحكم 📢');
+    toast(L('published'),'success',L('subLive'));
+    btn.disabled = false; btn.textContent = label;
+  }catch(e){ handlePublishError(e, btn, label); }
 });
 
 /* ===== التصدير الاحتياطي ===== */
@@ -1522,4 +1566,4 @@ window.__ADMIN_BOOTED = true;
 </script>
 </body>
 </html>
-<!-- ===== END OF FILE v15 ===== -->
+<!-- ===== END OF FILE v16 ===== -->
