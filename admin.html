@@ -1,4 +1,4 @@
-<!-- ===== ADMIN COMPLETE BUILD v16 ===== -->
+<!-- ===== ADMIN COMPLETE BUILD v17 ===== -->
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&display=swap" rel="stylesheet">
 <script>
-/* مراقب الأخطاء والإقلاع — يظهر رسالة فقط عند وجود خطأ */
+/* مراقب الإقلاع — يظهر رسالة فقط عند وجود خطأ */
 window.addEventListener('error', function(e){
   if(window.__ADMIN_ERR_SHOWN) return;
   window.__ADMIN_ERR_SHOWN = true;
@@ -346,7 +346,8 @@ document.addEventListener('touchmove', e=>{ if(e.touches.length > 1) e.preventDe
 document.addEventListener('dblclick', e=> e.preventDefault());
 
 /* =====================================================
-   لوحة تحكم مكرونجي — BUILD v16
+   لوحة تحكم مكرونجي — BUILD v17
+   (إصلاح إرسال التوكن مع طلبات الكتابة PUT)
 ===================================================== */
 
 const ADMIN_USER = 'mahmoud';
@@ -551,9 +552,7 @@ const ASTR = {
 const el = id => document.getElementById(id);
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function L(k, a){ const d = ASTR[ALANG] || ASTR.ar; const v = d[k] ?? ASTR.ar[k] ?? k; return typeof v === 'function' ? v(a) : v; }
-/* استدعاء نصوص القاموس التي على شكل دالة — بصيغة آمنة */
 function LF(k, ...a){ const d = ASTR[ALANG] || ASTR.ar; const v = d[k] ?? ASTR.ar[k]; return typeof v === 'function' ? v(...a) : v; }
-/* قراءة حقل نموذج بشكل آمن (لا تنهار إن نقص الحقل) */
 function mv(id){ const n = el(id); return n ? n.value : ''; }
 function radioVal(name, dflt){ const n = document.querySelector('input[name="'+name+'"]:checked'); return n ? n.value : dflt; }
 function checkedVals(cls){ return [...document.querySelectorAll('.'+cls+':checked')].map(c=>c.value); }
@@ -650,7 +649,6 @@ function classifyGhError(e){
   if(status === 404) return { key:'errNotFound', detail: e.message };
   return { key:'errGeneric', detail: e.message || ('HTTP ' + status) };
 }
-/* رسالة موحدة عند فشل النشر بسبب الصلاحية */
 function handlePublishError(e, btn, label){
   if(e.http === 401 || e.http === 403){
     toast(e.http === 401 ? L('errAuth') : L('errPermission'), 'error');
@@ -661,12 +659,17 @@ function handlePublishError(e, btn, label){
   if(btn){ btn.disabled = false; btn.textContent = label; }
 }
 
-/* ===== GitHub ===== */
+/* ===== GitHub (الإصلاح: دمج الرؤوس بدلاً من استبدالها) ===== */
 const GH_API = 'https://api.github.com';
 async function gh(path, opts={}){
-  const r = await fetch(GH_API + path, Object.assign({
-    headers: { 'Accept':'application/vnd.github+json', 'Authorization':'Bearer ' + CFG.token, 'X-GitHub-Api-Version':'2022-11-28' }
-  }, opts));
+  const headers = {
+    'Accept':'application/vnd.github+json',
+    'Authorization':'Bearer ' + (CFG ? CFG.token : ''),
+    'X-GitHub-Api-Version':'2022-11-28'
+  };
+  if(opts.headers) Object.assign(headers, opts.headers);
+  const init = Object.assign({}, opts, { headers: headers });
+  const r = await fetch(GH_API + path, init);
   if(!r.ok){
     const e = new Error('HTTP ' + r.status); e.http = r.status;
     try{ const j = await r.json(); e.message = j.message || e.message; }catch{}
@@ -687,9 +690,12 @@ async function getFile(path){
   return { text: b64ToUtf8(r.content), sha: r.sha };
 }
 async function putFile(path, content, sha, msg){
+  const body = { message: msg, content: btoa(unescape(encodeURIComponent(content))), branch: CFG.branch };
+  if(sha) body.sha = sha;
   return gh('/repos/' + CFG.owner + '/' + CFG.repo + '/contents/' + path, {
-    method:'PUT', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ message: msg, content: btoa(unescape(encodeURIComponent(content))), branch: CFG.branch, sha })
+    method:'PUT',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body)
   });
 }
 function b64OfFile(file){
@@ -702,17 +708,19 @@ function b64OfFile(file){
 async function uploadItemImgById(id, file){
   const path = 'img/items/' + id + '.png';
   const cur = await getFile(path).catch(()=>({sha:null}));
+  const body = { message:'رفع صورة صنف: ' + id, content: await b64OfFile(file), branch: CFG.branch };
+  if(cur.sha) body.sha = cur.sha;
   await gh('/repos/' + CFG.owner + '/' + CFG.repo + '/contents/' + path, {
-    method:'PUT', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ message:'رفع صورة صنف: ' + id, content: await b64OfFile(file), branch: CFG.branch, sha: cur.sha })
+    method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
   });
   return path;
 }
 async function uploadAppImage(path, file){
   const cur = await getFile(path).catch(()=>({sha:null}));
+  const body = { message:'تحديث صورة: ' + path, content: await b64OfFile(file), branch: CFG.branch };
+  if(cur.sha) body.sha = cur.sha;
   await gh('/repos/' + CFG.owner + '/' + CFG.repo + '/contents/' + path, {
-    method:'PUT', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ message:'تحديث صورة: ' + path, content: await b64OfFile(file), branch: CFG.branch, sha: cur.sha })
+    method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
   });
   return path;
 }
@@ -1566,4 +1574,4 @@ window.__ADMIN_BOOTED = true;
 </script>
 </body>
 </html>
-<!-- ===== END OF FILE v16 ===== -->
+<!-- ===== END OF FILE v17 ===== -->
