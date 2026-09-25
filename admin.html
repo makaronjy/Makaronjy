@@ -1,4 +1,4 @@
-<!-- ===== ADMIN COMPLETE BUILD v11 ===== -->
+<!-- ===== ADMIN COMPLETE BUILD v12 ===== -->
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -10,13 +10,13 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&display=swap" rel="stylesheet">
 <script>
-/* مراقب الأخطاء والإقلاع — يعمل حتى لو تعطّل السكربت الرئيسي */
+/* مراقب الإقلاع — يظهر رسالة فقط إذا كان الملف ناقصاً أو تالفاً */
 window.addEventListener('error', function(e){
   if(window.__ADMIN_ERR_SHOWN) return;
   window.__ADMIN_ERR_SHOWN = true;
   var d = document.createElement('div');
   d.style.cssText = 'position:fixed;left:0;right:0;bottom:0;background:#b91c1c;color:#fff;padding:.7rem .8rem;font-size:.75rem;font-weight:800;z-index:99999;text-align:center;line-height:1.7';
-  d.textContent = '⛠ خطأ في ملف اللوحة: ' + (e.message || 'غير معروف') + ' — غالباً الملف منسوخ بشكل ناقص أو تالف. أعد استبدال admin.html بالنسخة الكاملة دفعة واحدة.';
+  d.textContent = '⛠ خطأ في ملف اللوحة: ' + (e.message || 'غير معروف') + ' — أعد استبدال admin.html بالنسخة الكاملة دفعة واحدة.';
   document.documentElement.appendChild(d);
 });
 window.addEventListener('load', function(){
@@ -24,7 +24,7 @@ window.addEventListener('load', function(){
     if(!window.__ADMIN_BOOTED && !window.__ADMIN_ERR_SHOWN){
       var d = document.createElement('div');
       d.style.cssText = 'position:fixed;left:0;right:0;bottom:0;background:#b91c1c;color:#fff;padding:.7rem .8rem;font-size:.75rem;font-weight:800;z-index:99999;text-align:center;line-height:1.7';
-      d.textContent = '⛠ سكربت اللوحة لم يكتمل (ملف ناقص أو به خطأ صياغة). أعد رفع النسخة الكاملة مرة واحدة بدون تجزئة.';
+      d.textContent = '⛠ سكربت اللوحة لم يكتمل (ملف ناقص). أعد رفع النسخة الكاملة مرة واحدة بدون تجزئة.';
       document.documentElement.appendChild(d);
     }
   }, 800);
@@ -60,7 +60,6 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--ink);min-he
 .screen h1.r-title{color:var(--ink);font-size:1.3rem;font-weight:900;margin-bottom:.8rem}
 .screen .hint{color:var(--muted);font-size:.78rem;font-weight:700;line-height:1.8;margin-bottom:1.2rem}
 .renew-link{display:inline-block;margin-top:1rem;font-size:.8rem;font-weight:800;color:var(--rust);text-decoration:underline}
-.ver{margin-top:1rem;font-size:.68rem;font-weight:800;color:var(--muted)}
 
 /* ===== الأزرار ===== */
 .primary{width:100%;border:none;border-radius:14px;padding:.85rem;background:var(--rust);color:#fff;
@@ -245,7 +244,6 @@ fieldset label{display:inline-flex;align-items:center;gap:.35rem;font-size:.76re
     <label><span data-al="lblPass">كلمة السر</span><input id="inPass" type="password" autocomplete="current-password" placeholder="••••••••"></label>
     <button id="btnLogin" class="primary" data-al="btnLogin">دخول</button>
     <div id="loginErr" class="banner error"></div>
-    <p class="ver">الإصدار 11</p>
   </div>
 </div>
 
@@ -362,7 +360,7 @@ document.addEventListener('touchmove', e=>{ if(e.touches.length > 1) e.preventDe
 document.addEventListener('dblclick', e=> e.preventDefault());
 
 /* =====================================================
-   لوحة تحكم مكرونجي — BUILD v11
+   لوحة تحكم مكرونجي — BUILD v12
 ===================================================== */
 
 /* ##### ثوابت اختيارية (للدخول بدون لصق التوكن كل مرة) ##### */
@@ -950,10 +948,29 @@ let itemModalImage = null;
 function openItemModal(si, ii){
   const it = ii===null ? null : STATE.MENU[si].items[ii];
   itemModalImage = it && it.img ? it.img : null;
-  const availVal = !it || it.avail === 'all' ? 'all' : (Array.isArray(it.avail) ? it.avail.join(',') : 'all');
+  const availVal = (!it || it.avail === 'all') ? 'all' : (Array.isArray(it.avail) ? it.avail.join(',') : 'all');
   const missVal = it ? (it.miss || 'gray') : 'gray';
   const soldVal = !it ? 'none' : (it.sold === 'all' ? 'all' : (Array.isArray(it.sold) ? it.sold.join(',') : 'none'));
   const brs = branches();
+  const availCustomChecked = (availVal !== 'all') ? ' checked' : '';
+  const soldAllChecked = (soldVal === 'all') ? ' checked' : '';
+  const soldCustomChecked = (soldVal !== 'none' && soldVal !== 'all') ? ' checked' : '';
+  const availCustomHtml = brs.length
+    ? `<label><input type="radio" name="it_avail" value="custom"${availCustomChecked}> تخصيص</label>` : '';
+  const soldAllHtml = brs.length
+    ? `<label><input type="radio" name="it_sold" value="all"${soldAllChecked}> نفد في كل الفروع</label>` : '';
+  const soldCustomHtml = brs.length
+    ? `<label><input type="radio" name="it_sold" value="custom"${soldCustomChecked}> تخصيص</label>` : '';
+  const availBoxes = brs.map(b=>{
+    const ck = availVal.split(',').includes(b.id) ? ' checked' : '';
+    const nm = esc((ALANG==='ar'?b.nameAr:b.nameEn)||('B'+b.num));
+    return `<label><input type="checkbox" class="it_br" value="${b.id}"${ck}> ${nm}</label>`;
+  }).join('');
+  const soldBoxes = brs.map(b=>{
+    const ck = soldVal.split(',').includes(b.id) ? ' checked' : '';
+    const nm = esc((ALANG==='ar'?b.nameAr:b.nameEn)||('B'+b.num));
+    return `<label><input type="checkbox" class="it_sold_br" value="${b.id}"${ck}> ${nm}</label>`;
+  }).join('');
   openModal(ii===null ? L('addItemTitle') : L('editItemTitle'), `
     <div class="form-grid">
       <label>${L('lblNameAr')}<input id="it_ar" value="${esc(it?it.ar:'')}"></label>
@@ -979,26 +996,22 @@ function openItemModal(si, ii){
     </fieldset>
     <fieldset>
       <legend>${L('legendAvail')}</legend>
-      <label><input type="radio" name="it_avail" value="all" ${availVal==='all'?'checked':''}> ${L('allBranches')}</label>
-      ${brs.length ? '<label><input type="radio" name="it_avail" value="custom" ${availVal!=='all'?'checked':''}> تخصيص</label>' : ''}
+      <label><input type="radio" name="it_avail" value="all" ${(availVal==='all')?' checked':''}> ${L('allBranches')}</label>
+      ${availCustomHtml}
       <div id="availCustomWrap" style="display:${(brs.length && availVal!=='all')?'block':'none'}">
-        <div class="miss-wrap">
-          ${brs.map(b=>`<label><input type="checkbox" class="it_br" value="${b.id}" ${availVal.split(',').includes(b.id)?'checked':''}> ${esc((ALANG==='ar'?b.nameAr:b.nameEn)||('B'+b.num))}</label>`).join('')}
-        </div>
+        <div class="miss-wrap">${availBoxes}</div>
         <label style="margin-top:.4rem"><small>${L('missLegend')}</small></label>
-        <label><input type="radio" name="it_miss" value="gray" ${missVal==='gray'?'checked':''}> ${L('missGray')}</label>
-        <label><input type="radio" name="it_miss" value="hide" ${missVal==='hide'?'checked':''}> ${L('missHide')}</label>
+        <label><input type="radio" name="it_miss" value="gray" ${(missVal==='gray')?' checked':''}> ${L('missGray')}</label>
+        <label><input type="radio" name="it_miss" value="hide" ${(missVal==='hide')?' checked':''}> ${L('missHide')}</label>
       </div>
     </fieldset>
     <fieldset>
       <legend>${L('legendSold')}</legend>
-      <label><input type="radio" name="it_sold" value="none" ${soldVal==='none'?'checked':''}> متاح في كل الفروع</label>
-      ${brs.length ? `<label><input type="radio" name="it_sold" value="all" ${soldVal==='all'?'checked':''}> نفد في كل الفروع</label>` : ''}
-      ${brs.length ? `<label><input type="radio" name="it_sold" value="custom" ${soldVal!=='none'&&soldVal!=='all'?'checked':''}> تخصيص</label>` : ''}
+      <label><input type="radio" name="it_sold" value="none" ${(soldVal==='none')?' checked':''}> متاح في كل الفروع</label>
+      ${soldAllHtml}
+      ${soldCustomHtml}
       <div id="soldCustomWrap" style="display:${(brs.length && soldVal!=='none' && soldVal!=='all')?'block':'none'}">
-        <div class="miss-wrap">
-          ${brs.map(b=>`<label><input type="checkbox" class="it_sold_br" value="${b.id}" ${soldVal.split(',').includes(b.id)?'checked':''}> ${esc((ALANG==='ar'?b.nameAr:b.nameEn)||('B'+b.num))}</label>`).join('')}
-        </div>
+        <div class="miss-wrap">${soldBoxes}</div>
       </div>
     </fieldset>`, async ()=>{
     const ar = el('it_ar').value.trim(), en = el('it_en').value.trim();
@@ -1502,9 +1515,9 @@ function renderAll(){
   applyAdminLang();
 })();
 
-/* علامة اكتمال السكربت (يفحصها مراقب الإقلاع في الأعلى) */
+/* علامة اكتمال السكربت (يفحصها مراقب الإقلاع) */
 window.__ADMIN_BOOTED = true;
 </script>
 </body>
 </html>
-<!-- ===== END OF FILE v11 ===== -->
+<!-- ===== END OF FILE v12 ===== -->
