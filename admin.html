@@ -1,4 +1,4 @@
-<!-- ===== ADMIN COMPLETE BUILD v9 — بطراز لوحة العشري ===== -->
+<!-- ===== ADMIN COMPLETE BUILD v10 ===== -->
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -40,7 +40,7 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--ink);min-he
 .screen .hint{color:var(--muted);font-size:.78rem;font-weight:700;line-height:1.8;margin-bottom:1.2rem}
 .renew-link{display:inline-block;margin-top:1rem;font-size:.8rem;font-weight:800;color:var(--rust);text-decoration:underline}
 
-/* ===== الأزرار العامة ===== */
+/* ===== الأزرار ===== */
 .primary{width:100%;border:none;border-radius:14px;padding:.85rem;background:var(--rust);color:#fff;
   font-family:inherit;font-weight:900;font-size:.9rem;cursor:pointer;box-shadow:0 6px 18px rgba(180,83,9,.25);transition:.2s}
 .primary:active{transform:scale(.98)}
@@ -82,7 +82,7 @@ main{max-width:900px;margin:auto;padding:1rem 1rem 4rem}
   font-weight:700;color:var(--amber);line-height:1.8;margin-bottom:1rem}
 .save-bar{position:sticky;bottom:0;background:linear-gradient(0deg,var(--bg) 70%,transparent);padding:1rem 0 .5rem;z-index:10}
 
-/* ===== بطاقات الأقسام والأصناف ===== */
+/* ===== الأقسام والأصناف ===== */
 .sec-card{background:#fff;border:1px solid var(--line);border-radius:16px;margin-bottom:1rem;overflow:hidden}
 .sec-card.is-hidden{opacity:.55;border-style:dashed}
 .sec-head{display:flex;align-items:center;justify-content:space-between;gap:.5rem;background:var(--rust);
@@ -103,7 +103,7 @@ main{max-width:900px;margin:auto;padding:1rem 1rem 4rem}
   padding:.55rem;font-family:inherit;font-weight:900;font-size:.78rem;cursor:pointer;transition:.2s}
 .add-item:hover{background:var(--amber-bg)}
 
-/* ===== بطاقات الفروع ===== */
+/* ===== الفروع ===== */
 .br-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:.9rem 1rem;margin-bottom:.9rem}
 .br-head{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.4rem}
 .br-head b{color:var(--ink);font-size:.92rem;font-weight:900}
@@ -141,7 +141,7 @@ fieldset label{display:inline-flex;align-items:center;gap:.35rem;font-size:.76re
 .best-preview{background:var(--green-bg);border:1.5px solid #128c5e33;border-radius:12px;padding:.7rem .9rem;
   font-size:.78rem;font-weight:800;color:var(--green);line-height:2}
 
-/* ===== صور الأصناف والتطبيق ===== */
+/* ===== الصور ===== */
 .img-prev{aspect-ratio:4/3;border-radius:12px;overflow:hidden;margin-top:.3rem;
   background-color:#f1f2f4;background-image:url('img/bg.png');background-size:cover;background-position:center;
   display:flex;align-items:center;justify-content:center;border:1px solid var(--line)}
@@ -160,7 +160,7 @@ fieldset label{display:inline-flex;align-items:center;gap:.35rem;font-size:.76re
 .img-card b{font-size:.72rem;color:var(--muted);line-height:1.6}
 .img-card .img-ops{display:flex;flex-direction:column;gap:.35rem}
 
-/* ===== نوافذ ===== */
+/* ===== النوافذ ===== */
 .modal{position:fixed;inset:0;background:rgba(20,20,25,.45);backdrop-filter:blur(5px);z-index:50;
   display:flex;align-items:center;justify-content:center;padding:1rem}
 .modal-card{background:#fff;border:1px solid var(--line);border-radius:20px;width:min(560px,94vw);
@@ -347,16 +347,16 @@ document.addEventListener('touchmove', e=>{ if(e.touches.length > 1) e.preventDe
 document.addEventListener('dblclick', e=> e.preventDefault());
 
 /* =====================================================
-   لوحة تحكم مكرونجي — BUILD v9
+   لوحة تحكم مكرونجي — BUILD v10
 ===================================================== */
 
-/* ##### بيانات الدخول والنشر — عدّلها هنا مرة واحدة ##### */
-const ADMIN_USER = 'mahmoud';    /* اسم المستخدم للدخول */
-const ADMIN_PASS = '123456';     /* كلمة السر للدخول */
-const GH_OWNER   = 'makaronjy';
-const GH_REPO    = 'Makaronjy';
-const GH_BRANCH  = 'main';
-const GH_TOKEN   = '';           /* الصق التوكن هنا مرة واحدة */
+/* ##### ثوابت اختيارية (للدخول بدون لصق التوكن كل مرة) ##### */
+const ADMIN_USER = 'mahmoud';    /* اسم مستخدم الدخول الثابت — غيّره إن أردت */
+const ADMIN_PASS = '123456';     /* كلمة السر الثابتة — غيّرها إن أردت */
+const GH_OWNER   = 'makaronjy';  /* المالك الافتراضي */
+const GH_REPO    = 'Makaronjy';  /* اسم المستودع */
+const GH_BRANCH  = 'main';       /* الفرع */
+const GH_TOKEN   = '';           /* اختياري: توكن ثابت داخل الملف */
 /* #################################################### */
 
 let CFG = null;
@@ -368,7 +368,7 @@ const ASTR = {
   ar: {
     loginTitle:'لوحة تحكم مكرونجي', lblUser:'اسم المستخدم', lblPass:'كلمة السر', btnLogin:'دخول',
     errComplete:'أكمل جميع الحقول.', errCreds:'اسم المستخدم أو كلمة السر غير صحيحة.',
-    errNoToken:'بيانات النشر غير مضبوطة داخل الملف — راجع الثابت GH_TOKEN في admin.html.',
+    errNoToken:'لا يوجد توكن للنشر — الصق التوكن ككلمة سر أو ضع الثابت GH_TOKEN داخل الملف.',
     errPublish:'تعذّر تحميل البيانات من المستودع.',
     errNetwork:'تعذّر الاتصال بالخادم — تحقق من الإنترنت.', errNotFound:'المستودع أو الملف غير موجود.',
     errPermission:'رمز الوصول لا يملك الصلاحية الكافية.', errAuth:'رمز الوصول مرفوض.', errGeneric:'خطأ: ',
@@ -466,7 +466,7 @@ const ASTR = {
   en: {
     loginTitle:'Makaronjy Admin Panel', lblUser:'Username', lblPass:'Password', btnLogin:'Login',
     errComplete:'Please complete all fields.', errCreds:'Wrong username or password.',
-    errNoToken:'Publishing credentials missing inside the file — check GH_TOKEN in admin.html.',
+    errNoToken:'No publishing token — paste the token as password or set GH_TOKEN inside the file.',
     errPublish:'Could not load data from the repository.',
     errNetwork:'Could not connect to the server.', errNotFound:'Repository or file not found.',
     errPermission:'The access code lacks permission.', errAuth:'Access code rejected.', errGeneric:'Error: ',
@@ -490,12 +490,10 @@ const ASTR = {
     lblItemImage:'📷 Item image', imgPreviewNone:'No image',
     imgChange:'📷 Add / change', imgDelete:'🗑 Delete',
     imgUploading:'Uploading...', imgUploaded:'Uploaded ✔', imgDeleted:'Deleted ✔',
-    imgBadType:'Unsupported format', imgTooBig:'Too large (max 4MB)',
-    imgUploadFail:'Upload failed',
+    imgBadType:'Unsupported format', imgTooBig:'Too large (max 4MB)', imgUploadFail:'Upload failed',
     lblPrices:'Prices', lblCal:'Calories',
     legendAvail:'Availability', allBranches:'All branches', missLegend:'For unavailable branches:',
-    missGray:'Grey card', missHide:'Hidden',
-    legendSold:'Sold out ❌',
+    missGray:'Grey card', missHide:'Hidden', legendSold:'Sold out ❌',
     warnSecName:'Section name required', warnAvail:'Select at least one branch', warnItem:'Arabic name and a price required',
     savedSec:'Section saved', savedItem:'Item saved', dontForget:'Don\'t forget to publish',
     delSecMsg:function(t){ return 'Delete section «'+t+'» permanently?'; },
@@ -508,10 +506,8 @@ const ASTR = {
     btnAddBranch:'➕ Add branch', btnSaveBranches:'💾 Save & publish',
     editBranchTitle:'Edit branch', addBranchTitle:'Add branch',
     lblBrNameAr:'Name (AR)', lblBrNameEn:'Name (EN)', lblBrAddrAr:'Address (AR)', lblBrAddrEn:'Address (EN)',
-    lblBrNum:'Branch number',
-    lblWa:'WhatsApp (mandatory)', lblMap:'Map link', lblLat:'Latitude', lblLng:'Longitude',
-    waOk:'✔ WhatsApp:', waNonSa:'ℹ️ Non-SA code',
-    waBad:'⚠️ Bad format',
+    lblBrNum:'Branch number', lblWa:'WhatsApp (mandatory)', lblMap:'Map link', lblLat:'Latitude', lblLng:'Longitude',
+    waOk:'✔ WhatsApp:', waNonSa:'ℹ️ Non-SA code', waBad:'⚠️ Bad format',
     warnCoords:'Coordinates required', warnName:'Name required', savedBranch:'Branch saved',
     warnNum:'Number must be ≥ 1', warnNumDup:'Number already used',
     warnNumChange:function(code){ return 'Code becomes '+code+'. Continue?'; },
@@ -521,33 +517,24 @@ const ASTR = {
     brWa:'WA: ', brCoords:'Coords: ', brNum:'Num: ',
     legendHours:'Working hours', dayClosed:'Closed', openLbl:'Open:', closeLbl:'Close:', am:'AM', pm:'PM',
     days:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
-    bestNote:'Pick four best sellers.',
-    bestSlot:'Slot ', btnSaveBest:'💾 Save & publish', savedBest:'Published',
+    bestNote:'Pick four best sellers.', bestSlot:'Slot ', btnSaveBest:'💾 Save & publish', savedBest:'Published',
     warnBestDup:'No duplicates', warnBestEmpty:'Fill all slots',
     deliveryNote:'Delivery links appear on the branches screen.',
     btnAddDelivery:'➕ Add delivery', btnSaveDelivery:'💾 Save & publish',
     editDeliveryTitle:'Edit delivery', addDeliveryTitle:'Add delivery',
-    lblDelNameAr:'Name (AR)', lblDelNameEn:'Name (EN)', lblDelUrl:'Link',
-    lblDelColor:'Color', lblDelImg:'Logo path',
-    warnDelName:'Name required', warnDelUrl:'Must start with https://',
-    noDelivery:'No delivery apps yet.',
-    delDeliveryMsg:function(n){ return 'Remove «'+n+'»?'; },
-    deletedDelivery:'Deleted', savedDelivery:'Saved',
+    lblDelNameAr:'Name (AR)', lblDelNameEn:'Name (EN)', lblDelUrl:'Link', lblDelColor:'Color', lblDelImg:'Logo path',
+    warnDelName:'Name required', warnDelUrl:'Must start with https://', noDelivery:'No delivery apps yet.',
+    delDeliveryMsg:function(n){ return 'Remove «'+n+'»?'; }, deletedDelivery:'Deleted', savedDelivery:'Saved',
     legendSocial:'Social accounts', btnAddSocial:'➕ Add social',
     editSocialTitle:'Edit social', addSocialTitle:'Add social',
     lblSocialPlatform:'Platform', lblSocialNameAr:'Name (AR)', lblSocialNameEn:'Name (EN)',
     lblSocialUrl:'Link', lblSocialEmail:'Email',
-    warnSocialMax:'Max 5', warnSocialName:'Name required',
-    warnSocialEmail:'Bad email', warnSocialUrl:'Must start with https://',
+    warnSocialMax:'Max 5', warnSocialName:'Name required', warnSocialEmail:'Bad email', warnSocialUrl:'Must start with https://',
     noSocial:'No social accounts yet.',
-    delSocialMsg:function(n){ return 'Remove «'+n+'»?'; },
-    deletedSocial:'Deleted', savedSocial:'Saved', platCustom:'— Other —',
-    adNote:'Text announcement.',
-    btnSaveAd:'💾 Save & publish',
-    lblAdEnabled:'Enabled', lblAdOnce:'Once per day',
-    lblAdIcon:'Icon', lblAdBtnAr:'Button (AR)', lblAdBtnEn:'Button (EN)',
-    lblAdTitleAr:'Title (AR)', lblAdTitleEn:'Title (EN)',
-    lblAdTextAr:'Text (AR)', lblAdTextEn:'Text (EN)',
+    delSocialMsg:function(n){ return 'Remove «'+n+'»?'; }, deletedSocial:'Deleted', savedSocial:'Saved', platCustom:'— Other —',
+    adNote:'Text announcement.', btnSaveAd:'💾 Save & publish',
+    lblAdEnabled:'Enabled', lblAdOnce:'Once per day', lblAdIcon:'Icon', lblAdBtnAr:'Button (AR)', lblAdBtnEn:'Button (EN)',
+    lblAdTitleAr:'Title (AR)', lblAdTitleEn:'Title (EN)', lblAdTextAr:'Text (AR)', lblAdTextEn:'Text (EN)',
     adPrevTitle:'Sample', adPrevText:'Preview.',
     legendImages:'App images', imagesNote:'Pick then Confirm to upload.',
     imgLogo:'Logo', imgBg:'Background', imgWelcome:'Welcome', imgClosed:'Closed',
@@ -746,7 +733,7 @@ function waFeedback(inp, msg){
   }else{ msg.className='wa-preview bad'; msg.textContent = L('waBad'); }
 }
 
-/* ===== تبويبات ===== */
+/* ===== التبويبات ===== */
 document.querySelectorAll('.tab').forEach(t=>{
   t.addEventListener('click', ()=>{
     document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
@@ -781,16 +768,28 @@ async function loadAll(){
   renderAll();
 }
 
-/* ===== الدخول ===== */
+/* ===== الدخول: ثلاث طرق قبول ===== */
 el('btnLogin').addEventListener('click', async ()=>{
-  const u = el('inUser').value.trim(), p = el('inPass').value;
+  const u = el('inUser').value.trim();
+  const p = el('inPass').value.trim();
   hideBanner('loginErr');
   if(!u || !p){ showBanner('loginErr', L('errComplete')); return; }
-  if(u !== ADMIN_USER || p !== ADMIN_PASS){ showBanner('loginErr', L('errCreds')); return; }
-  if(!GH_TOKEN){ showBanner('loginErr', L('errNoToken')); return; }
-  CFG = { owner: GH_OWNER, repo: GH_REPO, branch: GH_BRANCH, token: GH_TOKEN };
+
+  /* أ) الثابتان داخل الملف  ب) اسم GitHub + التوكن ككلمة سر  ج) كلمة السر = GH_TOKEN */
+  const tokenLike = /^(github_pat_|ghp_|gho_|ghu_|ghs_|ghr_)/i.test(p);
+  const isLocal   = (u.toLowerCase() === String(ADMIN_USER).toLowerCase()) && (p === ADMIN_PASS);
+  const isEmbed   = (GH_TOKEN !== '') && (p === GH_TOKEN);
+
+  if(!isLocal && !tokenLike && !isEmbed){ showBanner('loginErr', L('errCreds')); return; }
+
+  const owner = isLocal ? GH_OWNER : (u || GH_OWNER);
+  const token = isLocal ? (GH_TOKEN || '') : p;
+  if(!token){ showBanner('loginErr', L('errNoToken')); return; }
+
+  CFG = { owner: owner, repo: GH_REPO, branch: GH_BRANCH, token: token };
   sessionStorage.setItem('mk_admin', JSON.stringify(CFG));
-  const btn = el('btnLogin'); btn.textContent = L('publishing'); btn.disabled = true;
+  const btn = el('btnLogin');
+  btn.textContent = L('publishing'); btn.disabled = true;
   try{
     await loadAll(); applyAdminLang();
     toast(L('loggedIn'),'success',L('loggedSub'));
@@ -830,9 +829,7 @@ el('btnRefresh').addEventListener('click', async ()=>{
   const b = el('btnRefresh'), old = b.textContent;
   b.textContent = L('refreshing'); b.disabled = true;
   try{ await loadAll(); toast(L('refreshed'),'success'); }
-  catch(e){
-    if(e.http===401||e.http===403) showRenew(); else toast(L('refreshFail') + e.message,'error');
-  }
+  catch(e){ if(e.http===401||e.http===403) showRenew(); else toast(L('refreshFail') + e.message,'error'); }
   b.disabled = false; b.textContent = old;
 });
 
@@ -970,23 +967,25 @@ function openItemModal(si, ii){
       <legend>${L('legendAvail')}</legend>
       <label><input type="radio" name="it_avail" value="all" ${availVal==='all'?'checked':''}> ${L('allBranches')}</label>
       ${brs.length ? '<label><input type="radio" name="it_avail" value="custom" ${availVal!=='all'?'checked':''}> تخصيص</label>' : ''}
-      ${brs.length && availVal!=='all' ? `
+      <div id="availCustomWrap" style="display:${(brs.length && availVal!=='all')?'block':'none'}">
         <div class="miss-wrap">
           ${brs.map(b=>`<label><input type="checkbox" class="it_br" value="${b.id}" ${availVal.split(',').includes(b.id)?'checked':''}> ${esc((ALANG==='ar'?b.nameAr:b.nameEn)||('B'+b.num))}</label>`).join('')}
         </div>
         <label style="margin-top:.4rem"><small>${L('missLegend')}</small></label>
         <label><input type="radio" name="it_miss" value="gray" ${missVal==='gray'?'checked':''}> ${L('missGray')}</label>
-        <label><input type="radio" name="it_miss" value="hide" ${missVal==='hide'?'checked':''}> ${L('missHide')}</label>` : ''}
+        <label><input type="radio" name="it_miss" value="hide" ${missVal==='hide'?'checked':''}> ${L('missHide')}</label>
+      </div>
     </fieldset>
     <fieldset>
       <legend>${L('legendSold')}</legend>
       <label><input type="radio" name="it_sold" value="none" ${soldVal==='none'?'checked':''}> متاح في كل الفروع</label>
       ${brs.length ? `<label><input type="radio" name="it_sold" value="all" ${soldVal==='all'?'checked':''}> نفد في كل الفروع</label>` : ''}
       ${brs.length ? `<label><input type="radio" name="it_sold" value="custom" ${soldVal!=='none'&&soldVal!=='all'?'checked':''}> تخصيص</label>` : ''}
-      ${brs.length && soldVal!=='none' && soldVal!=='all' ? `
+      <div id="soldCustomWrap" style="display:${(brs.length && soldVal!=='none' && soldVal!=='all')?'block':'none'}">
         <div class="miss-wrap">
           ${brs.map(b=>`<label><input type="checkbox" class="it_sold_br" value="${b.id}" ${soldVal.split(',').includes(b.id)?'checked':''}> ${esc((ALANG==='ar'?b.nameAr:b.nameEn)||('B'+b.num))}</label>`).join('')}
-        </div>` : ''}
+        </div>
+      </div>
     </fieldset>`, async ()=>{
     const ar = el('it_ar').value.trim(), en = el('it_en').value.trim();
     const prices = el('it_prices').value.trim().split(',').map(s=>parseFloat(s.trim())).filter(isFinite);
@@ -1030,7 +1029,13 @@ function openItemModal(si, ii){
     if(f.size > 4*1024*1024){ toast(L('imgTooBig'),'warn'); return; }
     itemModalImage = f; renderImgBox();
   });
-  document.querySelectorAll('input[name="it_avail"], input[name="it_sold"]').forEach(r=> r.addEventListener('change', ()=> openItemModal(si, ii)));
+  document.querySelectorAll('input[name="it_avail"]').forEach(r=> r.addEventListener('change', ()=>{
+    el('availCustomWrap').style.display = (document.querySelector('input[name="it_avail"]:checked').value === 'custom') ? 'block' : 'none';
+  }));
+  document.querySelectorAll('input[name="it_sold"]').forEach(r=> r.addEventListener('change', ()=>{
+    const v = document.querySelector('input[name="it_sold"]:checked').value;
+    el('soldCustomWrap').style.display = (v === 'custom') ? 'block' : 'none';
+  }));
 }
 
 /* ===== الفروع ===== */
@@ -1317,7 +1322,7 @@ el('saveDelivery').addEventListener('click', async ()=>{
   btn.textContent = L('btnSaveDelivery');
 });
 
-/* ===== الإعدادات ===== */
+/* ===== الإعدادات وصور التطبيق ===== */
 const APP_IMGS = [
   {key:'logo', path:'img/logo.png', label:'imgLogo'},
   {key:'bg', path:'img/bg.png', label:'imgBg'},
@@ -1448,7 +1453,7 @@ el('saveAd').addEventListener('click', async ()=>{
   btn.textContent = L('btnSaveAd');
 });
 
-/* ===== تصدير ===== */
+/* ===== التصدير الاحتياطي ===== */
 el('btnExport').addEventListener('click', ()=>{
   const data = { exportedAt: new Date().toISOString(), MENU: STATE.MENU, SETTINGS: STATE.SETTINGS };
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
@@ -1464,7 +1469,7 @@ function renderAll(){
   renderMenu(); renderBranches(); renderBest(); renderDeliveryAdmin(); renderSettings(); renderAd();
 }
 
-/* ===== الإقلاع ===== */
+/* ===== الإقلاع واستعادة الجلسة ===== */
 (function init(){
   const saved = sessionStorage.getItem('mk_admin');
   if(saved){
@@ -1485,4 +1490,4 @@ function renderAll(){
 </script>
 </body>
 </html>
-<!-- ===== END OF FILE v9 ===== -->
+<!-- ===== END OF FILE v10 ===== -->
