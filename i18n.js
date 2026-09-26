@@ -1,7 +1,7 @@
 /* =====================================================
 ملف اللغات — مكرونجي Makaronjy
 (ترجمات الواجهة فقط — المنيو في menu.js والإعدادات في settings.js)
-v2: مفاتيح صفحة التفاصيل والإضافات + «تابعنا على» + 🛵
+v3: متطابق مع app.js v11 (كاروسيل الإضافات + العناوين الجديدة)
 ===================================================== */
 window.I18N = {
 ar: {
@@ -129,6 +129,10 @@ detailOptional: 'اختياري',
 detailMax: function(n){ return 'يمكنك إضافة ' + n + ' خيارات'; },
 detailMaxOne: 'اختر خياراً واحداً',
 modsInvalid: '⚠️ بعض الإضافات لم تعد متوفرة — أُزيلت من طلبك',
+oftenWith: 'غالبًا ما يتم طلبه مع',
+oftenWithEn: 'Often ordered with',
+oftenWithSub: 'عادة ما يضيف الأشخاص هذه العناصر',
+oftenWithSubEn: 'People usually add these items',
 iosSteps:
   '<div class="sheet-step"><span class="num">١</span><p>من أسفل شاشة سفاري اضغط زر <b>المشاركة</b> (مربع يخرج منه سهم لأعلى ⬆️).</p></div>' +
   '<div class="sheet-step"><span class="num">٢</span><p>مرّر القائمة لأعلى واختر <b>«إضافة إلى الشاشة الرئيسية»</b> (أيقونة ＋).</p></div>' +
@@ -263,6 +267,10 @@ detailOptional: 'Optional',
 detailMax: function(n){ return 'You can add ' + n + ' choices'; },
 detailMaxOne: 'Choose one option',
 modsInvalid: '⚠️ Some add-ons are no longer available — removed from your order',
+oftenWith: 'Often ordered with',
+oftenWithEn: 'Often ordered with',
+oftenWithSub: 'People usually add these items',
+oftenWithSubEn: 'People usually add these items',
 iosSteps:
   '<div class="sheet-step"><span class="num">1</span><p>In Safari, tap the <b>Share</b> button at the bottom (a square with an up arrow ⬆️).</p></div>' +
   '<div class="sheet-step"><span class="num">2</span><p>Scroll up and choose <b>"Add to Home Screen"</b> (＋ icon).</p></div>' +
