@@ -1,4 +1,4 @@
-/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v2) ===== */
+/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v3) ===== */
 /* ===== المنيو ===== */
 function renderMenu(){
 var wrap = el(`menuWrap`);
@@ -51,8 +51,14 @@ soldTag = soldAll ? L(`soldAll`)
 : (L(`soldSome`) + soldNames);
 }
 var modsCount = 0;
+if(it.mods){
 if(Array.isArray(it.mods)){
-modsCount = it.mods.length;
+it.mods.forEach(function(g){
+modsCount += (g.opts||[]).length;
+});
+}else if(Array.isArray(it.mods.refs)){
+modsCount = it.mods.refs.length;
+}
 }
 var price0 = (it.prices && it.prices[0])
 ? it.prices[0] : 0;
@@ -191,7 +197,7 @@ renderMenu();
 toast(L(`savedSec`), `success`, L(`dontForget`));
 });
 }
-/* ===== نافذة الصنف + الإضافات الجاهزة ===== */
+/* ===== نافذة الصنف + محرر الإضافات الجديد ===== */
 let itemModalFile = null;
 let itemModalDelete = false;
 function openItemModal(si, ii){
@@ -253,38 +259,32 @@ var cutSel = ((it && it.imgMode===`cut`) || !it)
 ? ` selected` : ``;
 var fullSel = (it && it.imgMode===`full`)
 ? ` selected` : ``;
-/* صفوف الإضافات الجاهزة من الأقسام */
-var attached = {};
-if(it && Array.isArray(it.mods)){
-it.mods.forEach(function(g){ attached[g.id] = g; });
+/* حالة محرر الإضافات */
+var modsRefsArr = [];
+if(it && it.mods){
+if(Array.isArray(it.mods)){
+it.mods.forEach(function(g){
+(g.opts||[]).forEach(function(o){
+if(modsRefsArr.indexOf(o.ref) < 0){
+modsRefsArr.push(o.ref);
 }
-var modsRows = STATE.MENU.map(function(sec, sIdx){
+});
+});
+}else if(Array.isArray(it.mods.refs)){
+modsRefsArr = it.mods.refs.slice();
+}
+}
+var modsTitleArVal = ``;
+var modsTitleEnVal = ``;
+if(it && it.mods && !Array.isArray(it.mods)){
+modsTitleArVal = it.mods.tAr || ``;
+modsTitleEnVal = it.mods.tEn || ``;
+}
+var modsSecOptions = STATE.MENU.map(function(sec, sIdx){
 if(sIdx === si) return ``;
-var g = attached[sec.id];
-var chk = g ? ` checked` : ``;
-var type = g ? g.type : `multi`;
-var max = g ? (g.max || 0) : 0;
-var tSingle = (type===`single`) ? ` selected` : ``;
-var tMulti = (type===`multi`) ? ` selected` : ``;
 var nm = (ALANG===`ar`) ? sec.t : sec.tEn;
-var selSt = ` style="width:auto;margin:0;` +
-`border:1px solid var(--line);border-radius:8px;` +
-`padding:.25rem .3rem;font-family:inherit;` +
-`font-weight:800;font-size:.72rem;` +
-`background:var(--panel)"`;
-return `<div class="mg_opt">` +
-`<input type="checkbox" class="ms_chk" value="` +
-sec.id + `"` + chk + `>` +
-`<b>` + esc(sec.i + ` ` + nm) + `</b>` +
-`<select class="ms_type"` + selSt + `>` +
-`<option value="multi"` + tMulti + `>` +
-L(`modsTypeMulti`) + `</option>` +
-`<option value="single"` + tSingle + `>` +
-L(`modsTypeSingle`) + `</option>` +
-`</select>` +
-`<input type="number" min="0" class="ms_max" value="` +
-max + `" title="` + esc(L(`modsMax`)) + `">` +
-`</div>`;
+return `<option value="` + sIdx + `">` +
+esc(sec.i + ` ` + nm) + `</option>`;
 }).join(``);
 openModal(ii===null ? L(`addItemTitle`) : L(`editItemTitle`),
 `<div class="form-grid">` +
@@ -323,9 +323,23 @@ L(`imgDelete`) + `</button>` +
 `<input type="file" accept="image/png,image/jpeg,image/webp" hidden id="it_imgFile">` +
 `</fieldset>` +
 `<fieldset><legend>` + L(`legendMods`) + `</legend>` +
-`<div class="note" style="margin-bottom:.6rem">` +
-L(`modsSecHint`) + `</div>` +
-`<div class="mg_opts" id="modsBox">` + modsRows + `</div>` +
+`<div class="form-grid">` +
+`<label>` + L(`modsTitleArLbl`) +
+`<input id="modsTAr" placeholder="` +
+esc(L(`modsTitlePhAr`)) + `" value="` +
+esc(modsTitleArVal) + `"></label>` +
+`<label>` + L(`modsTitleEnLbl`) +
+`<input id="modsTEn" class="ltr" placeholder="` +
+esc(L(`modsTitlePhEn`)) + `" value="` +
+esc(modsTitleEnVal) + `"></label>` +
+`</div>` +
+`<div class="full"><label>` + L(`modsOpenSec`) +
+`<select id="modsSecSel"><option value="">—</option>` +
+modsSecOptions + `</select></label></div>` +
+`<div id="modsItemsBox" class="mg_opts"></div>` +
+`<div class="note" style="margin:.6rem 0 .4rem">` +
+L(`modsSelectedLbl`) + `</div>` +
+`<div id="modsChips" class="mg_opts"></div>` +
 `</fieldset>` +
 `<fieldset><legend>` + L(`legendAvail`) + `</legend>` +
 `<label><input type="radio" name="it_avail" value="all"` +
@@ -396,8 +410,8 @@ hidden: it ? it.hidden : false
 };
 if(only.length){ data.only = only; data.miss = miss; }
 if(so.length){ data.so = so; }
-var mods = readModsEditor();
-if(mods.length) data.mods = mods;
+var mods = readMods();
+if(mods) data.mods = mods;
 if(itemModalFile) pendingItemImgs[id] = itemModalFile;
 else if(itemModalDelete) pendingItemImgs[id] = `delete`;
 if(it){
@@ -410,35 +424,103 @@ STATE.MENU[si].items.push(data);
 renderMenu();
 toast(L(`savedItem`), `success`, L(`dontForget`));
 });
-/* قراءة الإضافات من صفوف الأقسام الجاهزة */
-var box = el(`modsBox`);
-function readModsEditor(){
-var groups = [];
-box.querySelectorAll(`.mg_opt`).forEach(function(row){
-var chk = row.querySelector(`.ms_chk`);
-if(!chk || !chk.checked) return;
-var sec = STATE.MENU.find(function(s){
-return s.id === chk.value;
-});
-if(!sec) return;
-var type = row.querySelector(`.ms_type`).value;
-var max = parseInt(
-row.querySelector(`.ms_max`).value, 10) || 0;
-var opts = sec.items
-.filter(function(x){ return x.hidden !== true; })
-.map(function(x){ return { ref: x.id }; });
-if(!opts.length) return;
-groups.push({
-id: sec.id,
-tAr: sec.t,
-tEn: sec.tEn,
-type: type,
-max: (type === `multi` ? max : 0),
-opts: opts
-});
-});
-return groups;
+/* wiring محرر الإضافات */
+var itemsBox = el(`modsItemsBox`);
+var chipsBox = el(`modsChips`);
+function miThumb(x){
+var st = ` style="width:40px;height:40px;` +
+`border-radius:8px;overflow:hidden;` +
+`background:#f1f2f4;display:inline-grid;` +
+`place-items:center;font-weight:900;` +
+`color:#b45309;flex:0 0 auto"`;
+if(x.imgv){
+return `<span` + st + `><img src="img/items/` + x.id +
+`.png?v=` + x.imgv +
+`" alt="" style="width:100%;height:100%;` +
+`object-fit:contain"></span>`;
 }
+return `<span` + st + `>` + esc(x.ar.charAt(0)) + `</span>`;
+}
+function renderModsItems(){
+var v = mv(`modsSecSel`);
+if(v === ``){ itemsBox.innerHTML = ``; return; }
+var sec = STATE.MENU[+v];
+if(!sec){ itemsBox.innerHTML = ``; return; }
+var list = sec.items.filter(function(x){
+return x.hidden !== true;
+});
+if(!list.length){
+itemsBox.innerHTML =
+`<div class="note">` + L(`modsNone`) + `</div>`;
+return;
+}
+itemsBox.innerHTML = list.map(function(x){
+var ck = (modsRefsArr.indexOf(x.id) >= 0)
+? ` checked` : ``;
+return `<div class="mg_opt">` +
+`<input type="checkbox" class="mi_chk" value="` +
+x.id + `"` + ck + `>` +
+miThumb(x) +
+`<b>` + esc(x.ar) + `</b>` +
+`<span style="color:var(--muted);font-weight:800;` +
+`font-size:.72rem">` + x.prices[0] + ` ` +
+L(`riyal`) + `</span>` +
+`</div>`;
+}).join(``);
+}
+function renderModsChips(){
+if(!modsRefsArr.length){
+chipsBox.innerHTML =
+`<div class="note" style="margin:0">` +
+L(`modsNone`) + `</div>`;
+return;
+}
+chipsBox.innerHTML = modsRefsArr.map(function(ref){
+var x = findItemAdmin(ref);
+if(!x) return ``;
+return `<span style="display:inline-flex;` +
+`align-items:center;gap:.4rem;background:#fff;` +
+`border:1px solid var(--line);border-radius:50px;` +
+`padding:.25rem .7rem;font-size:.72rem;` +
+`font-weight:800;color:var(--ink)">` +
+esc(x.ar) +
+`<button type="button" class="mi_rm" data-ref="` +
+ref + `" style="border:none;background:var(--red-bg);` +
+`color:var(--red);border-radius:50%;width:20px;` +
+`height:20px;font-weight:900;cursor:pointer">✕</button>` +
+`</span>`;
+}).join(` `);
+}
+function readMods(){
+var refs = modsRefsArr.filter(function(r){
+return !!findItemAdmin(r);
+});
+if(!refs.length) return null;
+return {
+tAr: mv(`modsTAr`).trim(),
+tEn: mv(`modsTEn`).trim(),
+refs: refs
+};
+}
+el(`modsSecSel`).addEventListener(`change`,
+renderModsItems);
+itemsBox.addEventListener(`change`, function(e){
+var c = e.target.closest(`.mi_chk`);
+if(!c) return;
+var idx = modsRefsArr.indexOf(c.value);
+if(c.checked && idx < 0) modsRefsArr.push(c.value);
+if(!c.checked && idx >= 0) modsRefsArr.splice(idx, 1);
+renderModsChips();
+});
+chipsBox.addEventListener(`click`, function(e){
+var b = e.target.closest(`.mi_rm`);
+if(!b) return;
+var idx = modsRefsArr.indexOf(b.dataset.ref);
+if(idx >= 0) modsRefsArr.splice(idx, 1);
+renderModsChips();
+renderModsItems();
+});
+renderModsChips();
 /* معاينة صورة الصنف */
 var imgBox = el(`it_imgBox`);
 var imgFile = el(`it_imgFile`);
@@ -823,8 +905,7 @@ var dot = `<span style="display:inline-block;` +
 `width:12px;height:12px;border-radius:50%;` +
 `background:` + esc(col) +
 `;margin-inline-end:.4rem"></span>`;
-var imgLine = x.img
-? (`<br>img: ` + esc(x.img)) : ``;
+var imgLine = x.img ? (`<br>img: ` + esc(x.img)) : ``;
 return `<div class="br-card">` +
 `<div class="br-head"><b>` + dot + esc(x.nameAr) +
 ` <span class="br-code">` + esc(x.nameEn||``) +
@@ -1096,18 +1177,15 @@ var src = pend ? pend.url :
 var pendBtns = ``;
 if(pend){
 pendBtns =
-`<button type="button" class="img-btn ok" data-iact="confirm" data-img="` + im.key + `">` +
-L(`imgConfirm`) + `</button>` +
-`<button type="button" class="img-btn del" data-iact="cancel" data-img="` + im.key + `">` +
-L(`imgCancel`) + `</button>`;
+`<button type="button" class="img-btn ok" data-iact="confirm" data-img="` + im.key + `">` + L(`imgConfirm`) + `</button>` +
+`<button type="button" class="img-btn del" data-iact="cancel" data-img="` + im.key + `">` + L(`imgCancel`) + `</button>`;
 }
 return `<div class="img-card">` +
 `<div class="img-prev"><img src="` + src +
 `" alt=""` + stImg + `></div>` +
 `<b>` + L(im.label) + `</b>` +
 `<div class="img-ops">` +
-`<button type="button" class="img-btn" data-iact="pick" data-img="` + im.key + `">` +
-L(`imgPick`) + `</button>` +
+`<button type="button" class="img-btn" data-iact="pick" data-img="` + im.key + `">` + L(`imgPick`) + `</button>` +
 pendBtns +
 `</div>` +
 `<input type="file" accept="image/png,image/jpeg,image/webp" hidden data-ifile="` + im.key + `">` +
@@ -1235,10 +1313,8 @@ var enChk = a.enabled ? ` checked` : ``;
 var onceChk = (a.oncePerDay!==false) ? ` checked` : ``;
 el(`adForm`).innerHTML =
 `<fieldset>` +
-`<label><input type="checkbox" id="a_enabled"` + enChk + `> ` +
-L(`lblAdEnabled`) + `</label>` +
-`<label><input type="checkbox" id="a_once"` + onceChk + `> ` +
-L(`lblAdOnce`) + `</label>` +
+`<label><input type="checkbox" id="a_enabled"` + enChk + `> ` + L(`lblAdEnabled`) + `</label>` +
+`<label><input type="checkbox" id="a_once"` + onceChk + `> ` + L(`lblAdOnce`) + `</label>` +
 `</fieldset>` +
 `<div class="form-grid">` +
 `<label>` + L(`lblAdIcon`) +
