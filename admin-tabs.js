@@ -1,4 +1,4 @@
-/* ===== admin-tabs.js — التبويبات والحفظ والنشر ===== */
+/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v2) ===== */
 /* ===== المنيو ===== */
 function renderMenu(){
 var wrap = el(`menuWrap`);
@@ -52,9 +52,7 @@ soldTag = soldAll ? L(`soldAll`)
 }
 var modsCount = 0;
 if(Array.isArray(it.mods)){
-it.mods.forEach(function(g){
-modsCount += (g.opts||[]).length;
-});
+modsCount = it.mods.length;
 }
 var price0 = (it.prices && it.prices[0])
 ? it.prices[0] : 0;
@@ -193,7 +191,7 @@ renderMenu();
 toast(L(`savedSec`), `success`, L(`dontForget`));
 });
 }
-/* ===== نافذة الصنف + محرر الإضافات ===== */
+/* ===== نافذة الصنف + الإضافات الجاهزة ===== */
 let itemModalFile = null;
 let itemModalDelete = false;
 function openItemModal(si, ii){
@@ -219,26 +217,22 @@ var curImg = null;
 if(it && it.imgv){
 curImg = `img/items/` + it.id + `.png?v=` + it.imgv;
 }
-var availCustomHtml = ``;
-if(brs.length){
 var acChk = (onlyVal !== `all`) ? ` checked` : ``;
-availCustomHtml =
-`<label><input type="radio" name="it_avail" value="custom"` +
-acChk + `> تخصيص</label>`;
-}
-var soldAllHtml = ``;
-var soldCustomHtml = ``;
-if(brs.length){
+var availCustomHtml = brs.length
+? (`<label><input type="radio" name="it_avail" value="custom"` +
+acChk + `> ` + L(`customChoice`) + `</label>`)
+: ``;
 var saChk = (soldVal === `all`) ? ` checked` : ``;
 var scChk = (soldVal !== `none` && soldVal !== `all`)
 ? ` checked` : ``;
-soldAllHtml =
-`<label><input type="radio" name="it_sold" value="all"` +
-saChk + `> نفد في كل الفروع</label>`;
-soldCustomHtml =
-`<label><input type="radio" name="it_sold" value="custom"` +
-scChk + `> تخصيص</label>`;
-}
+var soldAllHtml = brs.length
+? (`<label><input type="radio" name="it_sold" value="all"` +
+saChk + `> ` + L(`soldAllBranches`) + `</label>`)
+: ``;
+var soldCustomHtml = brs.length
+? (`<label><input type="radio" name="it_sold" value="custom"` +
+scChk + `> ` + L(`customChoice`) + `</label>`)
+: ``;
 var availBoxes = brs.map(function(b){
 var ck = onlyVal.split(`,`).includes(b.id)
 ? ` checked` : ``;
@@ -259,6 +253,39 @@ var cutSel = ((it && it.imgMode===`cut`) || !it)
 ? ` selected` : ``;
 var fullSel = (it && it.imgMode===`full`)
 ? ` selected` : ``;
+/* صفوف الإضافات الجاهزة من الأقسام */
+var attached = {};
+if(it && Array.isArray(it.mods)){
+it.mods.forEach(function(g){ attached[g.id] = g; });
+}
+var modsRows = STATE.MENU.map(function(sec, sIdx){
+if(sIdx === si) return ``;
+var g = attached[sec.id];
+var chk = g ? ` checked` : ``;
+var type = g ? g.type : `multi`;
+var max = g ? (g.max || 0) : 0;
+var tSingle = (type===`single`) ? ` selected` : ``;
+var tMulti = (type===`multi`) ? ` selected` : ``;
+var nm = (ALANG===`ar`) ? sec.t : sec.tEn;
+var selSt = ` style="width:auto;margin:0;` +
+`border:1px solid var(--line);border-radius:8px;` +
+`padding:.25rem .3rem;font-family:inherit;` +
+`font-weight:800;font-size:.72rem;` +
+`background:var(--panel)"`;
+return `<div class="mg_opt">` +
+`<input type="checkbox" class="ms_chk" value="` +
+sec.id + `"` + chk + `>` +
+`<b>` + esc(sec.i + ` ` + nm) + `</b>` +
+`<select class="ms_type"` + selSt + `>` +
+`<option value="multi"` + tMulti + `>` +
+L(`modsTypeMulti`) + `</option>` +
+`<option value="single"` + tSingle + `>` +
+L(`modsTypeSingle`) + `</option>` +
+`</select>` +
+`<input type="number" min="0" class="ms_max" value="` +
+max + `" title="` + esc(L(`modsMax`)) + `">` +
+`</div>`;
+}).join(``);
 openModal(ii===null ? L(`addItemTitle`) : L(`editItemTitle`),
 `<div class="form-grid">` +
 `<label>` + L(`lblNameAr`) +
@@ -274,7 +301,7 @@ esc(it?it.descEn||``:``) + `</textarea></label>` +
 `<label>` + L(`lblPrices`) +
 `<input id="it_prices" class="ltr" value="` +
 esc(it&&it.prices?it.prices.join(`,`):``) +
-`" placeholder="15 أو 15,18,22"></label>` +
+`" placeholder="` + esc(L(`pricesPh`)) + `"></label>` +
 `<label>` + L(`lblCal`) +
 `<input id="it_cal" type="number" min="0" value="` +
 esc(it&&it.cal?it.cal:``) + `"></label>` +
@@ -296,9 +323,9 @@ L(`imgDelete`) + `</button>` +
 `<input type="file" accept="image/png,image/jpeg,image/webp" hidden id="it_imgFile">` +
 `</fieldset>` +
 `<fieldset><legend>` + L(`legendMods`) + `</legend>` +
-`<div id="modsBox"></div>` +
-`<button type="button" class="add-item" id="modsAddGroup" style="border-radius:12px">` +
-L(`modsAddGroup`) + `</button>` +
+`<div class="note" style="margin-bottom:.6rem">` +
+L(`modsSecHint`) + `</div>` +
+`<div class="mg_opts" id="modsBox">` + modsRows + `</div>` +
 `</fieldset>` +
 `<fieldset><legend>` + L(`legendAvail`) + `</legend>` +
 `<label><input type="radio" name="it_avail" value="all"` +
@@ -319,8 +346,8 @@ L(`missHide`) + `</label>` +
 `</div></fieldset>` +
 `<fieldset><legend>` + L(`legendSold`) + `</legend>` +
 `<label><input type="radio" name="it_sold" value="none"` +
-((soldVal===`none`) ? ` checked` : ``) +
-`> متاح في كل الفروع</label>` +
+((soldVal===`none`) ? ` checked` : ``) + `> ` +
+L(`soldNone`) + `</label>` +
 soldAllHtml + soldCustomHtml +
 `<div id="soldCustomWrap" style="display:` +
 soldWrapShow + `">` +
@@ -383,135 +410,35 @@ STATE.MENU[si].items.push(data);
 renderMenu();
 toast(L(`savedItem`), `success`, L(`dontForget`));
 });
-/* محرر مجموعات الإضافات */
+/* قراءة الإضافات من صفوف الأقسام الجاهزة */
 var box = el(`modsBox`);
-function candidateOptsHtml(){
-return STATE.MENU.map(function(sec, sIdx){
-if(sIdx === si) return ``;
-var items = sec.items.filter(function(x){
-return x.hidden !== true;
-});
-if(!items.length) return ``;
-var opts = items.map(function(x){
-return `<option value="` + x.id + `">` +
-esc(x.ar) + ` — ` + x.prices[0] + `</option>`;
-}).join(``);
-return `<optgroup label="` +
-esc(sec.i + ` ` + ((ALANG===`ar`)?sec.t:sec.tEn)) +
-`">` + opts + `</optgroup>`;
-}).join(``);
-}
-function optRowHtml(ref, price){
-var rit = findItemAdmin(ref);
-if(!rit) return ``;
-var sec = findSectionOfItem(ref);
-var pv = (typeof price === `number`) ? price : ``;
-return `<div class="mg_opt" data-ref="` + esc(ref) + `">` +
-`<b>` + esc(rit.ar) +
-` <small style="color:var(--muted);font-weight:700">(` +
-esc(sec ? sec.t : ``) + `)</small></b>` +
-`<input type="number" min="0" step="1" class="mo_price" placeholder="` +
-esc(L(`modsPricePh`)) + `" value="` + pv + `">` +
-`<button type="button" class="img-btn del mo_del" style="flex:0 0 auto;padding:.4rem .6rem">🗑</button>` +
-`</div>`;
-}
-function groupHtml(g){
-g = g || {};
-var gid = g.id ||
-(`mg-` + Date.now() + `-` +
-Math.floor(Math.random()*9999));
-var tSingle = ((g.type||`single`)===`single`)
-? ` selected` : ``;
-var tMulti = (g.type===`multi`) ? ` selected` : ``;
-var optsHtml = (g.opts||[]).map(function(o){
-return optRowHtml(o.ref, o.price);
-}).join(``);
-return `<div class="mod-group" data-gid="` + esc(gid) + `">` +
-`<div class="form-grid">` +
-`<label>` + L(`modsGroupTitle`) +
-`<input class="mg_tAr" value="` + esc(g.tAr||``) + `"></label>` +
-`<label>` + L(`modsGroupTitleEn`) +
-`<input class="mg_tEn ltr" value="` + esc(g.tEn||``) + `"></label>` +
-`<label>` + L(`modsType`) +
-`<select class="mg_type">` +
-`<option value="single"` + tSingle + `>` +
-L(`modsTypeSingle`) + `</option>` +
-`<option value="multi"` + tMulti + `>` +
-L(`modsTypeMulti`) + `</option>` +
-`</select></label>` +
-`<label>` + L(`modsMax`) +
-`<input type="number" min="0" class="mg_max" value="` +
-(g.max||0) + `"></label>` +
-`</div>` +
-`<div class="mg_opts">` + optsHtml + `</div>` +
-`<div class="form-grid" style="margin-top:.5rem">` +
-`<label>` + L(`modsPick`) +
-`<select class="mg_pick"><option value="">—</option>` +
-candidateOptsHtml() + `</select></label>` +
-`<label>&nbsp;<button type="button" class="img-btn mg_add">` +
-L(`modsAdd`) + `</button></label>` +
-`</div>` +
-`<button type="button" class="img-btn del mg_del" style="margin-top:.5rem">` +
-L(`modsDelGroup`) + `</button>` +
-`</div>`;
-}
 function readModsEditor(){
 var groups = [];
-box.querySelectorAll(`.mod-group`).forEach(function(g){
-var tAr = g.querySelector(`.mg_tAr`).value.trim();
-var tEn = g.querySelector(`.mg_tEn`).value.trim();
-var type = g.querySelector(`.mg_type`).value;
-var max = parseInt(
-g.querySelector(`.mg_max`).value, 10) || 0;
-var opts = [];
-g.querySelectorAll(`.mg_opt`).forEach(function(o){
-var ref = o.dataset.ref;
-var pv = o.querySelector(`.mo_price`).value.trim();
-var entry = { ref: ref };
-if(pv !== `` && isFinite(parseFloat(pv))){
-entry.price = parseFloat(pv);
-}
-opts.push(entry);
+box.querySelectorAll(`.mg_opt`).forEach(function(row){
+var chk = row.querySelector(`.ms_chk`);
+if(!chk || !chk.checked) return;
+var sec = STATE.MENU.find(function(s){
+return s.id === chk.value;
 });
-if(tAr && opts.length){
+if(!sec) return;
+var type = row.querySelector(`.ms_type`).value;
+var max = parseInt(
+row.querySelector(`.ms_max`).value, 10) || 0;
+var opts = sec.items
+.filter(function(x){ return x.hidden !== true; })
+.map(function(x){ return { ref: x.id }; });
+if(!opts.length) return;
 groups.push({
-id: g.dataset.gid,
-tAr: tAr, tEn: tEn, type: type,
-max: (type===`multi` ? max : 0),
+id: sec.id,
+tAr: sec.t,
+tEn: sec.tEn,
+type: type,
+max: (type === `multi` ? max : 0),
 opts: opts
 });
-}
 });
 return groups;
 }
-box.innerHTML =
-(it && Array.isArray(it.mods) && it.mods.length)
-? it.mods.map(function(g){ return groupHtml(g); }).join(``)
-: ``;
-el(`modsAddGroup`).addEventListener(`click`, function(){
-box.insertAdjacentHTML(`beforeend`, groupHtml(null));
-});
-box.addEventListener(`click`, function(e){
-var add = e.target.closest(`.mg_add`);
-if(add){
-var grp = add.closest(`.mod-group`);
-var sel = grp.querySelector(`.mg_pick`);
-var ref = sel.value;
-if(!ref) return;
-var dup = grp.querySelector(
-`.mg_opt[data-ref="` + ref + `"]`);
-if(!dup){
-grp.querySelector(`.mg_opts`).insertAdjacentHTML(
-`beforeend`, optRowHtml(ref, undefined));
-}
-sel.value = ``;
-return;
-}
-var odel = e.target.closest(`.mo_del`);
-if(odel){ odel.closest(`.mg_opt`).remove(); return; }
-var gdel = e.target.closest(`.mg_del`);
-if(gdel){ gdel.closest(`.mod-group`).remove(); return; }
-});
 /* معاينة صورة الصنف */
 var imgBox = el(`it_imgBox`);
 var imgFile = el(`it_imgFile`);
@@ -824,8 +751,7 @@ var opts = sec.items.map(function(it){
 var s = (it.id===sel) ? ` selected` : ``;
 var nm = (ALANG===`ar`) ? it.ar : it.en;
 return `<option value="` + it.id + `"` + s + `>` +
-esc(nm) + ` — ` + it.prices[0] + ` ` + L(`riyal`) +
-`</option>`;
+esc(nm) + ` — ` + it.prices[0] + `</option>`;
 }).join(``);
 var lb = sec.i + ` ` +
 esc((ALANG===`ar`)?sec.t:sec.tEn);
