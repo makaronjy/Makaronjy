@@ -1,6 +1,3 @@
-/* =====================================================
-   ملف الإعدادات — مكرونجي (يُولَّد من لوحة التحكم)
-===================================================== */
 window.APP_SETTINGS = {
   "brand": {
     "nameAr": "مكرونجي",
@@ -443,5 +440,10 @@ window.APP_SETTINGS = {
     "btnAr": "حسناً 🍝",
     "btnEn": "Got it 🍝"
   },
-  "imagesVersion": 0
+  "imagesVersion": 0,
+  "display": {
+    "mode": "list",
+    "showDesc": true,
+    "showCal": true
+  }
 };
