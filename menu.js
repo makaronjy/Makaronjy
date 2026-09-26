@@ -16,7 +16,105 @@ window.MENU = [
         "desc": "مكرونة أقلام حمراء مع نص حبة دجاج مشوي",
         "descEn": "Red penne pasta with half grilled chicken",
         "imgv": 1789344170794,
-        "imgMode": "cut"
+        "imgMode": "cut",
+        "mods": [
+          {
+            "id": "sec-sides",
+            "tAr": "مقبلات",
+            "tEn": "Sides",
+            "type": "single",
+            "max": 0,
+            "opts": [
+              {
+                "ref": "side-potato"
+              },
+              {
+                "ref": "side-sambosa"
+              },
+              {
+                "ref": "side-caesar"
+              }
+            ]
+          },
+          {
+            "id": "sec-desserts",
+            "tAr": "حلويات",
+            "tEn": "Desserts",
+            "type": "single",
+            "max": 0,
+            "opts": [
+              {
+                "ref": "dessert-ummali"
+              },
+              {
+                "ref": "dessert-caramel"
+              }
+            ]
+          },
+          {
+            "id": "sec-sauces",
+            "tAr": "صوصات وإضافات",
+            "tEn": "Sauces & Extras",
+            "type": "single",
+            "max": 0,
+            "opts": [
+              {
+                "ref": "sauce-daqqus"
+              },
+              {
+                "ref": "sauce-pepper"
+              },
+              {
+                "ref": "sauce-shatta"
+              },
+              {
+                "ref": "sauce-lemon"
+              },
+              {
+                "ref": "sauce-bozuhaira"
+              }
+            ]
+          },
+          {
+            "id": "sec-drinks",
+            "tAr": "مشروبات",
+            "tEn": "Drinks",
+            "type": "single",
+            "max": 0,
+            "opts": [
+              {
+                "ref": "drink-water"
+              },
+              {
+                "ref": "drink-pepsi"
+              },
+              {
+                "ref": "drink-pepsi-diet"
+              },
+              {
+                "ref": "drink-7up"
+              },
+              {
+                "ref": "drink-7up-diet"
+              },
+              {
+                "ref": "drink-mirinda"
+              },
+              {
+                "ref": "drink-mirinda-citrus"
+              },
+              {
+                "ref": "sec-drinks-1789347283601"
+              },
+              {
+                "ref": "sec-drinks-1789348056900"
+              },
+              {
+                "ref": "sec-drinks-1789348386806"
+              }
+            ]
+          }
+        ]
       },
       {
         "id": "pasta-red-chest",
