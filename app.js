@@ -1,8 +1,8 @@
 /* =====================================================
 مكرونجي — سكربت التطبيق الرئيسي (app.js)
-v10: خيارات العرض (شبكي/قائمة) + صفحة التفاصيل والإضافات
-     + إلغاء الفتح اليومي التلقائي للأكثر مبيعاً (الشارة تبقى)
-     + تنظيف بوابة الفروع + عنوان التواصل + 🛵
+v11: الإضافات = كاروسيل «غالبًا ما يتم طلبه مع» ببطاقات مصوّرة
+     + اختيار حر بعدّاد +/− لكل إضافة (بدون حد)
+     + دعم صيغة الإضافات الجديدة والقديمة
 ===================================================== */
 /* ===== استعادة لقطة محلية عند فشل تحميل الملفات ===== */
 (function(){
@@ -141,7 +141,7 @@ function itemViewState(sec, it, brId){
   if(!iA) return (it.miss === 'hide') ? 'hide' : 'gray';
   return 'normal';
 }
-/* ===== خيارات العرض (جديد) ===== */
+/* ===== خيارات العرض ===== */
 function displayOpts(){
   const d = (S() && S().display) || {};
   return {
@@ -150,18 +150,34 @@ function displayOpts(){
     showCal: d.showCal !== false
   };
 }
-/* ===== الإضافات (جديد) ===== */
-function findModOpt(it, ref){
-  if(!it || !Array.isArray(it.mods)) return null;
-  for(const g of it.mods){
-    const o = (g.opts||[]).find(x=>x.ref===ref);
-    if(o) return o;
+/* ===== الإضافات: الصيغتان الجديدة والقديمة ===== */
+function modsRefs(it){
+  if(!it.mods) return [];
+  if(Array.isArray(it.mods)){
+    const out = [];
+    it.mods.forEach(g=>{
+      (g.opts||[]).forEach(o=>{
+        if(out.indexOf(o.ref) < 0) out.push(o.ref);
+      });
+    });
+    return out;
   }
-  return null;
+  return Array.isArray(it.mods.refs) ? it.mods.refs.slice() : [];
 }
-function modPrice(opt){
-  if(opt && typeof opt.price === 'number' && isFinite(opt.price)) return opt.price;
-  const rit = opt ? findMenuItem(opt.ref) : null;
+function modsTitleAr(it){
+  if(it.mods && !Array.isArray(it.mods) && it.mods.tAr) return it.mods.tAr;
+  if(Array.isArray(it.mods) && it.mods.length && it.mods[0].tAr) return it.mods[0].tAr;
+  return tt('oftenWith','غالبًا ما يتم طلبه مع','Often ordered with');
+}
+function modsTitleEn(it){
+  if(it.mods && !Array.isArray(it.mods) && it.mods.tEn) return it.mods.tEn;
+  if(Array.isArray(it.mods) && it.mods.length && it.mods[0].tEn) return it.mods[0].tEn;
+  return tt('oftenWithEn','Often ordered with','Often ordered with');
+}
+function modsSubAr(){ return tt('oftenWithSub','عادة ما يضيف الأشخاص هذه العناصر','People usually add these items'); }
+function modsSubEn(){ return tt('oftenWithSubEn','People usually add these items','People usually add these items'); }
+function modPriceFor(it, ref){
+  const rit = findMenuItem(ref);
   return rit ? rit.prices[0] : 0;
 }
 function modsSignature(mods){
@@ -179,8 +195,7 @@ function parseKey(k){
 function unitPriceWithMods(it, sizeIdx, mods){
   let p = itemPrice(it, sizeIdx);
   (mods||[]).forEach(m=>{
-    const o = findModOpt(it, m.ref);
-    p += (o ? modPrice(o) : 0) * m.qty;
+    p += modPriceFor(it, m.ref) * m.qty;
   });
   return p;
 }
@@ -309,7 +324,7 @@ function installApp(){
   }
 }
 function closeSheet(){ installSheet.classList.remove('show'); }
-/* ===== أيقونات التواصل الديناميكية ===== */
+/* ===== أيقونات التواصل ===== */
 const SOC_SVG = {
   instagram:'<svg viewBox="0 0 24 24"><path d="M7.8 2h8.4C19.4 2 22 4.6 22 7.8v8.4a5.8 5.8 0 0 1-5.8 5.8H7.8C4.6 22 2 19.4 2 16.2V7.8A5.8 5.8 0 0 1 7.8 2m-.2 2A3.6 3.6 0 0 0 4 7.6v8.8C4 18.4 5.6 20 7.6 20h8.8a3.6 3.6 0 0 0 3.6-3.6V7.6C20 5.6 18.4 4 16.4 4m.9 2.8a1.2 1.2 0 1 1 0 2.4 1.2 1.2 0 0 1 0-2.4M12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10m0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6"/></svg>',
   tiktok:'<svg viewBox="0 0 24 24"><path d="M16.6 5.82A4.28 4.28 0 0 1 15.54 3h-3.09v12.4a2.59 2.59 0 0 1-2.59 2.5c-1.42 0-2.6-1.16-2.6-2.6 0-1.72 1.66-3.01 3.37-2.48V9.66c-3.45-.46-6.47 2.22-6.47 5.64 0 3.33 2.76 5.7 5.83 5.7 3.24 0 5.81-2.35 5.81-5.7l.03-6.14c1.15.82 2.53 1.27 3.97 1.27V7.34c-1.28 0-2.46-.55-3.2-1.52z"/></svg>',
@@ -352,7 +367,7 @@ function renderSocial(){
       : '';
   }
 }
-/* ===== إصدار الصور — تحديث حي صامت ===== */
+/* ===== إصدار الصور ===== */
 function imagesVersion(){ const s = S(); return (s && s.imagesVersion) || 0; }
 function applyImageVersions(){
   const v = imagesVersion();
@@ -471,7 +486,7 @@ function updateStatus(){
 }
 updateStatus();
 setInterval(updateStatus, 30000);
-/* ===== حالة الإغلاق: قفل الطلب + إشعار المغلق ===== */
+/* ===== حالة الإغلاق ===== */
 let closedNoticeShown = false;
 function closedNow(){
   const br = currentBranch() || branches()[0] || null;
@@ -519,7 +534,7 @@ el('closedBtn').addEventListener('click', ()=>{
   if(m) m.scrollIntoView({behavior:'smooth', block:'start'});
 });
 el('closedClose').addEventListener('click', closeClosedNotice);
-/* ===== الإعلان النصي ===== */
+/* ===== الإعلان ===== */
 function showAdOnce(){
   const ad = S().ad;
   if(!ad || !ad.enabled) return;
@@ -537,7 +552,7 @@ function showAdOnce(){
   pushGuard();
 }
 function closeAd(){ el('adModal').classList.remove('show'); }
-/* ===== الأكثر مبيعاً: يدوي فقط عبر شارة 🏆 (بدون فتح يومي تلقائي) ===== */
+/* ===== الأكثر مبيعاً: يدوي فقط عبر 🏆 ===== */
 let featIndex = 0, featAuto = true, featToken = 0, autoTimeout = null;
 const featImg = el('featImg');
 const featAnim = el('featAnim');
@@ -768,7 +783,7 @@ el('gateList').addEventListener('click', e=>{
   const id = chooseBtn ? chooseBtn.dataset.choose : (card ? card.dataset.b : null);
   if(id) selectBranch(id);
 });
-/* ===== محرك المسارات الحقيقي (OSRM) ===== */
+/* ===== محرك المسارات (OSRM) ===== */
 const OSRM_HOSTS = ['https://routing.openstreetmap.de/routed-car','https://router.project-osrm.org'];
 let routeInfo = {};
 function round3(n){ return Math.round(n*1000)/1000; }
@@ -883,8 +898,28 @@ function updateBranchFooter(){
   const b = currentBranch();
   el('branchCurrent').textContent = b ? ('🍝 ' + branchName(b)) : '🍝 —';
 }
-/* ===== صفحة تفاصيل الصنف (جديد) ===== */
+/* ===== صفحة تفاصيل الصنف + كاروسيل الإضافات ===== */
 let dtState = null;
+(function injectDetailCss(){
+  const st = document.createElement('style');
+  st.textContent =
+    '.dt-often{margin-top:1rem}' +
+    '.dt-often h5{color:var(--ink);font-size:1.05rem;font-weight:900;line-height:1.6}' +
+    '.dt-often small{display:block;color:var(--muted);font-weight:700;font-size:.72rem;margin:.1rem 0 .6rem}' +
+    '.dt-often-row{display:flex;gap:.7rem;overflow-x:auto;padding:.1rem .1rem .5rem;scrollbar-width:none}' +
+    '.dt-often-row::-webkit-scrollbar{display:none}' +
+    '.dt-ocard{flex:0 0 150px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:.6rem;' +
+    'display:flex;flex-direction:column;gap:.35rem;align-items:center;text-align:center;' +
+    'box-shadow:0 2px 8px rgba(90,24,48,.06)}' +
+    '.dt-oimg{width:100%;aspect-ratio:1;border-radius:12px;overflow:hidden;' +
+    'background-color:var(--phbg);background-image:url("img/bg.png");background-size:cover;background-position:center}' +
+    '.dt-oimg img{width:100%;height:100%;object-fit:contain;padding:8%;display:block}' +
+    '.dt-ocard b{font-size:.8rem;font-weight:900;color:var(--ink);line-height:1.5;' +
+    'display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}' +
+    '.dt-oprice{font-size:.72rem;font-weight:800;color:var(--muted)}' +
+    '.dt-octrl{margin-top:.15rem}';
+  document.head.appendChild(st);
+})();
 function ensureDetailSheet(){
   if(el('detail')) return el('detail');
   const d = document.createElement('div');
@@ -918,7 +953,7 @@ function ensureDetailSheet(){
     cart.set(key, cur);
     updateCart();
     closeDetail();
-    toast(T().addedToCart || '🛒 تمت الإضافة إلى سلتك');
+    toast(tt('addedToCart','🛒 تمت الإضافة إلى سلتك','🛒 Added to your cart'));
   });
   el('dtSizeWrap').addEventListener('change', e=>{
     if(e.target.id === 'dtSize' && dtState){ dtState.sizeIdx = +e.target.value; renderDetailBar(); }
@@ -926,35 +961,27 @@ function ensureDetailSheet(){
   el('dtMods').addEventListener('click', e=>{
     const btn = e.target.closest('[data-mact]');
     if(!btn || !dtState) return;
-    const gid = btn.dataset.gid, ref = btn.dataset.ref, act = btn.dataset.mact;
-    const it = curDetailItem();
-    const g = (it.mods||[]).find(x=>x.id===gid);
-    if(!g) return;
-    const sel = dtState.sel[gid] || (dtState.sel[gid] = {});
-    const groupSum = ()=> Object.keys(sel).reduce((s,r)=> s + (sel[r]||0), 0);
-    const maxMsg = ()=> toast(tFn('detailMax', g.max, n=> T().detailMax(n), n=> T().detailMax(n)));
-    if(act === 'pick'){
-      if(sel[ref] > 0) delete sel[ref];
-      else { Object.keys(sel).forEach(r=> delete sel[r]); sel[ref] = 1; }
-    }
+    const ref = btn.dataset.ref;
+    const act = btn.dataset.mact;
     if(act === 'inc'){
-      if(g.max && groupSum() >= g.max){ maxMsg(); return; }
-      sel[ref] = (sel[ref]||0) + 1;
+      dtState.sel[ref] = (dtState.sel[ref]||0) + 1;
     }
     if(act === 'dec'){
-      if(sel[ref] > 0){ sel[ref]--; if(sel[ref]<=0) delete sel[ref]; }
+      if(dtState.sel[ref] > 0){
+        dtState.sel[ref]--;
+        if(dtState.sel[ref] <= 0) delete dtState.sel[ref];
+      }
     }
-    renderDetailMods(); renderDetailBar();
+    renderDetailMods();
+    renderDetailBar();
   });
   return d;
 }
 function curDetailItem(){ return MENU[dtState.si].items[dtState.ii]; }
 function dtModsArray(){
   const arr = [];
-  const it = curDetailItem();
-  (Array.isArray(it.mods)?it.mods:[]).forEach(g=>{
-    const s = dtState.sel[g.id]; if(!s) return;
-    Object.keys(s).forEach(ref=>{ if(s[ref]>0) arr.push({ref:ref, qty:s[ref]}); });
+  Object.keys(dtState.sel).forEach(ref=>{
+    if(dtState.sel[ref] > 0) arr.push({ ref: ref, qty: dtState.sel[ref] });
   });
   return arr;
 }
@@ -967,32 +994,33 @@ function renderDetailBar(){
 function renderDetailMods(){
   const it = curDetailItem();
   const box = el('dtMods');
-  const groups = Array.isArray(it.mods) ? it.mods : [];
-  box.innerHTML = groups.map(g=>{
-    const opts = (g.opts||[]).map(o=>({o:o, rit:findMenuItem(o.ref)})).filter(x=> x.rit && x.rit.hidden !== true);
-    if(!opts.length) return '';
-    const title = (currentLang==='ar') ? g.tAr : (g.tEn || g.tAr);
-    let sub = tt('detailOptional','اختياري','Optional');
-    if(g.type === 'multi' && g.max) sub += ' • ' + tFn('detailMax', g.max, n=> T().detailMax(n), n=> T().detailMax(n));
-    else if(g.type === 'single') sub += ' • ' + tt('detailMaxOne','اختر خياراً واحداً','Choose one option');
-    const sel = dtState.sel[g.id] || {};
-    const rows = opts.map(x=>{
-      const q = sel[x.o.ref] || 0;
-      const thumb = itemImgUrl(x.rit) || itemPlaceholder(x.rit.ar);
-      const price = modPrice(x.o);
-      const ctrl = (g.type === 'single')
-        ? `<button class="dt-pick ${q>0?'on':''}" data-mact="pick" data-gid="${g.id}" data-ref="${x.o.ref}">${q>0?'✓':'+'}</button>`
-        : (q>0
-          ? `<span class="dt-mini"><button class="dec" data-mact="dec" data-gid="${g.id}" data-ref="${x.o.ref}">−</button><span>${q}</span><button data-mact="inc" data-gid="${g.id}" data-ref="${x.o.ref}">+</button></span>`
-          : `<button class="dt-pick" data-mact="inc" data-gid="${g.id}" data-ref="${x.o.ref}">+</button>`);
-      return `<div class="dt-modrow">
-        <span class="dt-thumb"><img src="${thumb}" alt="${itemName(x.rit)}" loading="lazy"></span>
-        <span class="dt-modinfo"><b>${itemName(x.rit)}</b><span>+${price} ${T().currency}</span></span>
-        ${ctrl}
-      </div>`;
-    }).join('');
-    return `<div class="dt-modgroup"><h5>${title}</h5><small>${sub}</small>${rows}</div>`;
+  const refs = modsRefs(it).filter(ref=>{
+    const rit = findMenuItem(ref);
+    return rit && rit.hidden !== true;
+  });
+  if(!refs.length){ box.innerHTML = ''; return; }
+  const ar = (currentLang==='ar');
+  const head = ar ? modsTitleAr(it) : modsTitleEn(it);
+  const sub = ar ? modsSubAr() : modsSubEn();
+  const cards = refs.map(ref=>{
+    const rit = findMenuItem(ref);
+    const q = dtState.sel[ref] || 0;
+    const thumb = itemImgUrl(rit) || itemPlaceholder(rit.ar);
+    const ctrl = q > 0
+      ? `<span class="dt-mini"><button class="dec" data-mact="dec" data-ref="${ref}">−</button><span>${q}</span><button data-mact="inc" data-ref="${ref}">+</button></span>`
+      : `<button class="dt-pick" data-mact="inc" data-ref="${ref}">+</button>`;
+    return `<div class="dt-ocard">
+      <div class="dt-oimg"><img src="${thumb}" alt="${itemName(rit)}" loading="lazy"></div>
+      <b>${itemName(rit)}</b>
+      <span class="dt-oprice">+${rit.prices[0]} ${T().currency}</span>
+      <div class="dt-octrl">${ctrl}</div>
+    </div>`;
   }).join('');
+  box.innerHTML = `<div class="dt-often">
+    <h5>${head}</h5>
+    <small>${sub}</small>
+    <div class="dt-often-row">${cards}</div>
+  </div>`;
 }
 function openDetail(si, ii){
   ensureDetailSheet();
@@ -1103,7 +1131,8 @@ function buildMenu(){
       const mode = (it.imgMode === 'full') ? 'full' : '';
       const calTxt = cal ? ('🔥 '+cal+' '+TT.cal) : TT.zeroCal;
       const priceTxt = multi ? (TT.from+' '+prices[0]+' '+TT.currency) : (prices[0]+' '+TT.currency);
-      const bestBadge = isBestSeller(it) ? `<span class="c-badge" data-openfeat="1" style="cursor:pointer">🏆 ${bestTxt}</span>` : '';
+      const bestBadge = isBestSeller(it)
+        ? `<span class="c-badge" data-openfeat="1" style="cursor:pointer">🏆 ${bestTxt}</span>` : '';
       if(DO.mode === 'list'){
         const badges = [];
         if(gray) badges.push(`<span class="l-badge">${grayTxt}</span>`);
@@ -1200,7 +1229,7 @@ document.addEventListener('click', e=>{
   if(cur.qty<=0) cart.delete(key); else cart.set(key,cur);
   updateCart();
 });
-/* ===== فتح صفحة التفاصيل من صفوف القائمة ===== */
+/* ===== فتح التفاصيل من صفوف القائمة ===== */
 main.addEventListener('click', e=>{
   const row = e.target.closest('.lrow');
   if(!row) return;
@@ -1381,7 +1410,7 @@ function resolveConfirm(val){
   el('confirmModal').classList.remove('show');
   if(confirmResolve){ const r = confirmResolve; confirmResolve = null; r(val); }
 }
-/* ===== المفضلة (مع الإضافات) ===== */
+/* ===== المفضلة ===== */
 const FAV_KEY = 'mk_favs_v1';
 const MAX_FAVS = 3;
 function getFavs(){
@@ -1516,7 +1545,7 @@ el('saveFavBtn').addEventListener('click', openSlotPicker);
 document.querySelectorAll('#slotBtns .slot-btn').forEach(b => {
   b.addEventListener('click', () => saveFavToSlot(+b.dataset.slot));
 });
-/* ===== الدفع عبر واتساب (مع أسطر الإضافات) ===== */
+/* ===== الدفع عبر واتساب ===== */
 function checkout(){
   if(orderLocked()) return;
   const TT = T();
@@ -1541,8 +1570,7 @@ function checkout(){
     let line = `▪️ ${i.qty} × ${itemName(it)}${size} = ${i.qty*unit} ${TT.currency}`;
     (i.mods||[]).forEach(m=>{
       const rit = findMenuItem(m.ref);
-      const o = findModOpt(it, m.ref);
-      const mp = o ? modPrice(o) : (rit ? rit.prices[0] : 0);
+      const mp = modPriceFor(it, m.ref);
       if(rit) line += `\n   ➕ ${m.qty} × ${itemName(rit)} = ${m.qty*mp} ${TT.currency}`;
     });
     return line;
@@ -1663,8 +1691,6 @@ setInterval(liveCheck, 60000);
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) liveCheck(); });
 /* ===== الإقلاع ===== */
 (function boot(){
-  /* إزالة نصّي البوابة الملغيين إن وُجدا في الصفحة */
-  ['gateDirectLbl','gateTitle'].forEach(id=>{ const n = el(id); if(n) n.remove(); });
   migrateFavs();
   try{
     const urlB = new URLSearchParams(location.search).get('b');
