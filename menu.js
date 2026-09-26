@@ -34,7 +34,8 @@ window.MENU = [
             "drink-mirinda-citrus",
             "drink-7up",
             "sec-drinks-1789347283601",
-            "sec-drinks-1789348056900"
+            "sec-drinks-1789348056900",
+            "side-potato"
           ]
         }
       },
