@@ -264,7 +264,7 @@ window.MENU = [
         "cal": 105,
         "desc": "مشروب غازي بارد",
         "descEn": "Chilled soft drink",
-        "imgv": 1790525624998,
+        "imgv": 1790525822634,
         "imgMode": "cut"
       },
       {
