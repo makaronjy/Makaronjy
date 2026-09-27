@@ -21,21 +21,11 @@ window.MENU = [
           "tAr": "",
           "tEn": "",
           "refs": [
-            "side-caesar",
-            "dessert-ummali",
-            "dessert-caramel",
-            "sauce-daqqus",
-            "sauce-pepper",
-            "sauce-shatta",
-            "sauce-lemon",
-            "sauce-bozuhaira",
             "drink-pepsi",
-            "drink-mirinda",
+            "drink-7up-diet",
             "drink-mirinda-citrus",
-            "drink-7up",
-            "sec-drinks-1789347283601",
-            "sec-drinks-1789348056900",
-            "side-potato"
+            "side-sambosa",
+            "side-caesar"
           ]
         }
       },
