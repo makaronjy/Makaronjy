@@ -1,8 +1,8 @@
 /* =====================================================
 مكرونجي — سكربت التطبيق الرئيسي (app.js)
-v12: الإضافات أسطر طلب مستقلة (سلة/واتساب/مفضلة)
-     + كاروسيل بدون قفز + فتح التفاصيل من الشبكي
-     + ترحيل تلقائي للصيغ القديمة
+v13: عدّادات الإضافات مرآة حيّة للسلة (+/− فوري)
+     + زر + في الشبكة يضيف ويفتح التفاصيل
+     + الشريط السفلي للصنف الأساسي فقط
 ===================================================== */
 /* ===== استعادة لقطة محلية عند فشل تحميل الملفات ===== */
 (function(){
@@ -141,6 +141,14 @@ function itemViewState(sec, it, brId){
   if(!iA) return (it.miss === 'hide') ? 'hide' : 'gray';
   return 'normal';
 }
+function itemAvailable(id, brId){
+  const it = findMenuItem(id);
+  const sec = findSectionOfItem(id);
+  if(!it || !sec) return false;
+  if(it.hidden === true) return false;
+  if(itemSoldOut(it, brId)) return false;
+  return itemViewState(sec, it, brId) === 'normal';
+}
 /* ===== خيارات العرض ===== */
 function displayOpts(){
   const d = (S() && S().display) || {};
@@ -180,7 +188,7 @@ function modPriceFor(it, ref){
   const rit = findMenuItem(ref);
   return rit ? rit.prices[0] : 0;
 }
-/* ===== مفاتيح السلة (سطر عادي لكل صنف/إضافة) ===== */
+/* ===== مفاتيح السلة: سطر عادي لكل صنف/إضافة ===== */
 function cartKey(id, sizeIdx){ return id+'|'+sizeIdx; }
 function keyId(k){ return String(k).split('|')[0]; }
 function keySize(k){ return +String(k).split('|')[1]; }
@@ -882,7 +890,7 @@ function updateBranchFooter(){
   const b = currentBranch();
   el('branchCurrent').textContent = b ? ('🍝 ' + branchName(b)) : '🍝 —';
 }
-/* ===== صفحة التفاصيل + كاروسيل الإضافات ===== */
+/* ===== صفحة التفاصيل + الكاروسيل الحي ===== */
 let dtState = null;
 (function injectDetailCss(){
   const st = document.createElement('style');
@@ -901,7 +909,8 @@ let dtState = null;
     '.dt-ocard b{font-size:.8rem;font-weight:900;color:var(--ink);line-height:1.5;' +
     'display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}' +
     '.dt-oprice{font-size:.72rem;font-weight:800;color:var(--muted)}' +
-    '.dt-octrl{margin-top:.15rem}';
+    '.dt-octrl{margin-top:.15rem}' +
+    '.order-locked .dt-octrl{opacity:.55;pointer-events}';
   document.head.appendChild(st);
 })();
 function ensureDetailSheet(){
@@ -927,21 +936,14 @@ function ensureDetailSheet(){
   el('dtClose').addEventListener('click', closeDetail);
   el('dtInc').addEventListener('click', ()=>{ if(dtState){ dtState.qty++; renderDetailBar(); } });
   el('dtDec').addEventListener('click', ()=>{ if(dtState && dtState.qty>1){ dtState.qty--; renderDetailBar(); } });
+  /* الشريط: يضيف الصنف الأساسي فقط */
   el('dtAdd').addEventListener('click', ()=>{
     if(!dtState || orderLocked()) return;
     const it = curDetailItem();
-    const baseKey = cartKey(it.id, dtState.sizeIdx);
-    const baseCur = cart.get(baseKey) || {id:it.id, sizeIdx:dtState.sizeIdx, qty:0};
-    baseCur.qty += dtState.qty;
-    cart.set(baseKey, baseCur);
-    Object.keys(dtState.sel).forEach(ref=>{
-      const q = dtState.sel[ref];
-      if(q <= 0) return;
-      const k = cartKey(ref, -1);
-      const cur = cart.get(k) || {id:ref, sizeIdx:-1, qty:0};
-      cur.qty += q;
-      cart.set(k, cur);
-    });
+    const key = cartKey(it.id, dtState.sizeIdx);
+    const cur = cart.get(key) || {id:it.id, sizeIdx:dtState.sizeIdx, qty:0};
+    cur.qty += dtState.qty;
+    cart.set(key, cur);
     updateCart();
     closeDetail();
     toast(tt('addedToCart','🛒 تمت الإضافة إلى سلتك','🛒 Added to your cart'));
@@ -949,34 +951,36 @@ function ensureDetailSheet(){
   el('dtSizeWrap').addEventListener('change', e=>{
     if(e.target.id === 'dtSize' && dtState){ dtState.sizeIdx = +e.target.value; renderDetailBar(); }
   });
+  /* العدادات الحية: +/− يعدلان سطر السلة مباشرة */
   el('dtMods').addEventListener('click', e=>{
     const btn = e.target.closest('[data-mact]');
     if(!btn || !dtState) return;
+    if(orderLocked()) return;
     const ref = btn.dataset.ref;
     const act = btn.dataset.mact;
+    const key = cartKey(ref, -1);
     if(act === 'inc'){
-      dtState.sel[ref] = (dtState.sel[ref]||0) + 1;
+      const cur = cart.get(key) || {id:ref, sizeIdx:-1, qty:0};
+      cur.qty += 1;
+      cart.set(key, cur);
     }
     if(act === 'dec'){
-      if(dtState.sel[ref] > 0){
-        dtState.sel[ref]--;
-        if(dtState.sel[ref] <= 0) delete dtState.sel[ref];
+      const cur = cart.get(key);
+      if(cur){
+        cur.qty -= 1;
+        if(cur.qty <= 0) cart.delete(key);
       }
     }
+    updateCart();
     renderDetailMods();
-    renderDetailBar();
   });
   return d;
 }
 function curDetailItem(){ return MENU[dtState.si].items[dtState.ii]; }
-/* الإجمالي: الصنف×كميته + كل إضافة×كميتها (مستقلة) */
+/* إجمالي الشريط = الصنف الأساسي × كميته فقط */
 function detailTotal(){
   const it = curDetailItem();
-  let t = itemPrice(it, dtState.sizeIdx) * dtState.qty;
-  Object.keys(dtState.sel).forEach(ref=>{
-    t += modPriceFor(it, ref) * dtState.sel[ref];
-  });
-  return t;
+  return itemPrice(it, dtState.sizeIdx) * dtState.qty;
 }
 function renderDetailBar(){
   const TT = T();
@@ -986,19 +990,17 @@ function renderDetailBar(){
 function renderDetailMods(){
   const it = curDetailItem();
   const box = el('dtMods');
-  const refs = modsRefs(it).filter(ref=>{
-    const rit = findMenuItem(ref);
-    return rit && rit.hidden !== true;
-  });
+  const brId = savedBranchId() || '';
   const prevRow = box.querySelector('.dt-often-row');
   const sl = prevRow ? prevRow.scrollLeft : 0;
+  const refs = modsRefs(it).filter(ref=> itemAvailable(ref, brId));
   if(!refs.length){ box.innerHTML = ''; return; }
   const ar = (currentLang==='ar');
   const head = ar ? modsTitleAr(it) : modsTitleEn(it);
   const sub = ar ? modsSubAr() : modsSubEn();
   const cards = refs.map(ref=>{
     const rit = findMenuItem(ref);
-    const q = dtState.sel[ref] || 0;
+    const q = qtyForItemSize(ref, -1);
     const thumb = itemImgUrl(rit) || itemPlaceholder(rit.ar);
     const ctrl = q > 0
       ? `<span class="dt-mini"><button class="dec" data-mact="dec" data-ref="${ref}">−</button><span>${q}</span><button data-mact="inc" data-ref="${ref}">+</button></span>`
@@ -1020,7 +1022,7 @@ function renderDetailMods(){
 }
 function openDetail(si, ii){
   ensureDetailSheet();
-  dtState = { si:si, ii:ii, sizeIdx:-1, qty:1, sel:{} };
+  dtState = { si:si, ii:ii, sizeIdx:-1, qty:1 };
   const it = MENU[si].items[ii];
   const TT = T();
   const DO = displayOpts();
@@ -1208,7 +1210,7 @@ function buildMenu(){
   renderSocial();
 }
 buildMenu();
-/* ===== أزرار +/− في الشبكي ===== */
+/* ===== + / − في الشبكي: + يضيف ويفتح التفاصيل إن وجدت إضافات ===== */
 document.addEventListener('click', e=>{
   const b = e.target.closest('.st'); if(!b) return;
   const step = b.closest('.step');
@@ -1227,6 +1229,9 @@ document.addEventListener('click', e=>{
   b.classList.contains('inc') ? cur.qty++ : cur.qty--;
   if(cur.qty<=0) cart.delete(key); else cart.set(key,cur);
   updateCart();
+  if(b.classList.contains('inc') && modsRefs(it).length){
+    openDetail(si, ii);
+  }
 });
 /* ===== الشبكي: الضغط على بطاقة لها إضافات يفتح التفاصيل ===== */
 main.addEventListener('click', e=>{
@@ -1327,14 +1332,6 @@ function clearSearch(){
 /* ===== السلة: كل صنف/إضافة سطر مستقل ===== */
 const cart = new Map();
 try{ (JSON.parse(localStorage.getItem('mk_cart'))||[]).forEach(([k,v])=> cart.set(k,v)); }catch(e){}
-function itemAvailable(id, brId){
-  const it = findMenuItem(id);
-  const sec = findSectionOfItem(id);
-  if(!it || !sec) return false;
-  if(it.hidden === true) return false;
-  if(itemSoldOut(it, brId)) return false;
-  return itemViewState(sec, it, brId) === 'normal';
-}
 function reconcileCart(){
   const brId = savedBranchId() || '';
   let removed = 0, removedMods = false;
@@ -1377,6 +1374,7 @@ el('dItems').addEventListener('click', e=>{
   b.dataset.a==='inc' ? item.qty++ : item.qty--;
   if(item.qty<=0) cart.delete(b.dataset.k);
   updateCart();
+  if(detailShown()) renderDetailMods();
 });
 function updateCart(){
   const TT = T();
