@@ -1,8 +1,8 @@
 /* =====================================================
 مكرونجي — سكربت التطبيق الرئيسي (app.js)
-v11: الإضافات = كاروسيل «غالبًا ما يتم طلبه مع» ببطاقات مصوّرة
-     + اختيار حر بعدّاد +/− لكل إضافة (بدون حد)
-     + دعم صيغة الإضافات الجديدة والقديمة
+v12: الإضافات أسطر طلب مستقلة (سلة/واتساب/مفضلة)
+     + كاروسيل بدون قفز + فتح التفاصيل من الشبكي
+     + ترحيل تلقائي للصيغ القديمة
 ===================================================== */
 /* ===== استعادة لقطة محلية عند فشل تحميل الملفات ===== */
 (function(){
@@ -150,7 +150,7 @@ function displayOpts(){
     showCal: d.showCal !== false
   };
 }
-/* ===== الإضافات: الصيغتان الجديدة والقديمة ===== */
+/* ===== الإضافات: قراءة الصيغتين الجديدة والقديمة ===== */
 function modsRefs(it){
   if(!it.mods) return [];
   if(Array.isArray(it.mods)){
@@ -180,30 +180,14 @@ function modPriceFor(it, ref){
   const rit = findMenuItem(ref);
   return rit ? rit.prices[0] : 0;
 }
-function modsSignature(mods){
-  if(!mods || !mods.length) return '';
-  return mods.slice().sort((a,b)=> a.ref < b.ref ? -1 : 1).map(m=> m.ref+'x'+m.qty).join(',');
-}
-function cartKey(id, sizeIdx, mods){
-  const sig = modsSignature(mods);
-  return id+'|'+sizeIdx+(sig ? '|'+sig : '');
-}
-function parseKey(k){
-  const p = String(k).split('|');
-  return { id:p[0], sizeIdx:+p[1], sig:p[2]||'' };
-}
-function unitPriceWithMods(it, sizeIdx, mods){
-  let p = itemPrice(it, sizeIdx);
-  (mods||[]).forEach(m=>{
-    p += modPriceFor(it, m.ref) * m.qty;
-  });
-  return p;
-}
+/* ===== مفاتيح السلة (سطر عادي لكل صنف/إضافة) ===== */
+function cartKey(id, sizeIdx){ return id+'|'+sizeIdx; }
+function keyId(k){ return String(k).split('|')[0]; }
+function keySize(k){ return +String(k).split('|')[1]; }
 function qtyForItemSize(id, sizeIdx){
   let q = 0;
   cart.forEach((v,k)=>{
-    const p = parseKey(k);
-    if(p.id === id && p.sizeIdx === sizeIdx) q += v.qty;
+    if(keyId(k) === id && keySize(k) === sizeIdx) q += v.qty;
   });
   return q;
 }
@@ -898,7 +882,7 @@ function updateBranchFooter(){
   const b = currentBranch();
   el('branchCurrent').textContent = b ? ('🍝 ' + branchName(b)) : '🍝 —';
 }
-/* ===== صفحة تفاصيل الصنف + كاروسيل الإضافات ===== */
+/* ===== صفحة التفاصيل + كاروسيل الإضافات ===== */
 let dtState = null;
 (function injectDetailCss(){
   const st = document.createElement('style');
@@ -946,11 +930,18 @@ function ensureDetailSheet(){
   el('dtAdd').addEventListener('click', ()=>{
     if(!dtState || orderLocked()) return;
     const it = curDetailItem();
-    const mods = dtModsArray();
-    const key = cartKey(it.id, dtState.sizeIdx, mods);
-    const cur = cart.get(key) || {id:it.id, sizeIdx:dtState.sizeIdx, qty:0, mods:mods};
-    cur.qty += dtState.qty;
-    cart.set(key, cur);
+    const baseKey = cartKey(it.id, dtState.sizeIdx);
+    const baseCur = cart.get(baseKey) || {id:it.id, sizeIdx:dtState.sizeIdx, qty:0};
+    baseCur.qty += dtState.qty;
+    cart.set(baseKey, baseCur);
+    Object.keys(dtState.sel).forEach(ref=>{
+      const q = dtState.sel[ref];
+      if(q <= 0) return;
+      const k = cartKey(ref, -1);
+      const cur = cart.get(k) || {id:ref, sizeIdx:-1, qty:0};
+      cur.qty += q;
+      cart.set(k, cur);
+    });
     updateCart();
     closeDetail();
     toast(tt('addedToCart','🛒 تمت الإضافة إلى سلتك','🛒 Added to your cart'));
@@ -978,18 +969,19 @@ function ensureDetailSheet(){
   return d;
 }
 function curDetailItem(){ return MENU[dtState.si].items[dtState.ii]; }
-function dtModsArray(){
-  const arr = [];
+/* الإجمالي: الصنف×كميته + كل إضافة×كميتها (مستقلة) */
+function detailTotal(){
+  const it = curDetailItem();
+  let t = itemPrice(it, dtState.sizeIdx) * dtState.qty;
   Object.keys(dtState.sel).forEach(ref=>{
-    if(dtState.sel[ref] > 0) arr.push({ ref: ref, qty: dtState.sel[ref] });
+    t += modPriceFor(it, ref) * dtState.sel[ref];
   });
-  return arr;
+  return t;
 }
-function dtUnit(){ return unitPriceWithMods(curDetailItem(), dtState.sizeIdx, dtModsArray()); }
 function renderDetailBar(){
   const TT = T();
   el('dtQty').textContent = dtState.qty;
-  el('dtAdd').textContent = (TT.addToCart || 'إضافة للسلة') + ' • ' + (dtUnit()*dtState.qty) + ' ' + TT.currency;
+  el('dtAdd').textContent = (TT.addToCart || 'إضافة للسلة') + ' • ' + detailTotal() + ' ' + TT.currency;
 }
 function renderDetailMods(){
   const it = curDetailItem();
@@ -998,6 +990,8 @@ function renderDetailMods(){
     const rit = findMenuItem(ref);
     return rit && rit.hidden !== true;
   });
+  const prevRow = box.querySelector('.dt-often-row');
+  const sl = prevRow ? prevRow.scrollLeft : 0;
   if(!refs.length){ box.innerHTML = ''; return; }
   const ar = (currentLang==='ar');
   const head = ar ? modsTitleAr(it) : modsTitleEn(it);
@@ -1021,6 +1015,8 @@ function renderDetailMods(){
     <small>${sub}</small>
     <div class="dt-often-row">${cards}</div>
   </div>`;
+  const newRow = box.querySelector('.dt-often-row');
+  if(newRow) newRow.scrollLeft = sl;
 }
 function openDetail(si, ii){
   ensureDetailSheet();
@@ -1159,7 +1155,10 @@ function buildMenu(){
       if(DO.showCal) metaParts.push(calTxt);
       if(DO.showDesc && desc) metaParts.push(desc);
       const card = document.createElement('div');
-      card.className='card' + (gray?' card-gray':''); card.dataset.name = it.ar;
+      card.className='card' + (gray?' card-gray':'');
+      card.dataset.name = it.ar;
+      card.dataset.si = si;
+      card.dataset.ii = ii;
       card.innerHTML = `
         <div class="c-img">
           <img class="${mode}" src="${imgURL || ph}" alt="${itemName(it)}" loading="lazy"
@@ -1223,13 +1222,29 @@ document.addEventListener('click', e=>{
   if(itemSoldOut(it, brId)) return;
   const sel = step.closest('.card').querySelector('select');
   const sizeIdx = sel ? +sel.value : -1;
-  const key = cartKey(it.id, sizeIdx, null);
-  const cur = cart.get(key) || {id:it.id, sizeIdx:sizeIdx, qty:0, mods:[]};
+  const key = cartKey(it.id, sizeIdx);
+  const cur = cart.get(key) || {id:it.id, sizeIdx:sizeIdx, qty:0};
   b.classList.contains('inc') ? cur.qty++ : cur.qty--;
   if(cur.qty<=0) cart.delete(key); else cart.set(key,cur);
   updateCart();
 });
-/* ===== فتح التفاصيل من صفوف القائمة ===== */
+/* ===== الشبكي: الضغط على بطاقة لها إضافات يفتح التفاصيل ===== */
+main.addEventListener('click', e=>{
+  const card = e.target.closest('.card');
+  if(!card) return;
+  if(e.target.closest('.step')) return;
+  if(e.target.closest('select')) return;
+  if(e.target.closest('[data-openfeat]')) return;
+  if(orderLocked()) return;
+  const si = +card.dataset.si, ii = +card.dataset.ii;
+  const sec = MENU[si], it = sec.items[ii];
+  const brId = savedBranchId() || '';
+  if(itemViewState(sec, it, brId) !== 'normal') return;
+  if(itemSoldOut(it, brId)) return;
+  if(!modsRefs(it).length) return;
+  openDetail(si, ii);
+});
+/* ===== القائمة: الضغط على الصف يفتح التفاصيل ===== */
 main.addEventListener('click', e=>{
   const row = e.target.closest('.lrow');
   if(!row) return;
@@ -1309,31 +1324,45 @@ function clearSearch(){
   });
   showSection(currentSection);
 }
-/* ===== السلة (مع الإضافات) ===== */
+/* ===== السلة: كل صنف/إضافة سطر مستقل ===== */
 const cart = new Map();
 try{ (JSON.parse(localStorage.getItem('mk_cart'))||[]).forEach(([k,v])=> cart.set(k,v)); }catch(e){}
+function itemAvailable(id, brId){
+  const it = findMenuItem(id);
+  const sec = findSectionOfItem(id);
+  if(!it || !sec) return false;
+  if(it.hidden === true) return false;
+  if(itemSoldOut(it, brId)) return false;
+  return itemViewState(sec, it, brId) === 'normal';
+}
 function reconcileCart(){
   const brId = savedBranchId() || '';
   let removed = 0, removedMods = false;
   const rebuilt = new Map();
+  const addLine = (id, sizeIdx, qty)=>{
+    const k = cartKey(id, sizeIdx);
+    const cur = rebuilt.get(k) || {id:id, sizeIdx:sizeIdx, qty:0};
+    cur.qty += qty;
+    rebuilt.set(k, cur);
+  };
   cart.forEach((v)=>{
     let id = v.id, sizeIdx = v.sizeIdx, qty = v.qty;
     if(id === undefined){
       const mig = findMenuItemByAr(v.ar);
       if(!mig){ removed++; return; }
-      id = mig.id; sizeIdx = v.sizeIdx; qty = v.qty;
+      id = mig.id;
     }
-    const it = findMenuItem(id);
-    const sec = findSectionOfItem(id);
-    if(!it || !sec || it.hidden === true || itemSoldOut(it, brId) || itemViewState(sec, it, brId) !== 'normal'){ removed++; return; }
-    const mods = (v.mods||[]).map(m=>{
-      const rit = findMenuItem(m.ref);
-      const rsec = rit ? findSectionOfItem(m.ref) : null;
-      if(!rit || !rsec || rit.hidden === true || itemSoldOut(rit, brId) || itemViewState(rsec, rit, brId) !== 'normal'){ removedMods = true; return null; }
-      return { ref:m.ref, qty:m.qty };
-    }).filter(Boolean);
-    const key = cartKey(id, sizeIdx, mods);
-    rebuilt.set(key, {id:id, sizeIdx:sizeIdx, qty:qty, mods:mods});
+    if(!itemAvailable(id, brId)){ removed++; return; }
+    const mods = Array.isArray(v.mods) ? v.mods : null;
+    if(mods && mods.length){
+      addLine(id, sizeIdx, qty);
+      mods.forEach(m=>{
+        if(!itemAvailable(m.ref, brId)){ removedMods = true; return; }
+        addLine(m.ref, -1, qty * (m.qty || 1));
+      });
+    } else {
+      addLine(id, sizeIdx, qty);
+    }
   });
   cart.clear();
   rebuilt.forEach((v,k)=> cart.set(k,v));
@@ -1349,19 +1378,13 @@ el('dItems').addEventListener('click', e=>{
   if(item.qty<=0) cart.delete(b.dataset.k);
   updateCart();
 });
-function modsNames(it, mods){
-  return (mods||[]).map(m=>{
-    const rit = findMenuItem(m.ref);
-    return rit ? (m.qty+'× '+itemName(rit)) : '';
-  }).filter(Boolean).join('، ');
-}
 function updateCart(){
   const TT = T();
   let count=0, total=0;
   cart.forEach(i=>{
     const it = findMenuItem(i.id);
     if(!it) return;
-    count+=i.qty; total+=i.qty*unitPriceWithMods(it, i.sizeIdx, i.mods);
+    count+=i.qty; total+=i.qty*itemPrice(it, i.sizeIdx);
   });
   el('cartCount').textContent = count;
   el('dTotal').textContent = total+' '+TT.currency;
@@ -1372,11 +1395,10 @@ function updateCart(){
     const it = findMenuItem(i.id);
     if(!it) return '';
     const name = itemName(it);
-    const unit = unitPriceWithMods(it, i.sizeIdx, i.mods);
+    const unit = itemPrice(it, i.sizeIdx);
     const size = i.sizeIdx>=0 ? TT.sizes[i.sizeIdx] : '';
-    const mn = modsNames(it, i.mods);
     return `<div class="ci">
-      <div class="ci-info"><b>${name}${size?`<span class="ci-size">${size}</span>`:''}</b>${mn?`<span class="ci-mods">➕ ${mn}</span>`:''}<span class="ci-price">${unit} ${TT.currency}</span></div>
+      <div class="ci-info"><b>${name}${size?`<span class="ci-size">${size}</span>`:''}</b><span class="ci-price">${unit} ${TT.currency}</span></div>
       <div class="ci-ctrl"><button class="q" data-k="${k}" data-a="dec">−</button><span>${i.qty}</span><button class="q" data-k="${k}" data-a="inc">+</button></div>
       <div class="ci-total">${i.qty*unit} ${TT.currency}</div>
     </div>`;
@@ -1410,7 +1432,7 @@ function resolveConfirm(val){
   el('confirmModal').classList.remove('show');
   if(confirmResolve){ const r = confirmResolve; confirmResolve = null; r(val); }
 }
-/* ===== المفضلة ===== */
+/* ===== المفضلة (مع ترحيل الإضافات القديمة إلى أسطر) ===== */
 const FAV_KEY = 'mk_favs_v1';
 const MAX_FAVS = 3;
 function getFavs(){
@@ -1426,13 +1448,30 @@ function migrateFavs(){
   let changed = false;
   const out = favs.map(f=>{
     if(!f) return null;
-    const items = (f.items||[]).map(xi=>{
-      if(xi && xi.id) return {id:xi.id, sizeIdx:xi.sizeIdx, qty:xi.qty, mods: Array.isArray(xi.mods)?xi.mods:[]};
-      const it = xi ? findMenuItemByAr(xi.ar) : null;
-      if(!it){ changed = true; return null; }
-      changed = true;
-      return {id:it.id, sizeIdx:xi.sizeIdx, qty:xi.qty, mods:[]};
-    }).filter(Boolean);
+    const items = [];
+    (f.items||[]).forEach(xi=>{
+      let id = null;
+      if(xi && xi.id) id = xi.id;
+      else if(xi){
+        const it = findMenuItemByAr(xi.ar);
+        if(it){ id = it.id; changed = true; } else { changed = true; return; }
+      }
+      if(!id || !findMenuItem(id)){ changed = true; return; }
+      const sizeIdx = xi.sizeIdx;
+      const qty = xi.qty;
+      const mods = Array.isArray(xi.mods) ? xi.mods : null;
+      if(mods && mods.length){
+        changed = true;
+        items.push({id:id, sizeIdx:sizeIdx, qty:qty});
+        mods.forEach(m=>{
+          if(findMenuItem(m.ref)){
+            items.push({id:m.ref, sizeIdx:-1, qty: qty*(m.qty||1)});
+          }
+        });
+      } else {
+        items.push({id:id, sizeIdx:sizeIdx, qty:qty});
+      }
+    });
     if(!items.length){ if(f) changed = true; return null; }
     return { items:items, savedAt: f.savedAt || Date.now() };
   });
@@ -1457,13 +1496,12 @@ function renderFavSheet(){
         const it = findMenuItem(xi.id);
         if(!it) return null;
         const size = xi.sizeIdx >= 0 ? ' (' + TT.sizes[xi.sizeIdx] + ')' : '';
-        const mn = modsNames(it, xi.mods);
-        return xi.qty + '× ' + itemName(it) + size + (mn ? ' (➕ ' + mn + ')' : '');
+        return xi.qty + '× ' + itemName(it) + size;
       }).filter(Boolean).join('، ');
       let total = 0;
       f.items.forEach(xi=>{
         const it = findMenuItem(xi.id);
-        if(it) total += xi.qty * unitPriceWithMods(it, xi.sizeIdx, xi.mods);
+        if(it) total += xi.qty * itemPrice(it, xi.sizeIdx);
       });
       html += `<div class="fav-card">
         <div class="fav-card-head"><span class="fav-slot-name">${slots[i]}</span><span class="fav-total">${total} ${TT.currency}</span></div>
@@ -1505,7 +1543,7 @@ async function saveFavToSlot(i){
     if(!ok) return;
   }
   const items = [];
-  cart.forEach(v=> items.push({id:v.id, sizeIdx:v.sizeIdx, qty:v.qty, mods:v.mods||[]}));
+  cart.forEach(v=> items.push({id:v.id, sizeIdx:v.sizeIdx, qty:v.qty}));
   favs[i] = { items:items, savedAt: Date.now() };
   persistFavs(favs);
   closeSlotPicker();
@@ -1518,12 +1556,9 @@ function orderFav(i){
   if(!f) return;
   const brId = savedBranchId() || '';
   f.items.forEach(xi=>{
-    const it = findMenuItem(xi.id);
-    const sec = findSectionOfItem(xi.id);
-    if(!it || !sec || it.hidden === true || itemSoldOut(it, brId) || itemViewState(sec, it, brId) !== 'normal') return;
-    const mods = (xi.mods||[]).filter(m=> findMenuItem(m.ref));
-    const key = cartKey(xi.id, xi.sizeIdx, mods);
-    const cur = cart.get(key) || {id:xi.id, sizeIdx:xi.sizeIdx, qty:0, mods:mods};
+    if(!itemAvailable(xi.id, brId)) return;
+    const key = cartKey(xi.id, xi.sizeIdx);
+    const cur = cart.get(key) || {id:xi.id, sizeIdx:xi.sizeIdx, qty:0};
     cur.qty += xi.qty;
     cart.set(key, cur);
   });
@@ -1545,7 +1580,7 @@ el('saveFavBtn').addEventListener('click', openSlotPicker);
 document.querySelectorAll('#slotBtns .slot-btn').forEach(b => {
   b.addEventListener('click', () => saveFavToSlot(+b.dataset.slot));
 });
-/* ===== الدفع عبر واتساب ===== */
+/* ===== الدفع عبر واتساب (أسطر عادية بترتيب السلة) ===== */
 function checkout(){
   if(orderLocked()) return;
   const TT = T();
@@ -1564,16 +1599,10 @@ function checkout(){
   const lines = [...cart.values()].map(i=>{
     const it = findMenuItem(i.id);
     if(!it) return null;
-    const unit = unitPriceWithMods(it, i.sizeIdx, i.mods);
+    const unit = itemPrice(it, i.sizeIdx);
     total += i.qty*unit;
     const size = i.sizeIdx>=0 ? ' ('+TT.sizes[i.sizeIdx]+')' : '';
-    let line = `▪️ ${i.qty} × ${itemName(it)}${size} = ${i.qty*unit} ${TT.currency}`;
-    (i.mods||[]).forEach(m=>{
-      const rit = findMenuItem(m.ref);
-      const mp = modPriceFor(it, m.ref);
-      if(rit) line += `\n   ➕ ${m.qty} × ${itemName(rit)} = ${m.qty*mp} ${TT.currency}`;
-    });
-    return line;
+    return `▪️ ${i.qty} × ${itemName(it)}${size} = ${i.qty*unit} ${TT.currency}`;
   }).filter(Boolean);
   const notes = el('cnotes').value.trim();
   let msg =
