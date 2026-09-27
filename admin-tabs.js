@@ -1,4 +1,19 @@
-/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v3) ===== */
+/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v4 ترجمة كاملة) ===== */
+/* ترجمة نصوص تأكيد الخروج القادمة من admin-core */
+(function patchConfirmTexts(){
+var orig = window.askConfirm;
+if(typeof orig !== `function`) return;
+window.askConfirm = function(msg, title, ico, yesLbl){
+if(msg === `سيتم تسجيل الخروج. متابعة؟`) msg = L(`logoutMsg`);
+if(title === `تأكيد الخروج`) title = L(`logoutTitle`);
+if(yesLbl === `نعم، خروج`) yesLbl = L(`logoutYes`);
+return orig(msg, title, ico, yesLbl);
+};
+})();
+/* اسم حسب لغة الواجهة */
+function nmOf(x){
+return (ALANG===`ar`) ? x.ar : (x.en || x.ar);
+}
 /* ===== المنيو ===== */
 function renderMenu(){
 var wrap = el(`menuWrap`);
@@ -38,7 +53,7 @@ return b ? brName(b) : id;
 }
 }
 var missMode = it.miss || `gray`;
-var name = (ALANG===`ar`) ? it.ar : (it.en || it.ar);
+var name = nmOf(it);
 var tag = ``;
 if(un){
 var mm = (missMode===`hide`)
@@ -109,7 +124,8 @@ var sIdx = +b.dataset.si;
 if(act === `editSec`) openSectionModal(si);
 if(act === `delSec`){
 var sec = STATE.MENU[si];
-var ok = await askConfirm(LF(`delSecMsg`, sec.t),
+var secNm = (ALANG===`ar`) ? sec.t : sec.tEn;
+var ok = await askConfirm(LF(`delSecMsg`, secNm),
 L(`confirmDefault`), `🗑`, L(`btnDelFinal`));
 if(ok){
 STATE.MENU.splice(si,1);
@@ -126,7 +142,7 @@ toast(STATE.MENU[si].hidden ? L(`hide`) : L(`show`),
 if(act === `editItem`) openItemModal(sIdx, ii);
 if(act === `delItem`){
 var it = STATE.MENU[sIdx].items[ii];
-var ok2 = await askConfirm(LF(`delItemMsg`, it.ar),
+var ok2 = await askConfirm(LF(`delItemMsg`, nmOf(it)),
 L(`confirmDefault`), `🗑`, L(`btnDelFinal`));
 if(ok2){
 STATE.MENU[sIdx].items.splice(ii,1);
@@ -197,13 +213,14 @@ renderMenu();
 toast(L(`savedSec`), `success`, L(`dontForget`));
 });
 }
-/* ===== نافذة الصنف + محرر الإضافات الجديد ===== */
+/* ===== نافذة الصنف + محرر الإضافات ===== */
 let itemModalFile = null;
 let itemModalDelete = false;
 function openItemModal(si, ii){
 var it = (ii===null) ? null : STATE.MENU[si].items[ii];
 itemModalFile = null;
 itemModalDelete = false;
+var curItemId = it ? it.id : null;
 var brs = branches();
 var onlyVal = `all`;
 if(it && Array.isArray(it.only) && it.only.length){
@@ -280,11 +297,11 @@ if(it && it.mods && !Array.isArray(it.mods)){
 modsTitleArVal = it.mods.tAr || ``;
 modsTitleEnVal = it.mods.tEn || ``;
 }
+/* كل الأقسام بما فيها قسم الصنف نفسه */
 var modsSecOptions = STATE.MENU.map(function(sec, sIdx){
-if(sIdx === si) return ``;
-var nm = (ALANG===`ar`) ? sec.t : sec.tEn;
+var snm = (ALANG===`ar`) ? sec.t : sec.tEn;
 return `<option value="` + sIdx + `">` +
-esc(sec.i + ` ` + nm) + `</option>`;
+esc(sec.i + ` ` + snm) + `</option>`;
 }).join(``);
 openModal(ii===null ? L(`addItemTitle`) : L(`editItemTitle`),
 `<div class="form-grid">` +
@@ -340,6 +357,8 @@ modsSecOptions + `</select></label></div>` +
 `<div class="note" style="margin:.6rem 0 .4rem">` +
 L(`modsSelectedLbl`) + `</div>` +
 `<div id="modsChips" class="mg_opts"></div>` +
+`<button type="button" class="img-btn del" id="modsClearAll" style="margin-top:.5rem">` +
+L(`modsClearAll`) + `</button>` +
 `</fieldset>` +
 `<fieldset><legend>` + L(`legendAvail`) + `</legend>` +
 `<label><input type="radio" name="it_avail" value="all"` +
@@ -439,15 +458,18 @@ return `<span` + st + `><img src="img/items/` + x.id +
 `" alt="" style="width:100%;height:100%;` +
 `object-fit:contain"></span>`;
 }
-return `<span` + st + `>` + esc(x.ar.charAt(0)) + `</span>`;
+return `<span` + st + `>` + esc(nmOf(x).charAt(0)) + `</span>`;
 }
 function renderModsItems(){
 var v = mv(`modsSecSel`);
 if(v === ``){ itemsBox.innerHTML = ``; return; }
-var sec = STATE.MENU[+v];
+var idx = +v;
+var sec = STATE.MENU[idx];
 if(!sec){ itemsBox.innerHTML = ``; return; }
 var list = sec.items.filter(function(x){
-return x.hidden !== true;
+if(x.hidden === true) return false;
+if(idx === si && x.id === curItemId) return false;
+return true;
 });
 if(!list.length){
 itemsBox.innerHTML =
@@ -461,7 +483,7 @@ return `<div class="mg_opt">` +
 `<input type="checkbox" class="mi_chk" value="` +
 x.id + `"` + ck + `>` +
 miThumb(x) +
-`<b>` + esc(x.ar) + `</b>` +
+`<b>` + esc(nmOf(x)) + `</b>` +
 `<span style="color:var(--muted);font-weight:800;` +
 `font-size:.72rem">` + x.prices[0] + ` ` +
 L(`riyal`) + `</span>` +
@@ -483,7 +505,7 @@ return `<span style="display:inline-flex;` +
 `border:1px solid var(--line);border-radius:50px;` +
 `padding:.25rem .7rem;font-size:.72rem;` +
 `font-weight:800;color:var(--ink)">` +
-esc(x.ar) +
+esc(nmOf(x)) +
 `<button type="button" class="mi_rm" data-ref="` +
 ref + `" style="border:none;background:var(--red-bg);` +
 `color:var(--red);border-radius:50%;width:20px;` +
@@ -507,16 +529,21 @@ renderModsItems);
 itemsBox.addEventListener(`change`, function(e){
 var c = e.target.closest(`.mi_chk`);
 if(!c) return;
-var idx = modsRefsArr.indexOf(c.value);
-if(c.checked && idx < 0) modsRefsArr.push(c.value);
-if(!c.checked && idx >= 0) modsRefsArr.splice(idx, 1);
+var idx2 = modsRefsArr.indexOf(c.value);
+if(c.checked && idx2 < 0) modsRefsArr.push(c.value);
+if(!c.checked && idx2 >= 0) modsRefsArr.splice(idx2, 1);
 renderModsChips();
 });
 chipsBox.addEventListener(`click`, function(e){
 var b = e.target.closest(`.mi_rm`);
 if(!b) return;
-var idx = modsRefsArr.indexOf(b.dataset.ref);
-if(idx >= 0) modsRefsArr.splice(idx, 1);
+var idx3 = modsRefsArr.indexOf(b.dataset.ref);
+if(idx3 >= 0) modsRefsArr.splice(idx3, 1);
+renderModsChips();
+renderModsItems();
+});
+el(`modsClearAll`).addEventListener(`click`, function(){
+modsRefsArr.length = 0;
 renderModsChips();
 renderModsItems();
 });
@@ -594,16 +621,17 @@ if(b.lat && b.lng){
 coords = L(`brCoords`) + b.lat.toFixed(4) +
 `, ` + b.lng.toFixed(4) + `<br>`;
 }
+var otherNm = (ALANG===`ar`) ? b.nameEn : b.nameAr;
 return `<div class="br-card">` +
 `<div class="br-head">` +
-`<b>` + esc(b.nameAr) +
+`<b>` + esc(brName(b)) +
 ` <span class="br-code">B` + b.num + `</span></b>` +
 `<span class="item-ops">` +
 `<button class="edit" data-act="editBranch" data-i="` + i + `">✏️</button>` +
 `<button class="del" data-act="delBranch" data-i="` + i + `"` + dis + `>🗑</button>` +
 `</span></div>` +
 `<div class="br-info">` +
-esc(b.nameEn||``) + `<br>` +
+esc(otherNm||``) + `<br>` +
 esc(b.addrAr||``) + `<br>` +
 `<span class="sec-line">` + esc(b.addrEn||``) + `</span><br>` +
 L(`brNum`) + b.num + ` • ` + L(`brWa`) + esc(b.wa||``) + `<br>` +
@@ -625,7 +653,7 @@ return;
 }
 var br = branches()[i];
 var ok = await askConfirm(
-LF(`delBranchMsg`, br.nameAr),
+LF(`delBranchMsg`, brName(br)),
 L(`confirmDefault`), `🗑`, L(`btnDelFinal`));
 if(ok){
 branches().splice(i,1);
@@ -831,9 +859,8 @@ function allItemsOptions(sel){
 return STATE.MENU.map(function(sec){
 var opts = sec.items.map(function(it){
 var s = (it.id===sel) ? ` selected` : ``;
-var nm = (ALANG===`ar`) ? it.ar : it.en;
 return `<option value="` + it.id + `"` + s + `>` +
-esc(nm) + ` — ` + it.prices[0] + `</option>`;
+esc(nmOf(it)) + ` — ` + it.prices[0] + `</option>`;
 }).join(``);
 var lb = sec.i + ` ` +
 esc((ALANG===`ar`)?sec.t:sec.tEn);
@@ -864,8 +891,7 @@ return el(`best_` + i).value;
 var lines = ids.map(function(id,i){
 var it = findItemAdmin(id);
 if(!it) return ``;
-var nm = (ALANG===`ar`) ? it.ar : it.en;
-return `<b>` + (i+1) + `.</b> ` + esc(nm) +
+return `<b>` + (i+1) + `.</b> ` + esc(nmOf(it)) +
 ` — ` + it.prices[0] + ` ` + L(`riyal`);
 }).filter(Boolean).join(`<br>`);
 el(`bestPreview`).innerHTML = lines;
@@ -906,8 +932,9 @@ var dot = `<span style="display:inline-block;` +
 `background:` + esc(col) +
 `;margin-inline-end:.4rem"></span>`;
 var imgLine = x.img ? (`<br>img: ` + esc(x.img)) : ``;
+var dn = (ALANG===`ar`) ? x.nameAr : (x.nameEn||x.nameAr);
 return `<div class="br-card">` +
-`<div class="br-head"><b>` + dot + esc(x.nameAr) +
+`<div class="br-head"><b>` + dot + esc(dn) +
 ` <span class="br-code">` + esc(x.nameEn||``) +
 `</span></b>` +
 `<span class="item-ops">` +
@@ -933,8 +960,9 @@ var act = b.dataset.dact;
 if(act===`edit`) openDeliveryModal(i);
 if(act===`del`){
 var x = STATE.SETTINGS.delivery[i];
+var dn = (ALANG===`ar`) ? x.nameAr : (x.nameEn||x.nameAr);
 var ok = await askConfirm(
-LF(`delDeliveryMsg`, x.nameAr),
+LF(`delDeliveryMsg`, dn),
 L(`confirmDefault`), `🗑`, L(`btnDelFinal`));
 if(ok){
 STATE.SETTINGS.delivery.splice(i,1);
@@ -1053,8 +1081,9 @@ var act = b.dataset.sact;
 if(act===`edit`) openSocialModal(i);
 if(act===`del`){
 var x = STATE.SETTINGS.social[i];
+var nm = (ALANG===`ar`) ? x.nameAr : (x.nameEn||x.nameAr);
 var ok = await askConfirm(
-LF(`delSocialMsg`, x.nameAr),
+LF(`delSocialMsg`, nm),
 L(`confirmDefault`), `🗑`, L(`btnDelFinal`));
 if(ok){
 STATE.SETTINGS.social.splice(i,1);
