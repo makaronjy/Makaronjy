@@ -443,7 +443,7 @@ window.APP_SETTINGS = {
   "imagesVersion": 0,
   "display": {
     "mode": "list",
-    "showDesc": false,
-    "showCal": false
+    "showDesc": true,
+    "showCal": true
   }
 };
