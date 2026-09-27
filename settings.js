@@ -36,7 +36,7 @@ window.APP_SETTINGS = {
       "hours": [
         {
           "o": {
-            "h": 11,
+            "h": 13,
             "m": 0
           },
           "c": {
