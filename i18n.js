@@ -1,7 +1,7 @@
 /* =====================================================
 ملف اللغات — مكرونجي Makaronjy
 (ترجمات الواجهة فقط — المنيو في menu.js والإعدادات في settings.js)
-v3: متطابق مع app.js v11 (كاروسيل الإضافات + العناوين الجديدة)
+v4: العملة العربية ﷼ (والإنجليزية SAR) + كل مفاتيح التفاصيل والتواصل
 ===================================================== */
 window.I18N = {
 ar: {
@@ -40,7 +40,7 @@ orderSent: '✅ تم إرسال طلبك بنجاح',
 emptyCart: '🛒 <br>سلتك فارغة.. <br>أضف أصنافك المفضلة!',
 emptyMsg: 'سلتك فارغة 🛒',
 noResults: 'لا توجد نتائج 🔍',
-currency: 'ريال',
+currency: '﷼',
 cal: 'سعرة',
 zeroCal: '💧 صفر سعرات',
 from: 'من',
@@ -276,7 +276,7 @@ iosSteps:
   '<div class="sheet-step"><span class="num">2</span><p>Scroll up and choose <b>"Add to Home Screen"</b> (＋ icon).</p></div>' +
   '<div class="sheet-step"><span class="num">3</span><p>Tap <b>"Add"</b> — the Makaronjy icon will appear on your home screen 🎉</p></div>',
 otherSteps:
-  '<div class="sheet-step"><span class="num">1</span><p>Open the browser menu (⋮ or ⋯) at the top.</p></div>' +
+  '<div class="sheet-step"><span class="num">1</span><p>Open the browser menu (⋮ or ) at the top.</p></div>' +
   '<div class="sheet-step"><span class="num">2</span><p>Choose <b>"Install App"</b> or <b>"Add to Home Screen"</b>.</p></div>' +
   '<div class="sheet-step"><span class="num">3</span><p>Confirm — the Makaronjy icon will appear on your home screen 🎉</p></div>'
 }
