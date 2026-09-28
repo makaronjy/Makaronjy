@@ -1,4 +1,4 @@
-/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v5) ===== */
+/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v6) ===== */
 /* اسم حسب لغة الواجهة */
 function nmOf(x){
 return (ALANG===`ar`) ? x.ar : (x.en || x.ar);
@@ -14,9 +14,14 @@ return on ? ` disabled style="opacity:.35;pointer-events:none"` : ``;
 /* ===== المنيو ===== */
 function renderMenu(){
 var wrap = el(`menuWrap`);
+var addSecBtn =
+`<button class="add-item" data-act="addSec" ` +
+`style="border-radius:14px;margin-top:.8rem">` +
+L(`addSec`) + `</button>`;
 if(!STATE.MENU.length){
 wrap.innerHTML =
-`<div class="note">لا توجد أقسام بعد.</div>`;
+`<div class="note">لا توجد أقسام بعد.</div>` +
+addSecBtn;
 return;
 }
 var brs = branches();
@@ -87,12 +92,16 @@ var hidIt = it.hidden
 L(`hidden`) + `</span>`
 : ``;
 var rowCls = it.hidden ? ` is-hidden` : ``;
+var itTogCls = it.hidden ? `show` : `hide`;
+var itTogTxt = it.hidden ? L(`show`) : L(`hide`);
 return `<div class="item-row` + rowCls + `">` +
 `<div class="item-info">` +
 `<b>` + esc(name) + hidIt + `</b>` +
 `<small>` + small + `</small>` +
 `</div>` +
-`<span class="item-ops"><span` + SQ_STYLE + `>` +
+`<span class="item-ops">` +
+`<button class="` + itTogCls + `" data-act="hideItem" data-si="` + si + `" data-ii="` + ii + `">` + itTogTxt + `</button>` +
+`<span` + SQ_STYLE + `>` +
 `<button class="edit" data-act="editItem" data-si="` + si + `" data-ii="` + ii + `" title="` + esc(L(`editItemTitle`)) + `">✏️</button>` +
 `<button class="del" data-act="delItem" data-si="` + si + `" data-ii="` + ii + `" title="` + esc(L(`btnDelFinal`)) + `">🗑</button>` +
 `<button class="edit" data-act="moveItemUp" data-si="` + si + `" data-ii="` + ii + `" title="` + esc(L(`moveUp`)) + `"` + disSt(ii===0) + `>▲</button>` +
@@ -115,7 +124,7 @@ esc((ALANG===`ar`)?sec.t:sec.tEn) + hidTag + `</b>` +
 `<button class="add-item" data-act="addItem" data-si="` + si + `">` +
 L(`addItem`) + `</button>` +
 `</div></div>`;
-}).join(``);
+}).join(``) + addSecBtn;
 }
 el(`menuWrap`).addEventListener(`click`,
 async function(e){
@@ -125,6 +134,7 @@ var act = b.dataset.act;
 var si = +b.dataset.i;
 var ii = +b.dataset.ii;
 var sIdx = +b.dataset.si;
+if(act === `addSec`) openSectionModal(null);
 if(act === `editSec`) openSectionModal(si);
 if(act === `delSec`){
 var sec = STATE.MENU[si];
@@ -141,6 +151,13 @@ if(act === `hideSec`){
 STATE.MENU[si].hidden = !STATE.MENU[si].hidden;
 renderMenu();
 toast(STATE.MENU[si].hidden ? L(`hide`) : L(`show`),
+`info`, L(`dontForget`));
+}
+if(act === `hideItem`){
+var itH = STATE.MENU[sIdx].items[ii];
+itH.hidden = !itH.hidden;
+renderMenu();
+toast(itH.hidden ? L(`hide`) : L(`show`),
 `info`, L(`dontForget`));
 }
 if(act === `moveSecUp` || act === `moveSecDown`){
@@ -786,7 +803,7 @@ var oa = document.querySelector(
 var om = +document.querySelector(
 `.d_om[data-d="` + i + `"]`).value;
 var ch = clamp12(document.querySelector(
-`.d_ch[data-d="` + i + `"]`).value);
+`.d_ch[data-d="` + i + `"]`).value;
 var ca = document.querySelector(
 `.d_ca[data-d="` + i + `"]`).value;
 var cm = +document.querySelector(
