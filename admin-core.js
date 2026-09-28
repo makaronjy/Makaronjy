@@ -1,4 +1,4 @@
-/* ===== admin-core.js — النواة: دخول + GitHub + نوافذ ===== */
+/* ===== admin-core.js — النواة: دخول + GitHub + نوافذ (v3) ===== */
 /* ===== إيقاف التكبير ===== */
 document.addEventListener(`touchstart`,
 function(e){
@@ -165,11 +165,56 @@ div.classList.add(`out`);
 setTimeout(function(){ div.remove(); }, 350);
 }, 3400);
 }
-/* ===== نافذة التأكيد ===== */
+/* ===== نافذة التأكيد + حقل كتابة delete ===== */
 let confirmResolve = null;
-function askConfirm(msg, title, ico, yesLbl){
+let cfRequireDelete = false;
+let cfDeleteInput = null;
+let cfDeleteHint = null;
+function ensureCfDelete(){
+if(cfDeleteInput) return cfDeleteInput;
+cfDeleteInput = document.createElement(`input`);
+cfDeleteInput.id = `cfDeleteInput`;
+cfDeleteInput.type = `text`;
+cfDeleteInput.autocomplete = `off`;
+cfDeleteInput.spellcheck = false;
+cfDeleteInput.style.cssText =
+`width:100%;margin:0 0 .5rem;` +
+`border:1.5px solid var(--line);border-radius:12px;` +
+`padding:.6rem .8rem;font-family:inherit;` +
+`font-weight:800;font-size:.95rem;text-align:center;` +
+`background:#fff;color:var(--ink);outline:none;` +
+`direction:ltr;letter-spacing:1px`;
+cfDeleteHint = document.createElement(`small`);
+cfDeleteHint.id = `cfDeleteHintLbl`;
+cfDeleteHint.style.cssText =
+`display:block;color:var(--muted);font-weight:700;` +
+`font-size:.7rem;margin:0 0 .8rem;line-height:1.6`;
+var msgEl = el(`cfMsg`);
+msgEl.parentNode.insertBefore(cfDeleteInput,
+msgEl.nextSibling);
+msgEl.parentNode.insertBefore(cfDeleteHint,
+cfDeleteInput.nextSibling);
+cfDeleteInput.addEventListener(`input`,
+refreshCfDelete);
+return cfDeleteInput;
+}
+function cfDeleteOk(){
+var v = cfDeleteInput ? (cfDeleteInput.value || ``) : ``;
+return v.trim().toLowerCase() === `delete`;
+}
+function refreshCfDelete(){
+if(!cfRequireDelete) return;
+var ok = cfDeleteOk();
+var yes = el(`cfYes`);
+yes.disabled = !ok;
+yes.style.opacity = ok ? `1` : `.45`;
+yes.style.cursor = ok ? `pointer` : `default`;
+}
+function askConfirm(msg, title, ico, yesLbl,
+requireDelete){
 return new Promise(function(resolve){
 confirmResolve = resolve;
+cfRequireDelete = !!requireDelete;
 el(`cfIco`).textContent = ico || `⚠️`;
 el(`cfTitle`).textContent =
 title || L(`confirmDefault`);
@@ -177,6 +222,25 @@ el(`cfMsg`).textContent = msg;
 el(`cfYes`).textContent =
 yesLbl || L(`btnDelFinal`);
 el(`cfNo`).textContent = L(`modalCancel`);
+var inp = ensureCfDelete();
+if(cfRequireDelete){
+inp.style.display = ``;
+cfDeleteHint.style.display = ``;
+cfDeleteHint.textContent =
+L(`cfDeleteWord`) + ` — ` + L(`cfDeleteHint`);
+inp.value = ``;
+refreshCfDelete();
+setTimeout(function(){
+try{ inp.focus(); }catch(e){}
+}, 80);
+}else{
+inp.style.display = `none`;
+cfDeleteHint.style.display = `none`;
+var yes = el(`cfYes`);
+yes.disabled = false;
+yes.style.opacity = `1`;
+yes.style.cursor = `pointer`;
+}
 el(`confirmModal`).classList.remove(`hidden`);
 pushGuard();
 });
@@ -184,7 +248,15 @@ pushGuard();
 function settleConfirm(val, consume){
 if(consume === undefined) consume = true;
 if(!confirmOpen() && !confirmResolve) return;
+if(cfRequireDelete && val === true && !cfDeleteOk()){
+return;
+}
 el(`confirmModal`).classList.add(`hidden`);
+if(cfDeleteInput) cfDeleteInput.value = ``;
+cfRequireDelete = false;
+var yes = el(`cfYes`);
+yes.disabled = false;
+yes.style.opacity = `1`;
 var r = confirmResolve;
 confirmResolve = null;
 if(consume) consumeGuard();
@@ -319,7 +391,7 @@ text: await r.text(),
 sha: r.headers.get(`etag`)
 };
 }
-/* فك Base64 إلى نص UTF-8 سليم (يمنع تشويه العربية) */
+/* فك Base64 إلى نص UTF-8 سليم */
 function b64ToUtf8(b64){
 var bin = atob(b64);
 var bytes = new Uint8Array(bin.length);
@@ -363,7 +435,6 @@ u8.subarray(i, i+32768));
 return btoa(bytes);
 });
 }
-/* صورة الصنف: نفس مسار التطبيق img/items/{id}.png */
 async function uploadItemImgById(id, file){
 var path = `img/items/` + id + `.png`;
 var cur = await getFile(path).catch(function(){
@@ -445,6 +516,12 @@ return b.num;
 var n = 1;
 while(used.includes(n)) n++;
 return n;
+}
+/* الترقيم الآلي: الموضع في المصفوفة = رقم الفرع */
+function renumberBranches(){
+branches().forEach(function(b, i){
+b.num = i + 1;
+});
 }
 function migrateBranchNums(){
 branches().forEach(function(b,i){
@@ -555,12 +632,12 @@ function(s){ s.classList.add(`hidden`); });
 el(`tab-` + t.dataset.tab).classList.remove(`hidden`);
 });
 });
-/* ===== الخروج ===== */
+/* ===== الخروج (تأكيد عادي بدون delete) ===== */
 el(`btnLogout`).addEventListener(`click`,
 async function(){
 var ok = await askConfirm(
-`سيتم تسجيل الخروج. متابعة؟`,
-`تأكيد الخروج`, `🚪`, `نعم، خروج`);
+L(`logoutMsg`),
+L(`logoutTitle`), `🚪`, L(`logoutYes`));
 if(!ok) return;
 sessionStorage.removeItem(`mk_admin`);
 location.reload();
