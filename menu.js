@@ -40,7 +40,18 @@ window.MENU = [
         "cal": 1250,
         "desc": "مكرونة أقلام حمراء مع صدر دجاج مشوي",
         "descEn": "Red penne pasta with grilled chicken breast",
-        "imgv": 1789285296947
+        "imgv": 1789285296947,
+        "imgMode": "cut",
+        "hidden": false,
+        "mods": {
+          "tAr": "",
+          "tEn": "",
+          "refs": [
+            "side-potato",
+            "side-sambosa",
+            "side-caesar"
+          ]
+        }
       },
       {
         "id": "pasta-red-breasts",
