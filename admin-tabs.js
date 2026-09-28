@@ -1,4 +1,4 @@
-/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v6) ===== */
+/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v7) ===== */
 /* اسم حسب لغة الواجهة */
 function nmOf(x){
 return (ALANG===`ar`) ? x.ar : (x.en || x.ar);
@@ -92,16 +92,12 @@ var hidIt = it.hidden
 L(`hidden`) + `</span>`
 : ``;
 var rowCls = it.hidden ? ` is-hidden` : ``;
-var itTogCls = it.hidden ? `show` : `hide`;
-var itTogTxt = it.hidden ? L(`show`) : L(`hide`);
 return `<div class="item-row` + rowCls + `">` +
 `<div class="item-info">` +
 `<b>` + esc(name) + hidIt + `</b>` +
 `<small>` + small + `</small>` +
 `</div>` +
-`<span class="item-ops">` +
-`<button class="` + itTogCls + `" data-act="hideItem" data-si="` + si + `" data-ii="` + ii + `">` + itTogTxt + `</button>` +
-`<span` + SQ_STYLE + `>` +
+`<span class="item-ops"><span` + SQ_STYLE + `>` +
 `<button class="edit" data-act="editItem" data-si="` + si + `" data-ii="` + ii + `" title="` + esc(L(`editItemTitle`)) + `">✏️</button>` +
 `<button class="del" data-act="delItem" data-si="` + si + `" data-ii="` + ii + `" title="` + esc(L(`btnDelFinal`)) + `">🗑</button>` +
 `<button class="edit" data-act="moveItemUp" data-si="` + si + `" data-ii="` + ii + `" title="` + esc(L(`moveUp`)) + `"` + disSt(ii===0) + `>▲</button>` +
@@ -153,23 +149,6 @@ renderMenu();
 toast(STATE.MENU[si].hidden ? L(`hide`) : L(`show`),
 `info`, L(`dontForget`));
 }
-if(act === `hideItem`){
-var itH = STATE.MENU[sIdx].items[ii];
-itH.hidden = !itH.hidden;
-renderMenu();
-toast(itH.hidden ? L(`hide`) : L(`show`),
-`info`, L(`dontForget`));
-}
-if(act === `moveSecUp` || act === `moveSecDown`){
-var d1 = (act === `moveSecUp`) ? -1 : 1;
-var j1 = si + d1;
-if(j1 < 0 || j1 >= STATE.MENU.length) return;
-var tmp1 = STATE.MENU[si];
-STATE.MENU[si] = STATE.MENU[j1];
-STATE.MENU[j1] = tmp1;
-renderMenu();
-toast(L(`dontForget`), `info`);
-}
 if(act === `editItem`) openItemModal(sIdx, ii);
 if(act === `delItem`){
 var it = STATE.MENU[sIdx].items[ii];
@@ -189,6 +168,16 @@ if(j2 < 0 || j2 >= arr.length) return;
 var tmp2 = arr[ii];
 arr[ii] = arr[j2];
 arr[j2] = tmp2;
+renderMenu();
+toast(L(`dontForget`), `info`);
+}
+if(act === `moveSecUp` || act === `moveSecDown`){
+var d1 = (act === `moveSecUp`) ? -1 : 1;
+var j1 = si + d1;
+if(j1 < 0 || j1 >= STATE.MENU.length) return;
+var tmp1 = STATE.MENU[si];
+STATE.MENU[si] = STATE.MENU[j1];
+STATE.MENU[j1] = tmp1;
 renderMenu();
 toast(L(`dontForget`), `info`);
 }
@@ -282,6 +271,7 @@ var curImg = null;
 if(it && it.imgv){
 curImg = `img/items/` + it.id + `.png?v=` + it.imgv;
 }
+var hidChk = (it && it.hidden) ? ` checked` : ``;
 var acChk = (onlyVal !== `all`) ? ` checked` : ``;
 var availCustomHtml = brs.length
 ? (`<label><input type="radio" name="it_avail" value="custom"` +
@@ -365,6 +355,11 @@ esc(it&&it.prices?it.prices.join(`,`):``) +
 `<input id="it_cal" type="number" min="0" value="` +
 esc(it&&it.cal?it.cal:``) + `"></label>` +
 `</div>` +
+`<label style="display:flex;align-items:center;` +
+`gap:.5rem;font-size:.8rem;font-weight:800;` +
+`color:var(--ink);margin:0 0 .8rem">` +
+`<input type="checkbox" id="it_hidden"` + hidChk +
+` style="width:auto;margin:0"> ` + L(`hide`) + `</label>` +
 `<div class="full"><label>` + L(`lblImgMode`) +
 `<select id="it_imgMode">` +
 `<option value="cut"` + cutSel + `>` + L(`imgModeCut`) + `</option>` +
@@ -467,7 +462,7 @@ prices: prices,
 cal: cal,
 imgv: it ? (it.imgv || 0) : 0,
 imgMode: mv(`it_imgMode`) || `cut`,
-hidden: it ? it.hidden : false
+hidden: el(`it_hidden`).checked
 };
 if(only.length){ data.only = only; data.miss = miss; }
 if(so.length){ data.so = so; }
@@ -803,7 +798,7 @@ var oa = document.querySelector(
 var om = +document.querySelector(
 `.d_om[data-d="` + i + `"]`).value;
 var ch = clamp12(document.querySelector(
-`.d_ch[data-d="` + i + `"]`).value;
+`.d_ch[data-d="` + i + `"]`).value);
 var ca = document.querySelector(
 `.d_ca[data-d="` + i + `"]`).value;
 var cm = +document.querySelector(
