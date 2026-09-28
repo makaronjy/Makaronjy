@@ -372,6 +372,21 @@ window.MENU = [
     "t": "فول",
     "tEn": "Foool",
     "hidden": false,
-    "items": []
+    "items": [
+      {
+        "id": "it-1790582372477",
+        "ar": "ت",
+        "en": "H",
+        "desc": "ت",
+        "descEn": "H",
+        "prices": [
+          3
+        ],
+        "cal": 0,
+        "imgv": 0,
+        "imgMode": "cut",
+        "hidden": false
+      }
+    ]
   }
 ];
