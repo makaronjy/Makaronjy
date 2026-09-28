@@ -17,15 +17,16 @@ window.MENU = [
         "descEn": "Red penne pasta with half grilled chicken",
         "imgv": 1789344170794,
         "imgMode": "cut",
+        "hidden": false,
         "mods": {
           "tAr": "",
           "tEn": "",
           "refs": [
-            "drink-pepsi",
-            "drink-7up-diet",
-            "drink-mirinda-citrus",
             "side-sambosa",
-            "side-caesar"
+            "drink-pepsi",
+            "side-caesar",
+            "drink-mirinda-citrus",
+            "drink-7up-diet"
           ]
         }
       },
