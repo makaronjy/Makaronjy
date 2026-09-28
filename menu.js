@@ -365,28 +365,5 @@ window.MENU = [
         "imgv": 1789348392194
       }
     ]
-  },
-  {
-    "id": "sec-1790580281425",
-    "i": "🥰",
-    "t": "فول",
-    "tEn": "Foool",
-    "hidden": false,
-    "items": [
-      {
-        "id": "it-1790582372477",
-        "ar": "ت",
-        "en": "H",
-        "desc": "ت",
-        "descEn": "H",
-        "prices": [
-          3
-        ],
-        "cal": 0,
-        "imgv": 0,
-        "imgMode": "cut",
-        "hidden": false
-      }
-    ]
   }
 ];
