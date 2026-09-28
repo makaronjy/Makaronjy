@@ -102,7 +102,7 @@ window.MENU = [
         "imgv": 1789344458500
       }
     ],
-    "hidden": true
+    "hidden": false
   },
   {
     "id": "sec-sides",
