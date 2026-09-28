@@ -368,9 +368,9 @@ window.MENU = [
   },
   {
     "id": "sec-1790580281425",
-    "i": "🍝",
+    "i": "🥰",
     "t": "فول",
-    "tEn": "فول",
+    "tEn": "Foool",
     "hidden": false,
     "items": []
   }
