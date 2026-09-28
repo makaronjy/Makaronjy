@@ -101,7 +101,8 @@ window.MENU = [
         "descEn": "Pasta with tomato sauce and roasted eggplant",
         "imgv": 1789344458500
       }
-    ]
+    ],
+    "hidden": true
   },
   {
     "id": "sec-sides",
