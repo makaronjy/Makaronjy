@@ -40,7 +40,7 @@ window.MENU = [
         "cal": 1250,
         "desc": "مكرونة أقلام حمراء مع صدر دجاج مشوي",
         "descEn": "Red penne pasta with grilled chicken breast",
-        "imgv": 1790589063181,
+        "imgv": 1790589425380,
         "imgMode": "cut",
         "hidden": false,
         "mods": {
