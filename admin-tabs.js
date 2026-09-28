@@ -1,18 +1,35 @@
-/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v4 ترجمة كاملة) ===== */
-/* ترجمة نصوص تأكيد الخروج القادمة من admin-core */
-(function patchConfirmTexts(){
-var orig = window.askConfirm;
-if(typeof orig !== `function`) return;
-window.askConfirm = function(msg, title, ico, yesLbl){
-if(msg === `سيتم تسجيل الخروج. متابعة؟`) msg = L(`logoutMsg`);
-if(title === `تأكيد الخروج`) title = L(`logoutTitle`);
-if(yesLbl === `نعم، خروج`) yesLbl = L(`logoutYes`);
-return orig(msg, title, ico, yesLbl);
-};
+/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v5) ===== */
+/* ===== CSS مربعات الترتيب 2×2 وشرائح الإضافات ===== */
+(function injectOpsCss(){
+var st = document.createElement(`style`);
+st.textContent =
+`.ops-grid{display:inline-grid;grid-template-columns:repeat(2,auto);` +
+`gap:.3rem;align-items:center;justify-items:center}` +
+`.ops-grid button{width:34px;height:30px;border:none;border-radius:8px;` +
+`font-family:inherit;font-weight:800;font-size:.72rem;cursor:pointer;` +
+`transition:.15s;margin:0;display:flex;align-items:center;` +
+`justify-content:center;line-height:1}` +
+`.ops-grid .edit{background:#fff;color:var(--rust)}` +
+`.ops-grid .del{background:var(--red-bg);color:var(--red)}` +
+`.ops-grid .mvup,.ops-grid .mvdown{background:#e9eaec;color:var(--ink)}` +
+`.ops-grid button:disabled{opacity:.35;cursor:default}` +
+`.ops-grid button:not(:disabled):active{transform:scale(.94)}` +
+`.chip-ops{display:inline-flex;gap:.3rem;align-items:center;` +
+`margin-inline-start:.3rem}` +
+`.chip-ops button{border:none;border-radius:50%;width:20px;height:20px;` +
+`font-weight:900;cursor:pointer;font-size:.62rem;display:inline-flex;` +
+`align-items:center;justify-content:center;line-height:1}` +
+`.chip-ops .mvup,.chip-ops .mvdown{background:#e9eaec;color:var(--ink)}` +
+`.chip-ops .mi_rm{background:var(--red-bg);color:var(--red)}` +
+`.chip-ops button:disabled{opacity:.35;cursor:default}`;
+document.head.appendChild(st);
 })();
 /* اسم حسب لغة الواجهة */
 function nmOf(x){
 return (ALANG===`ar`) ? x.ar : (x.en || x.ar);
+}
+function swapArr(arr, i, j){
+var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
 }
 /* ===== المنيو ===== */
 function renderMenu(){
@@ -23,6 +40,7 @@ wrap.innerHTML =
 return;
 }
 var brs = branches();
+var lastSec = STATE.MENU.length - 1;
 wrap.innerHTML = STATE.MENU.map(function(sec, si){
 var hidCls = sec.hidden ? ` is-hidden` : ``;
 var hidTag = sec.hidden
@@ -31,6 +49,7 @@ L(`hidden`) + `</span>`
 : ``;
 var togCls = sec.hidden ? `show` : `hide`;
 var togTxt = sec.hidden ? L(`show`) : L(`hide`);
+var lastIt = sec.items.length - 1;
 var rows = sec.items.map(function(it, ii){
 var onlyArr = Array.isArray(it.only) ? it.only : null;
 var un = ``;
@@ -88,24 +107,31 @@ var hidIt = it.hidden
 L(`hidden`) + `</span>`
 : ``;
 var rowCls = it.hidden ? ` is-hidden` : ``;
+var upDis = (ii === 0) ? ` disabled` : ``;
+var dnDis = (ii === lastIt) ? ` disabled` : ``;
 return `<div class="item-row` + rowCls + `">` +
 `<div class="item-info">` +
 `<b>` + esc(name) + hidIt + `</b>` +
 `<small>` + small + `</small>` +
 `</div>` +
-`<span class="item-ops">` +
-`<button class="edit" data-act="editItem" data-si="` + si + `" data-ii="` + ii + `">✏️</button>` +
-`<button class="del" data-act="delItem" data-si="` + si + `" data-ii="` + ii + `">🗑</button>` +
+`<span class="item-ops ops-grid">` +
+`<button class="edit" data-act="editItem" data-si="` + si + `" data-ii="` + ii + `" title="✏️">✏️</button>` +
+`<button class="del" data-act="delItem" data-si="` + si + `" data-ii="` + ii + `" title="🗑"></button>` +
+`<button class="mvup" data-act="moveItemUp" data-si="` + si + `" data-ii="` + ii + `"` + upDis + ` title="` + esc(L(`moveUp`)) + `">▲</button>` +
+`<button class="mvdown" data-act="moveItemDown" data-si="` + si + `" data-ii="` + ii + `"` + dnDis + ` title="` + esc(L(`moveDown`)) + `">▼</button>` +
 `</span></div>`;
 }).join(``);
+var sUpDis = (si === 0) ? ` disabled` : ``;
+var sDnDis = (si === lastSec) ? ` disabled` : ``;
 return `<div class="sec-card` + hidCls + `">` +
 `<div class="sec-head">` +
 `<b>` + esc(sec.i) + ` ` +
 esc((ALANG===`ar`)?sec.t:sec.tEn) + hidTag + `</b>` +
-`<span class="sec-ops">` +
-`<button class="edit" data-act="editSec" data-i="` + si + `">✏️</button>` +
-`<button class="` + togCls + `" data-act="hideSec" data-i="` + si + `">` + togTxt + `</button>` +
-`<button class="del" data-act="delSec" data-i="` + si + `">🗑</button>` +
+`<span class="sec-ops ops-grid">` +
+`<button class="edit" data-act="editSec" data-i="` + si + `" title="✏️">✏️</button>` +
+`<button class="del" data-act="delSec" data-i="` + si + `" title="🗑"></button>` +
+`<button class="mvup" data-act="moveSecUp" data-i="` + si + `"` + sUpDis + ` title="` + esc(L(`moveUp`)) + `">▲</button>` +
+`<button class="mvdown" data-act="moveSecDown" data-i="` + si + `"` + sDnDis + ` title="` + esc(L(`moveDown`)) + `">▼</button>` +
 `</span></div>` +
 `<div class="items">` + rows +
 `<button class="add-item" data-act="addItem" data-si="` + si + `">` +
@@ -116,17 +142,51 @@ L(`addItem`) + `</button>` +
 el(`menuWrap`).addEventListener(`click`,
 async function(e){
 var b = e.target.closest(`button[data-act]`);
-if(!b) return;
+if(!b || b.disabled) return;
 var act = b.dataset.act;
 var si = +b.dataset.i;
 var ii = +b.dataset.ii;
 var sIdx = +b.dataset.si;
 if(act === `editSec`) openSectionModal(si);
+if(act === `moveSecUp`){
+if(si > 0){
+swapArr(STATE.MENU, si, si-1);
+renderMenu();
+toast(L(`dontForget`), `info`);
+}
+return;
+}
+if(act === `moveSecDown`){
+if(si < STATE.MENU.length-1){
+swapArr(STATE.MENU, si, si+1);
+renderMenu();
+toast(L(`dontForget`), `info`);
+}
+return;
+}
+if(act === `moveItemUp`){
+var secU = STATE.MENU[sIdx];
+if(secU && ii > 0){
+swapArr(secU.items, ii, ii-1);
+renderMenu();
+toast(L(`dontForget`), `info`);
+}
+return;
+}
+if(act === `moveItemDown`){
+var secD = STATE.MENU[sIdx];
+if(secD && ii < secD.items.length-1){
+swapArr(secD.items, ii, ii+1);
+renderMenu();
+toast(L(`dontForget`), `info`);
+}
+return;
+}
 if(act === `delSec`){
 var sec = STATE.MENU[si];
 var secNm = (ALANG===`ar`) ? sec.t : sec.tEn;
 var ok = await askConfirm(LF(`delSecMsg`, secNm),
-L(`confirmDefault`), `🗑`, L(`btnDelFinal`));
+L(`confirmDefault`), `🗑`, L(`btnDelFinal`), true);
 if(ok){
 STATE.MENU.splice(si,1);
 renderMenu();
@@ -143,7 +203,7 @@ if(act === `editItem`) openItemModal(sIdx, ii);
 if(act === `delItem`){
 var it = STATE.MENU[sIdx].items[ii];
 var ok2 = await askConfirm(LF(`delItemMsg`, nmOf(it)),
-L(`confirmDefault`), `🗑`, L(`btnDelFinal`));
+L(`confirmDefault`), `🗑`, L(`btnDelFinal`), true);
 if(ok2){
 STATE.MENU[sIdx].items.splice(ii,1);
 renderMenu();
@@ -497,19 +557,26 @@ chipsBox.innerHTML =
 L(`modsNone`) + `</div>`;
 return;
 }
-chipsBox.innerHTML = modsRefsArr.map(function(ref){
+var last = modsRefsArr.length - 1;
+chipsBox.innerHTML = modsRefsArr.map(function(ref, ri){
 var x = findItemAdmin(ref);
 if(!x) return ``;
+var upDis = (ri === 0) ? ` disabled` : ``;
+var dnDis = (ri === last) ? ` disabled` : ``;
 return `<span style="display:inline-flex;` +
 `align-items:center;gap:.4rem;background:#fff;` +
 `border:1px solid var(--line);border-radius:50px;` +
 `padding:.25rem .7rem;font-size:.72rem;` +
 `font-weight:800;color:var(--ink)">` +
 esc(nmOf(x)) +
-`<button type="button" class="mi_rm" data-ref="` +
-ref + `" style="border:none;background:var(--red-bg);` +
-`color:var(--red);border-radius:50%;width:20px;` +
-`height:20px;font-weight:900;cursor:pointer">✕</button>` +
+`<span class="chip-ops">` +
+`<button type="button" class="mvup" data-mact="mup" data-ref="` +
+ref + `"` + upDis + ` title="` + esc(L(`moveUp`)) + `">▲</button>` +
+`<button type="button" class="mvdown" data-mact="mdn" data-ref="` +
+ref + `"` + dnDis + ` title="` + esc(L(`moveDown`)) + `">▼</button>` +
+`<button type="button" class="mi_rm" data-mact="rm" data-ref="` +
+ref + `" title="✕">✕</button>` +
+`</span>` +
 `</span>`;
 }).join(` `);
 }
@@ -535,12 +602,27 @@ if(!c.checked && idx2 >= 0) modsRefsArr.splice(idx2, 1);
 renderModsChips();
 });
 chipsBox.addEventListener(`click`, function(e){
-var b = e.target.closest(`.mi_rm`);
-if(!b) return;
-var idx3 = modsRefsArr.indexOf(b.dataset.ref);
+var b = e.target.closest(`button[data-mact]`);
+if(!b || b.disabled) return;
+var ref = b.dataset.ref;
+var act = b.dataset.mact;
+var idx3 = modsRefsArr.indexOf(ref);
+if(act === `rm`){
 if(idx3 >= 0) modsRefsArr.splice(idx3, 1);
 renderModsChips();
 renderModsItems();
+return;
+}
+if(act === `mup` && idx3 > 0){
+swapArr(modsRefsArr, idx3, idx3-1);
+renderModsChips();
+return;
+}
+if(act === `mdn` && idx3 < modsRefsArr.length-1){
+swapArr(modsRefsArr, idx3, idx3+1);
+renderModsChips();
+return;
+}
 });
 el(`modsClearAll`).addEventListener(`click`, function(){
 modsRefsArr.length = 0;
@@ -605,7 +687,7 @@ el(`soldCustomWrap`).style.display =
 });
 });
 }
-/* ===== الفروع ===== */
+/* ===== الفروع (ترتيب + ترقيم آلي) ===== */
 function renderBranches(){
 var wrap = el(`branchWrap`);
 var brs = branches();
@@ -614,8 +696,11 @@ wrap.innerHTML =
 `<div class="note">لا توجد فروع بعد.</div>`;
 return;
 }
+var last = brs.length - 1;
 wrap.innerHTML = brs.map(function(b,i){
 var dis = (brs.length<=1) ? ` disabled` : ``;
+var upDis = (i === 0) ? ` disabled` : ``;
+var dnDis = (i === last) ? ` disabled` : ``;
 var coords = ``;
 if(b.lat && b.lng){
 coords = L(`brCoords`) + b.lat.toFixed(4) +
@@ -625,16 +710,18 @@ var otherNm = (ALANG===`ar`) ? b.nameEn : b.nameAr;
 return `<div class="br-card">` +
 `<div class="br-head">` +
 `<b>` + esc(brName(b)) +
-` <span class="br-code">B` + b.num + `</span></b>` +
-`<span class="item-ops">` +
-`<button class="edit" data-act="editBranch" data-i="` + i + `">✏️</button>` +
-`<button class="del" data-act="delBranch" data-i="` + i + `"` + dis + `>🗑</button>` +
+` <span class="br-code">B` + (i+1) + `</span></b>` +
+`<span class="item-ops ops-grid">` +
+`<button class="edit" data-act="editBranch" data-i="` + i + `" title="✏️">✏️</button>` +
+`<button class="del" data-act="delBranch" data-i="` + i + `"` + dis + ` title="🗑">🗑</button>` +
+`<button class="mvup" data-act="moveBranchUp" data-i="` + i + `"` + upDis + ` title="` + esc(L(`moveUp`)) + `">▲</button>` +
+`<button class="mvdown" data-act="moveBranchDown" data-i="` + i + `"` + dnDis + ` title="` + esc(L(`moveDown`)) + `">▼</button>` +
 `</span></div>` +
 `<div class="br-info">` +
 esc(otherNm||``) + `<br>` +
 esc(b.addrAr||``) + `<br>` +
 `<span class="sec-line">` + esc(b.addrEn||``) + `</span><br>` +
-L(`brNum`) + b.num + ` • ` + L(`brWa`) + esc(b.wa||``) + `<br>` +
+L(`brNum`) + (i+1) + ` • ` + L(`brWa`) + esc(b.wa||``) + `<br>` +
 coords +
 `</div></div>`;
 }).join(``);
@@ -642,10 +729,26 @@ coords +
 el(`branchWrap`).addEventListener(`click`,
 async function(e){
 var b = e.target.closest(`button[data-act]`);
-if(!b) return;
+if(!b || b.disabled) return;
 var i = +b.dataset.i;
 var act = b.dataset.act;
 if(act === `editBranch`) openBranchModal(i);
+if(act === `moveBranchUp`){
+if(i > 0){
+swapArr(branches(), i, i-1);
+renderBranches();
+toast(L(`dontForget`), `info`);
+}
+return;
+}
+if(act === `moveBranchDown`){
+if(i < branches().length-1){
+swapArr(branches(), i, i+1);
+renderBranches();
+toast(L(`dontForget`), `info`);
+}
+return;
+}
 if(act === `delBranch`){
 if(branches().length <= 1){
 toast(L(`warnLastBranch`), `warn`);
@@ -654,7 +757,7 @@ return;
 var br = branches()[i];
 var ok = await askConfirm(
 LF(`delBranchMsg`, brName(br)),
-L(`confirmDefault`), `🗑`, L(`btnDelFinal`));
+L(`confirmDefault`), `🗑`, L(`btnDelFinal`), true);
 if(ok){
 branches().splice(i,1);
 renderBranches();
@@ -718,7 +821,7 @@ var oa = document.querySelector(
 var om = +document.querySelector(
 `.d_om[data-d="` + i + `"]`).value;
 var ch = clamp12(document.querySelector(
-`.d_ch[data-d="` + i + `"]`).value);
+`.d_ch[data-d="` + i + `"]`).value;
 var ca = document.querySelector(
 `.d_ca[data-d="` + i + `"]`).value;
 var cm = +document.querySelector(
@@ -733,6 +836,9 @@ return hours;
 }
 function openBranchModal(i){
 var b = (i===null) ? null : branches()[i];
+var codeNum = (i===null)
+? (branches().length + 1)
+: (i + 1);
 openModal(b ? L(`editBranchTitle`) : L(`addBranchTitle`),
 `<div class="form-grid">` +
 `<label>` + L(`lblBrNameAr`) +
@@ -743,9 +849,9 @@ openModal(b ? L(`editBranchTitle`) : L(`addBranchTitle`),
 `<input id="f_addrAr" value="` + esc(b?b.addrAr:``) + `"></label>` +
 `<label>` + L(`lblBrAddrEn`) +
 `<input id="f_addrEn" class="ltr" value="` + esc(b?b.addrEn:``) + `"></label>` +
-`<label>` + L(`lblBrNum`) +
-`<input id="f_num" type="number" min="1" step="1" value="` +
-(b ? b.num : nextBranchNum()) + `"></label>` +
+`<label>` + L(`lblBrCodeAuto`) +
+`<input id="f_code" class="ltr" readonly value="B` + codeNum +
+`" style="opacity:.7;cursor:default;background:#f1f2f4"></label>` +
 `<label>` + L(`lblMap`) +
 `<input id="f_map" class="ltr" value="` + esc(b?b.map:``) + `"></label>` +
 `<label>` + L(`lblLat`) +
@@ -763,25 +869,11 @@ hoursFieldset(b), async function(){
 var wa = mv(`f_wa`).trim();
 var lat = parseFloat(mv(`f_lat`));
 var lng = parseFloat(mv(`f_lng`));
-var numVal = parseInt(mv(`f_num`), 10);
 if(!validWa(wa)){
 toast(L(`waBad`), `error`); return false;
 }
 if(!isFinite(lat) || !isFinite(lng)){
 toast(L(`warnCoords`), `warn`); return false;
-}
-if(!isFinite(numVal) || numVal < 1){
-toast(L(`warnNum`), `warn`); return false;
-}
-var dup = branches().some(function(x){
-return x.num === numVal && x !== b;
-});
-if(dup){ toast(L(`warnNumDup`), `warn`); return false; }
-if(b && b.num !== numVal){
-var ok = await askConfirm(
-LF(`warnNumChange`, `B` + numVal),
-L(`confirmDefault`), `⚠️`, L(`yesContinue`));
-if(!ok) return false;
 }
 if(!mv(`f_nameAr`).trim()){
 toast(L(`warnName`), `warn`); return false;
@@ -791,7 +883,8 @@ nameAr: mv(`f_nameAr`).trim(),
 nameEn: mv(`f_nameEn`).trim(),
 addrAr: mv(`f_addrAr`).trim(),
 addrEn: mv(`f_addrEn`).trim(),
-num: numVal, wa: wa, lat: lat, lng: lng,
+num: b ? b.num : codeNum,
+wa: wa, lat: lat, lng: lng,
 map: mv(`f_map`).trim(),
 hours: readHours()
 };
@@ -817,6 +910,9 @@ var label = L(`btnSaveBranches`);
 btn.textContent = L(`publishing`);
 btn.disabled = true;
 try{
+/* الترقيم الآلي: الموضع = رقم الفرع قبل النشر */
+renumberBranches();
+renderBranches();
 await publishSettings(`تحديث الفروع من لوحة التحكم 🍝`);
 toast(L(`published`), `success`, L(`subLive`));
 btn.disabled = false;
@@ -963,7 +1059,7 @@ var x = STATE.SETTINGS.delivery[i];
 var dn = (ALANG===`ar`) ? x.nameAr : (x.nameEn||x.nameAr);
 var ok = await askConfirm(
 LF(`delDeliveryMsg`, dn),
-L(`confirmDefault`), `🗑`, L(`btnDelFinal`));
+L(`confirmDefault`), `🗑`, L(`btnDelFinal`), true);
 if(ok){
 STATE.SETTINGS.delivery.splice(i,1);
 renderDeliveryAdmin();
@@ -1084,7 +1180,7 @@ var x = STATE.SETTINGS.social[i];
 var nm = (ALANG===`ar`) ? x.nameAr : (x.nameEn||x.nameAr);
 var ok = await askConfirm(
 LF(`delSocialMsg`, nm),
-L(`confirmDefault`), `🗑`, L(`btnDelFinal`));
+L(`confirmDefault`), `🗑`, L(`btnDelFinal`), true);
 if(ok){
 STATE.SETTINGS.social.splice(i,1);
 renderSocialAdmin();
