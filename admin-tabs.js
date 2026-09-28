@@ -1,7 +1,13 @@
-/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v7) ===== */
+/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v8) ===== */
 /* اسم حسب لغة الواجهة */
 function nmOf(x){
 return (ALANG===`ar`) ? x.ar : (x.en || x.ar);
+}
+/* تنبيه القسم الفارغ (محلي حسب اللغة) */
+function emptySecNote(){
+return (ALANG===`ar`)
+? `هذا القسم فارغ أو كل أصنافه مخفية — لن يظهر للزبائن حتى تضيف صنفاً ظاهراً واحداً على الأقل ثم تضغط «حفظ ونشر المنيو».`
+: `This section is empty or all its items are hidden — customers will not see it until you add at least one visible item and publish the menu.`;
 }
 /* نمط مربع الأزرار 2×2 */
 const SQ_STYLE =
@@ -20,7 +26,7 @@ var addSecBtn =
 L(`addSec`) + `</button>`;
 if(!STATE.MENU.length){
 wrap.innerHTML =
-`<div class="note">لا توجد أقسام بعد.</div>` +
+`<div class="note">` + emptySecNote() + `</div>` +
 addSecBtn;
 return;
 }
@@ -104,6 +110,14 @@ return `<div class="item-row` + rowCls + `">` +
 `<button class="edit" data-act="moveItemDown" data-si="` + si + `" data-ii="` + ii + `" title="` + esc(L(`moveDown`)) + `"` + disSt(ii===lastItem) + `>▼</button>` +
 `</span></span></div>`;
 }).join(``);
+var visibleRows = sec.items.filter(function(x){
+return x.hidden !== true;
+});
+var bodyHtml = (visibleRows.length ? rows :
+`<div class="note" style="margin:.5rem 0 0">` +
+emptySecNote() + `</div>`) +
+`<button class="add-item" data-act="addItem" data-si="` + si + `">` +
+L(`addItem`) + `</button>`;
 return `<div class="sec-card` + hidCls + `">` +
 `<div class="sec-head">` +
 `<b>` + esc(sec.i) + ` ` +
@@ -116,9 +130,7 @@ esc((ALANG===`ar`)?sec.t:sec.tEn) + hidTag + `</b>` +
 `<button class="edit" data-act="moveSecUp" data-i="` + si + `" title="` + esc(L(`moveUp`)) + `"` + disSt(si===0) + `>▲</button>` +
 `<button class="edit" data-act="moveSecDown" data-i="` + si + `" title="` + esc(L(`moveDown`)) + `"` + disSt(si===lastSec) + `>▼</button>` +
 `</span></span></div>` +
-`<div class="items">` + rows +
-`<button class="add-item" data-act="addItem" data-si="` + si + `">` +
-L(`addItem`) + `</button>` +
+`<div class="items">` + bodyHtml +
 `</div></div>`;
 }).join(``) + addSecBtn;
 }
@@ -181,7 +193,7 @@ STATE.MENU[j1] = tmp1;
 renderMenu();
 toast(L(`dontForget`), `info`);
 }
-if(act === `addItem`) openItemModal(si, null);
+if(act === `addItem`) openItemModal(sIdx, null);
 });
 const pendingItemImgs = {};
 el(`saveMenu`).addEventListener(`click`,
@@ -423,6 +435,11 @@ soldAllHtml + soldCustomHtml +
 soldWrapShow + `">` +
 `<div class="miss-wrap">` + soldBoxes + `</div>` +
 `</div></fieldset>`, async function(){
+var targetSec = STATE.MENU[si];
+if(!targetSec){
+toast(L(`errGeneric`) + `section`, `error`);
+return false;
+}
 var ar = mv(`it_ar`).trim();
 var en = mv(`it_en`).trim();
 var prices = mv(`it_prices`).trim().split(`,`)
@@ -475,7 +492,7 @@ delete it.only; delete it.miss;
 delete it.so; delete it.mods;
 Object.assign(it, data);
 }else{
-STATE.MENU[si].items.push(data);
+targetSec.items.push(data);
 }
 renderMenu();
 toast(L(`savedItem`), `success`, L(`dontForget`));
