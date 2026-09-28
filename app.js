@@ -1,8 +1,7 @@
 /* =====================================================
 مكرونجي — سكربت التطبيق الرئيسي (app.js)
-v13: عدّادات الإضافات مرآة حيّة للسلة (+/− فوري)
-     + زر + في الشبكة يضيف ويفتح التفاصيل
-     + الشريط السفلي للصنف الأساسي فقط
+v14: صفحة التفاصيل = محرر طلب يُحفظ بزر واحد
+     العدادات تقرأ من السلة عند الفتح، والالتزام عند «إضافة للسلة»
 ===================================================== */
 /* ===== استعادة لقطة محلية عند فشل تحميل الملفات ===== */
 (function(){
@@ -890,7 +889,7 @@ function updateBranchFooter(){
   const b = currentBranch();
   el('branchCurrent').textContent = b ? ('🍝 ' + branchName(b)) : '🍝 —';
 }
-/* ===== صفحة التفاصيل + الكاروسيل الحي ===== */
+/* ===== صفحة التفاصيل: محرر طلب يُحفظ بزر واحد ===== */
 let dtState = null;
 (function injectDetailCss(){
   const st = document.createElement('style');
@@ -909,8 +908,7 @@ let dtState = null;
     '.dt-ocard b{font-size:.8rem;font-weight:900;color:var(--ink);line-height:1.5;' +
     'display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}' +
     '.dt-oprice{font-size:.72rem;font-weight:800;color:var(--muted)}' +
-    '.dt-octrl{margin-top:.15rem}' +
-    '.order-locked .dt-octrl{opacity:.55;pointer-events}';
+    '.dt-octrl{margin-top:.15rem}';
   document.head.appendChild(st);
 })();
 function ensureDetailSheet(){
@@ -934,53 +932,78 @@ function ensureDetailSheet(){
     </div>`;
   document.body.appendChild(d);
   el('dtClose').addEventListener('click', closeDetail);
-  el('dtInc').addEventListener('click', ()=>{ if(dtState){ dtState.qty++; renderDetailBar(); } });
-  el('dtDec').addEventListener('click', ()=>{ if(dtState && dtState.qty>1){ dtState.qty--; renderDetailBar(); } });
-  /* الشريط: يضيف الصنف الأساسي فقط */
+  /* عدّاد الصنف: تعديل محلي فقط */
+  el('dtInc').addEventListener('click', ()=>{
+    if(!dtState || orderLocked()) return;
+    dtState.qty++;
+    renderDetailBar();
+  });
+  el('dtDec').addEventListener('click', ()=>{
+    if(!dtState || orderLocked()) return;
+    if(dtState.qty > 0) dtState.qty--;
+    renderDetailBar();
+  });
+  /* الالتزام الوحيد: زر إضافة للسلة */
   el('dtAdd').addEventListener('click', ()=>{
     if(!dtState || orderLocked()) return;
     const it = curDetailItem();
-    const key = cartKey(it.id, dtState.sizeIdx);
-    const cur = cart.get(key) || {id:it.id, sizeIdx:dtState.sizeIdx, qty:0};
-    cur.qty += dtState.qty;
-    cart.set(key, cur);
+    /* سطر أساسي واحد بالمقاس المختار (حذف أي أسطر مقاسات قديمة) */
+    [...cart.keys()].forEach(k=>{
+      if(keyId(k) === it.id) cart.delete(k);
+    });
+    if(dtState.qty > 0){
+      cart.set(cartKey(it.id, dtState.sizeIdx),
+        {id:it.id, sizeIdx:dtState.sizeIdx, qty:dtState.qty});
+    }
+    /* الإضافات: كتابة الكميات الظاهرة ( والصفر يحذف ) */
+    modsRefs(it).forEach(ref=>{
+      const q = dtState.sel[ref] || 0;
+      const k = cartKey(ref, -1);
+      if(q > 0) cart.set(k, {id:ref, sizeIdx:-1, qty:q});
+      else cart.delete(k);
+    });
     updateCart();
     closeDetail();
     toast(tt('addedToCart','🛒 تمت الإضافة إلى سلتك','🛒 Added to your cart'));
   });
+  /* تغيير المقاس: إعادة قراءة الكمية من السلة */
   el('dtSizeWrap').addEventListener('change', e=>{
-    if(e.target.id === 'dtSize' && dtState){ dtState.sizeIdx = +e.target.value; renderDetailBar(); }
+    if(e.target.id !== 'dtSize' || !dtState) return;
+    dtState.sizeIdx = +e.target.value;
+    const q = qtyForItemSize(curDetailItem().id, dtState.sizeIdx);
+    dtState.qty = q > 0 ? q : 1;
+    renderDetailBar();
   });
-  /* العدادات الحية: +/− يعدلان سطر السلة مباشرة */
+  /* عدّادات الإضافات: تعديل محلي فقط */
   el('dtMods').addEventListener('click', e=>{
     const btn = e.target.closest('[data-mact]');
     if(!btn || !dtState) return;
     if(orderLocked()) return;
     const ref = btn.dataset.ref;
     const act = btn.dataset.mact;
-    const key = cartKey(ref, -1);
     if(act === 'inc'){
-      const cur = cart.get(key) || {id:ref, sizeIdx:-1, qty:0};
-      cur.qty += 1;
-      cart.set(key, cur);
+      dtState.sel[ref] = (dtState.sel[ref]||0) + 1;
     }
     if(act === 'dec'){
-      const cur = cart.get(key);
-      if(cur){
-        cur.qty -= 1;
-        if(cur.qty <= 0) cart.delete(key);
+      if(dtState.sel[ref] > 0){
+        dtState.sel[ref]--;
+        if(dtState.sel[ref] <= 0) delete dtState.sel[ref];
       }
     }
-    updateCart();
     renderDetailMods();
+    renderDetailBar();
   });
   return d;
 }
 function curDetailItem(){ return MENU[dtState.si].items[dtState.ii]; }
-/* إجمالي الشريط = الصنف الأساسي × كميته فقط */
+/* الإجمالي المعروض = الصنف×عداده + كل إضافة×عدّادها */
 function detailTotal(){
   const it = curDetailItem();
-  return itemPrice(it, dtState.sizeIdx) * dtState.qty;
+  let t = itemPrice(it, dtState.sizeIdx) * dtState.qty;
+  Object.keys(dtState.sel).forEach(ref=>{
+    t += modPriceFor(it, ref) * dtState.sel[ref];
+  });
+  return t;
 }
 function renderDetailBar(){
   const TT = T();
@@ -1000,7 +1023,7 @@ function renderDetailMods(){
   const sub = ar ? modsSubAr() : modsSubEn();
   const cards = refs.map(ref=>{
     const rit = findMenuItem(ref);
-    const q = qtyForItemSize(ref, -1);
+    const q = dtState.sel[ref] || 0;
     const thumb = itemImgUrl(rit) || itemPlaceholder(rit.ar);
     const ctrl = q > 0
       ? `<span class="dt-mini"><button class="dec" data-mact="dec" data-ref="${ref}">−</button><span>${q}</span><button data-mact="inc" data-ref="${ref}">+</button></span>`
@@ -1022,8 +1045,27 @@ function renderDetailMods(){
 }
 function openDetail(si, ii){
   ensureDetailSheet();
-  dtState = { si:si, ii:ii, sizeIdx:-1, qty:1 };
   const it = MENU[si].items[ii];
+  /* قراءة الحالة من السلة: المقاس والكمية وعدّادات الإضافات */
+  let sizeIdx = -1;
+  let qty = 0;
+  if(it.prices.length > 1){
+    sizeIdx = 0;
+    for(let i=0;i<it.prices.length;i++){
+      const q = qtyForItemSize(it.id, i);
+      if(q > 0){ sizeIdx = i; qty = q; break; }
+    }
+    if(qty === 0){ sizeIdx = 0; qty = 1; }
+  } else {
+    qty = qtyForItemSize(it.id, -1);
+    if(qty === 0) qty = 1;
+  }
+  const sel = {};
+  modsRefs(it).forEach(ref=>{
+    const q = qtyForItemSize(ref, -1);
+    if(q > 0) sel[ref] = q;
+  });
+  dtState = { si:si, ii:ii, sizeIdx:sizeIdx, qty:qty, sel:sel };
   const TT = T();
   const DO = displayOpts();
   el('dtImg').src = itemImgUrl(it) || itemPlaceholder(it.ar);
@@ -1037,7 +1079,7 @@ function openDetail(si, ii){
   else cEl.style.display = 'none';
   const sw = el('dtSizeWrap');
   sw.innerHTML = it.prices.length > 1
-    ? `<select id="dtSize" class="dt-size">${it.prices.map((p,i)=>`<option value="${i}">${TT.sizes[i]} • ${p} ${TT.currency}</option>`).join('')}</select>`
+    ? `<select id="dtSize" class="dt-size">${it.prices.map((p,i)=>`<option value="${i}"${i===sizeIdx?' selected':''}>${TT.sizes[i]} • ${p} ${TT.currency}</option>`).join('')}</select>`
     : '';
   renderDetailMods();
   renderDetailBar();
@@ -1210,7 +1252,7 @@ function buildMenu(){
   renderSocial();
 }
 buildMenu();
-/* ===== + / − في الشبكي: + يضيف ويفتح التفاصيل إن وجدت إضافات ===== */
+/* ===== + / − في الشبكي: إضافة سريعة فورية، و+ يفتح التفاصيل إن وجدت إضافات ===== */
 document.addEventListener('click', e=>{
   const b = e.target.closest('.st'); if(!b) return;
   const step = b.closest('.step');
