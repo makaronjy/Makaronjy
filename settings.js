@@ -435,8 +435,8 @@ window.APP_SETTINGS = {
     "icon": "🍝",
     "titleAr": "افتتاح قريب",
     "titleEn": "Coming Soon",
-    "textAr": "تابعونا على حساباتنا لمعرفة آخر العروض والافتتاحات الجديدة.",
-    "textEn": "Follow us to catch the latest offers and openings.",
+    "textAr": "تابعونا على حساباتنا لمعرفة آخر العروض",
+    "textEn": "Follow us on our accounts to stay updated on the latest offers",
     "btnAr": "حسناً 🍝",
     "btnEn": "Got it 🍝"
   },
