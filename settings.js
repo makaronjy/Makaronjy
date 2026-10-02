@@ -430,7 +430,7 @@ window.APP_SETTINGS = {
     }
   ],
   "ad": {
-    "enabled": false,
+    "enabled": true,
     "oncePerDay": true,
     "icon": "🍝",
     "titleAr": "افتتاح قريب",
