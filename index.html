@@ -21,7 +21,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&family=Aref+Ruqaa:wght@700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="style.css">
-<link rel="stylesheet" href="upgrade.css">
 <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
@@ -116,7 +115,7 @@
   <button class="f-menu-btn" onclick="closeFeatured()" data-i18n="browseMenu">تصفح قائمة الطعام</button>
 </div>
 
-<!-- بوابة الفروع القديمة: تُترك في DOM مخفية لضمان توافق الكود، ولا تُفتح أبداً -->
+<!-- بوابة الفروع القديمة: تبقى في DOM مخفية تماماً (توافق الكود) ولا تُفتح أبداً -->
 <div class="gate" id="gate">
   <div class="gate-head">
     <button class="gate-close" id="gateClose" onclick="closeGate()" aria-label="إغلاق">✕</button>
@@ -188,7 +187,7 @@
   </button>
 </div>
 
-<!-- عناصر مخفية: تحمي دوال الكود الأصلي من أي خطأ (عدادات/تسميات قديمة) -->
+<!-- عناصر مخفية: تحمي دوال الكود من أي خطأ (عدادات وتسميات قديمة) -->
 <div id="legacyHidden" hidden aria-hidden="true">
   <button class="fab fab-cart" onclick="openCart()">
     <span class="cart-icon-wrap" aria-hidden="true"></span>
@@ -301,10 +300,8 @@
 <div id="toast"><span id="toastMsg"></span></div>
 
 <script src="i18n.js"></script>
-<script src="i18n-extra.js"></script>
 <script src="menu.js"></script>
 <script src="settings.js"></script>
 <script src="app.js"></script>
-<script src="upgrade.js"></script>
 </body>
 </html>
