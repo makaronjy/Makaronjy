@@ -440,6 +440,10 @@ window.APP_SETTINGS = {
     "btnAr": "حسناً 🍝",
     "btnEn": "Got it 🍝"
   },
+  "delivery": {
+    "fee": 5
+  },
+  "banners": [],
   "imagesVersion": 0,
   "display": {
     "mode": "list",
