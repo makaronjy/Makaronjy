@@ -1,6 +1,6 @@
 /* =====================================================
    Service Worker — مكرونجي (sw.js)
-   الإصدار v12 — طبقة الترقية (upgrade) + كاش Leaflet
+   الإصدار v12 — طبقة الترقية v15 + كاش Leaflet/OpenStreetMap
 ===================================================== */
 
 const CACHE = 'makaronjy-v12';
@@ -10,11 +10,8 @@ const CORE = [
   './',
   'index.html',
   'style.css',
-  'upgrade.css',
   'app.js',
-  'upgrade.js',
   'i18n.js',
-  'i18n-extra.js',
   'menu.js',
   'settings.js',
   'manifest.json',
