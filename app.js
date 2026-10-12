@@ -1,7 +1,7 @@
 /* =====================================================
 مكرونجي — سكربت التطبيق الرئيسي (app.js)
-v15: طبقة الترقية — قائمة جانبية، كاروسيل، صفحة نوع الطلب،
-     شريط إتمام كبسولي، توصيل فعلي، بدون فتح تلقائي للبوابة
+v15.1: شركاء التوصيل بتصميمهم القديم + تأمين دالة الحالة
+       بعد حذف شريحة مفتوح/مغلق + حماية صيغة الإعدادات
 ===================================================== */
 /* ===== استعادة لقطة محلية عند فشل تحميل الملفات ===== */
 (function(){
@@ -206,7 +206,7 @@ function hmToMin(t){ const o = normHM(t); return o.h*60 + o.m; }
 function defaultSchedule(){
   const H = S().hours || { open:{h:13,m:0}, close:{h:2,m:0} };
   const o = normHM(H.open), c = normHM(H.close);
-  return [0,1,2,3,4,5,6].map(()=> ({ o:{h:o.h,m:o.m}, c:{h:c.h,m:o.m} }));
+  return [0,1,2,3,4,5,6].map(()=> ({ o:{h:o.h,m:o.m}, c:{h:c.h,m:c.m} }));
 }
 function branchSchedule(br){
   if(br && Array.isArray(br.hours) && br.hours.length === 7){
@@ -351,20 +351,21 @@ function applyImageVersions(){
     if(im.getAttribute('src') !== want) im.src = want;
   });
 }
-/* v15: شركاء التوصيل يُرسمون داخل صفحة نوع الطلب */
+/* v15.1: شركاء التوصيل بتصميم البلاطات القديم + حماية الصيغة */
 function renderDelivery(){
-  const d = S().delivery || [];
+  const d = Array.isArray(S().delivery) ? S().delivery : [];
   const box = el('otpApps');
   if(!box) return;
   if(!d.length){ box.innerHTML = ''; return; }
   const name = x=> currentLang==='ar' ? x.nameAr : (x.nameEn || x.nameAr);
-  box.innerHTML = d.map((x,i)=>`<button class="oa-btn" aria-label="${name(x)}" onclick="return openDeliveryApp(event, ${i});">
-      <span class="oa-ico" style="background:${x.color || '#8e2a4a'}"><img src="${x.img || 'img/missing.png'}" alt="${name(x)}" onerror="this.style.display='none';this.parentNode.textContent='${name(x).charAt(0)}'"></span>
-      <span class="oa-name">${name(x)}</span></button>`).join('');
+  box.innerHTML = `<div class="gd-tiles">${d.map((x,i)=>`<button class="gd-btn" aria-label="${name(x)}" onclick="return openDeliveryApp(event, ${i});">
+      <img src="${x.img || 'img/missing.png'}" alt="${name(x)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <span class="gd-fallback" style="display:none;background:${x.color || '#8e2a4a'}">${name(x).charAt(0)}</span>
+      <span class="gd-name">${name(x)}</span></button>`).join('')}</div>`;
 }
 function openDeliveryApp(event, idx){
   event.preventDefault();
-  const d = S().delivery || [];
+  const d = Array.isArray(S().delivery) ? S().delivery : [];
   const x = d[idx];
   if(!x) return false;
   window.location.href = x.url;
@@ -427,31 +428,33 @@ function applyLang(lang){
   setTimeout(()=>{ catsSign = 0; catsPos = 0; cats.scrollLeft = 0; }, 50);
 }
 function toggleLang(){ applyLang(currentLang==='ar' ? 'en' : 'ar'); }
+/* v15.1: الحالة تعمل داخلياً فقط — الشريحة محذوفة من الواجهة */
 function updateStatus(){
   const pill = el('statusPill');
   const txt = el('statusText');
   const note = el('statusNote');
-  const br = currentBranch() || branches()[0] || null;
-  if(!br){
-    pill.classList.remove('open'); pill.classList.add('closed');
-    txt.textContent = T().closed; note.textContent = '';
-    applyClosedState();
-    return;
-  }
-  const st = branchStatus(br);
-  const lang = currentLang;
-  const days = T().days || (lang==='ar' ? ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'] : ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']);
-  pill.classList.toggle('open', st.open);
-  pill.classList.toggle('closed', !st.open);
-  txt.textContent = st.open ? T().open : T().closed;
-  if(st.open){
-    note.textContent = tCall('closesAt', h=> 'يغلق عند الساعة ' + h, fmtMin(st.closeMin, lang));
-  } else if(st.openMin !== null && st.openDay === null){
-    note.textContent = tCall('opensAt', h=> 'يفتح عند الساعة ' + h, fmtMin(st.openMin, lang));
-  } else if(st.openMin !== null){
-    note.textContent = tCall('opensOn', (d,h)=> 'يفتح يوم ' + d + ' عند الساعة ' + h, days[st.openDay] || '', fmtMin(st.openMin, lang));
-  } else {
-    note.textContent = tt('closedWeek','مغلق هذا الأسبوع','Closed this week');
+  if(pill && txt && note){
+    const br = currentBranch() || branches()[0] || null;
+    if(!br){
+      pill.classList.remove('open'); pill.classList.add('closed');
+      txt.textContent = T().closed; note.textContent = '';
+    } else {
+      const st = branchStatus(br);
+      const lang = currentLang;
+      const days = T().days || (lang==='ar' ? ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'] : ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']);
+      pill.classList.toggle('open', st.open);
+      pill.classList.toggle('closed', !st.open);
+      txt.textContent = st.open ? T().open : T().closed;
+      if(st.open){
+        note.textContent = tCall('closesAt', h=> 'يغلق عند الساعة ' + h, fmtMin(st.closeMin, lang));
+      } else if(st.openMin !== null && st.openDay === null){
+        note.textContent = tCall('opensAt', h=> 'يفتح عند الساعة ' + h, fmtMin(st.openMin, lang));
+      } else if(st.openMin !== null){
+        note.textContent = tCall('opensOn', (d,h)=> 'يفتح يوم ' + d + ' عند الساعة ' + h, days[st.openDay] || '', fmtMin(st.openMin, lang));
+      } else {
+        note.textContent = tt('closedWeek','مغلق هذا الأسبوع','Closed this week');
+      }
+    }
   }
   applyClosedState();
 }
@@ -1438,7 +1441,7 @@ cats.addEventListener('touchstart', ()=> pauseCats(3000), {passive:true});
 cats.addEventListener('wheel', ()=> pauseCats(3000), {passive:true});
 
 /* =====================================================
-   ===== طبقة الترقية v15 — المنطق الجديد الكامل =====
+   ===== طبقة الترقية v15.1 — المنطق الجديد الكامل =====
 ===================================================== */
 
 /* ===== حالة نوع الطلب والتوصيل ===== */
@@ -1505,7 +1508,7 @@ function stopBanners(){ if(bnTimer){ clearInterval(bnTimer); bnTimer = null; } }
     const dx = e.changedTouches[0].clientX - bnTouchX;
     if(Math.abs(dx) > 45) goBanner(bnIndex + (dx > 0 ? -1 : 1), true);
     bnTouchX = null;
-    if(bannersList().length > 1) bnTimer = setInterval(()=> goBanner(bnIndex+1, true), 4000);
+    if(bannersList().length > 1 && !bnTimer) bnTimer = setInterval(()=> goBanner(bnIndex+1, true), 4000);
   }, {passive:true});
   const dots = el('bannersDots');
   if(dots) dots.addEventListener('click', e=>{
@@ -1513,7 +1516,7 @@ function stopBanners(){ if(bnTimer){ clearInterval(bnTimer); bnTimer = null; } }
     if(!d) return;
     stopBanners();
     goBanner(+d.dataset.bn, false);
-    if(bannersList().length > 1) bnTimer = setInterval(()=> goBanner(bnIndex+1, true), 4000);
+    if(bannersList().length > 1 && !bnTimer) bnTimer = setInterval(()=> goBanner(bnIndex+1, true), 4000);
   });
   document.addEventListener('visibilitychange', ()=>{
     if(document.hidden) stopBanners();
@@ -1604,7 +1607,6 @@ function renderOtpList(){
   if(nearestId) brs.sort((a,b)=> (a.id===nearestId ? -1 : (b.id===nearestId ? 1 : 0)));
   const cur = savedBranchId();
   const lang = currentLang;
-  const LV = ['background:#e8f5e9;color:#2d6a4f','background:#fff6e6;color:#a06b1c','background:#fee2e2;color:#b91c1c'];
   const LVTXT = [
     tt('trafficLight','🟢 زحمة خفيفة','🟢 light traffic'),
     tt('trafficMed','🟠 زحمة متوسطة','🟠 moderate traffic'),
@@ -1709,7 +1711,6 @@ function initOtpMap(){
       const icon = L.divIcon({ className:'', html:'<div class="mk-pin"></div>', iconSize:[34,34], iconAnchor:[17,34] });
       const mk = L.marker([b.lat, b.lng], { icon }).addTo(otpMap);
       mk.bindPopup(branchName(b));
-      mk.on('click', ()=>{});
       otpMarkers[b.id] = mk;
       pts.push([b.lat, b.lng]);
     });
