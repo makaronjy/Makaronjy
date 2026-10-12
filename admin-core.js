@@ -566,7 +566,8 @@ STATE.SETTINGS.social = [];
 /* ===== أدوات الوقت ===== */
 function clamp12(v){
 var n = parseInt(v,10);
-if(!isFinite(n) || n<1) n = 12;
+if(!isFinite(n)) n = 12;
+if(n<1) n = 1;
 if(n>12) n = 12;
 return n;
 }
@@ -636,8 +637,7 @@ el(`tab-` + t.dataset.tab).classList.remove(`hidden`);
 el(`btnLogout`).addEventListener(`click`,
 async function(){
 var ok = await askConfirm(
-L(`logoutMsg`),
-L(`logoutTitle`), `🚪`, L(`logoutYes`));
+L(`logoutMsg`), L(`logoutTitle`), `🚪`, L(`logoutYes`));
 if(!ok) return;
 sessionStorage.removeItem(`mk_admin`);
 location.reload();
@@ -814,4 +814,221 @@ menuText(), STATE.shas.menu, msg);
 STATE.shas.menu =
 r.content ? r.content.sha : r.sha;
 }
+
+/* =====================================================
+   ===== v15: سلايدر الصفحة الرئيسية + رسوم التوصيل =====
+   (واجهة تُحقن داخل تبويب الإعلان — بدون تعديل admin.html)
+===================================================== */
+function migrateBanners(){
+var S0 = STATE.SETTINGS;
+if(!Array.isArray(S0.banners)) S0.banners = [];
+S0.banners.forEach(function(b, i){
+if(!b || typeof b !== `object`) return;
+if(!b.id) b.id = `bn-` + (i + 1);
+if(typeof b.v !== `number`) b.v = 0;
+});
+if(typeof S0.deliveryFee !== `number`){
+S0.deliveryFee = 5;
+}
+}
+function v15Style(){
+if(el(`v15Style`)) return;
+var st = document.createElement(`style`);
+st.id = `v15Style`;
+st.textContent =
+`.v15-card{background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:1rem;margin:0 0 1rem}` +
+`.v15-card h3{font-size:1rem;font-weight:900;color:var(--ink);margin:0 0 .6rem}` +
+`.v15-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:.6rem;margin:0 0 .7rem}` +
+`.bn-adm{position:relative;border:1.5px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}` +
+`.bn-adm .img-prev{aspect-ratio:16/9;overflow:hidden;background:#f0e8dc}` +
+`.bn-adm .img-prev img{width:100%;height:100%;object-fit:cover;display:block}` +
+`.bn-adm-act{display:flex;gap:.3rem;padding:.4rem}` +
+`.bn-adm-act button{flex:1;border:none;border-radius:8px;padding:.35rem 0;font-weight:900;cursor:pointer;font-family:inherit;font-size:.72rem}` +
+`.bn-up,.bn-dn{background:#f3e7d7;color:var(--ink)}` +
+`.bn-del{background:#fee2e2;color:#b91c1c}` +
+`.v15-row{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap}` +
+`.v15-add{border:none;border-radius:12px;padding:.7rem 1.2rem;background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--dark);font-weight:900;cursor:pointer;font-family:inherit}` +
+`.v15-pub{border:none;border-radius:12px;padding:.7rem 1.2rem;background:var(--wa);color:#fff;font-weight:900;cursor:pointer;font-family:inherit}` +
+`.v15-fee{width:110px;border:1.5px solid var(--line);border-radius:10px;padding:.55rem .6rem;font-family:inherit;font-weight:900;font-size:1rem;text-align:center}` +
+`.v15-empty{color:var(--muted);font-weight:700;font-size:.8rem;padding:.6rem;border:1.5px dashed var(--line);border-radius:10px;text-align:center}`;
+document.head.appendChild(st);
+}
+function adminSection(reList){
+var tabs = document.querySelectorAll(`.tab`);
+for(var i=0;i<tabs.length;i++){
+var t = tabs[i];
+var key = ((t.dataset && t.dataset.tab) || ``) +
+` ` + (t.textContent || ``);
+for(var r=0;r<reList.length;r++){
+if(reList[r].test(key)){
+return el(`tab-` + t.dataset.tab);
+}
+}
+}
+return null;
+}
+function ensureV15Cards(){
+if(el(`v15BannerCard`)) return;
+v15Style();
+var adsSec = adminSection([/ads?|إعلان/i]);
+var setSec = adminSection([/settings?|إعداد|ضبط/i]);
+var host = adsSec || setSec ||
+document.querySelector(`main > section`);
+if(!host) return;
+var card = document.createElement(`div`);
+card.className = `v15-card`;
+card.id = `v15BannerCard`;
+card.innerHTML =
+`<h3>🖼️ سلايدر الصفحة الرئيسية / Home Slider</h3>` +
+`<div class="v15-grid" id="bnAdminList"></div>` +
+`<div class="v15-row">` +
+`<button class="v15-add" id="bnAddBtn">➕ إضافة بانر / Add</button>` +
+`<button class="v15-pub" id="bnPublishBtn">🚀 نشر / Publish</button>` +
+`<input type="file" id="bnFile" accept="image/*" hidden>` +
+`</div>`;
+host.insertBefore(card, host.firstChild);
+var feeHost = setSec || host;
+var fee = document.createElement(`div`);
+fee.className = `v15-card`;
+fee.id = `v15FeeCard`;
+fee.innerHTML =
+`<h3>🛵 رسوم توصيل المطعم / Restaurant Delivery Fee</h3>` +
+`<div class="v15-row">` +
+`<input type="number" min="0" step="0.5" class="v15-fee" id="v15FeeInput">` +
+`<span>ريال / SAR</span>` +
+`<button class="v15-pub" id="feePublishBtn">🚀 نشر / Publish</button>` +
+`</div>`;
+feeHost.insertBefore(fee, feeHost.firstChild);
+el(`bnAddBtn`).addEventListener(`click`, function(){
+el(`bnFile`).click();
+});
+el(`bnFile`).addEventListener(`change`,
+async function(e){
+var f = e.target.files && e.target.files[0];
+e.target.value = ``;
+if(!f) return;
+try{
+toast(`جارٍ رفع البانر...`, `info`);
+var path = await uploadBannerImg(
+`img/banners/bn-` + Date.now() + `.png`, f);
+STATE.SETTINGS.banners.push({
+id: `bn-` + Date.now(),
+img: path,
+v: Date.now(),
+titleAr: ``,
+titleEn: ``
+});
+renderBannersAdmin();
+toast(`✔ تم إضافة البانر — اضغط نشر`, `success`);
+}catch(err){
+toast(`فشل الرفع: ` + err.message, `error`);
+}
+});
+el(`bnPublishBtn`).addEventListener(`click`, publishV15);
+el(`feePublishBtn`).addEventListener(`click`, publishV15);
+el(`v15FeeInput`).addEventListener(`change`, function(e){
+var v = parseFloat(e.target.value);
+STATE.SETTINGS.deliveryFee =
+(isFinite(v) && v >= 0) ? v : 5;
+});
+el(`bnAdminList`).addEventListener(`click`,
+async function(e){
+var up = e.target.closest(`[data-bnup]`);
+var dn = e.target.closest(`[data-bndn]`);
+var del = e.target.closest(`[data-bndel]`);
+var list = STATE.SETTINGS.banners;
+if(up){
+var i = +up.dataset.bnup;
+if(i > 0){
+var t = list[i-1]; list[i-1] = list[i]; list[i] = t;
+renderBannersAdmin();
+}
+return;
+}
+if(dn){
+var j = +dn.dataset.bndn;
+if(j < list.length - 1){
+var t2 = list[j+1]; list[j+1] = list[j]; list[j] = t2;
+renderBannersAdmin();
+}
+return;
+}
+if(del){
+var k = +del.dataset.bndel;
+var ok = await askConfirm(
+`سيُحذف البانر من السلايدر (ملف الصورة يبقى بالمستودع).`,
+`حذف بانر`, `🗑`, `حذف`);
+if(!ok) return;
+list.splice(k, 1);
+renderBannersAdmin();
+toast(`✔ تم الحذف — اضغط نشر`, `success`);
+}
+});
+}
+function renderBannersAdmin(){
+var box = el(`bnAdminList`);
+if(!box || !STATE) return;
+var list = STATE.SETTINGS.banners || [];
+var fi = el(`v15FeeInput`);
+if(fi) fi.value = STATE.SETTINGS.deliveryFee;
+if(!list.length){
+box.innerHTML =
+`<div class="v15-empty">لا توجد بانرات — أضف أول بانر ليظهر السلايدر بالتطبيق / No banners yet</div>`;
+return;
+}
+box.innerHTML = list.map(function(b, i){
+return `<div class="bn-adm">` +
+`<div class="img-prev"><img src="` +
+esc(b.img) + (b.v ? `?v=` + b.v : ``) + `"></div>` +
+`<div class="bn-adm-act">` +
+`<button class="bn-up" data-bnup="` + i + `">↑</button>` +
+`<button class="bn-dn" data-bndn="` + i + `">↓</button>` +
+`<button class="bn-del" data-bndel="` + i + `">🗑</button>` +
+`</div></div>`;
+}).join(``);
+}
+async function uploadBannerImg(path, file){
+var cur = await getFile(path).catch(function(){
+return { sha:null };
+});
+var body = {
+message:`رفع بانر: ` + path,
+content: await b64OfFile(file),
+branch: CFG.branch
+};
+if(cur.sha) body.sha = cur.sha;
+var q = `/repos/` + CFG.owner + `/` + CFG.repo +
+`/contents/` + path;
+await gh(q, {
+method:`PUT`,
+headers:{ [`Content-Type`]:`application/json` },
+body: JSON.stringify(body)
+});
+return path;
+}
+async function publishV15(){
+var btn = el(`bnPublishBtn`);
+var old = btn.textContent;
+btn.disabled = true;
+btn.textContent = `...`;
+try{
+await publishSettings(`🖼️ تحديث السلايدر ورسوم التوصيل`);
+toast(`✔ تم النشر — سيظهر بالتطبيق خلال دقيقة`,
+`success`);
+}catch(e){
+handlePublishError(e, btn, old);
+return;
+}
+btn.disabled = false;
+btn.textContent = old;
+}
+/* لفّ loadAll لتشغيل هجرات وواجهة v15 بعد كل تحميل */
+var _loadAllOrig = loadAll;
+loadAll = async function(){
+var r = await _loadAllOrig();
+migrateBanners();
+ensureV15Cards();
+renderBannersAdmin();
+return r;
+};
 /* ===== END admin-core.js ===== */
