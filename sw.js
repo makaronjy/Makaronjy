@@ -1,17 +1,20 @@
 /* =====================================================
    Service Worker — مكرونجي (sw.js)
-   الإصدار v7 — بعد تقسيم index.html إلى style.css و app.js
+   الإصدار v12 — طبقة الترقية (upgrade) + كاش Leaflet
 ===================================================== */
 
-const CACHE = 'makaronjy-v11';
+const CACHE = 'makaronjy-v12';
 
 /* ===== الملفات الأساسية للتخزين المسبق ===== */
 const CORE = [
   './',
   'index.html',
   'style.css',
+  'upgrade.css',
   'app.js',
+  'upgrade.js',
   'i18n.js',
+  'i18n-extra.js',
   'menu.js',
   'settings.js',
   'manifest.json',
@@ -47,6 +50,24 @@ self.addEventListener('fetch', e=>{
   if(req.method !== 'GET') return;
 
   const url = new URL(req.url);
+
+  /* 0) مكتبة الخريطة وبلاطاتها: كاش أولاً ثم شبكة (عمل جزئي دون إنترنت) */
+  if(url.hostname === 'unpkg.com' || url.hostname.includes('openstreetmap.org')){
+    e.respondWith(
+      caches.match(req).then(hit=>{
+        if(hit) return hit;
+        return fetch(req).then(res=>{
+          if(res && res.ok){
+            const copy = res.clone();
+            caches.open(CACHE).then(c=> c.put(req, copy));
+          }
+          return res;
+        });
+      })
+    );
+    return;
+  }
+
   if(url.origin !== self.location.origin) return;
 
   /* 1) طلبات التحديث الحي: شبكة فقط دائماً (لا كاش أبداً) */
