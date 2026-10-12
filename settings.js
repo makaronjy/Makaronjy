@@ -508,15 +508,7 @@ window.APP_SETTINGS = {
     "btnAr": "حسناً 🍝",
     "btnEn": "Got it 🍝"
   },
-  "banners": [
-    {
-      "id": "bn-1791848971805",
-      "img": "img/banners/bn-1791848968205.png",
-      "v": 1791848971805,
-      "titleAr": "",
-      "titleEn": ""
-    }
-  ],
+  "banners": [],
   "imagesVersion": 0,
   "display": {
     "mode": "list",
