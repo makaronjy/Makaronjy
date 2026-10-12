@@ -1,7 +1,7 @@
 /* =====================================================
 ملف اللغات — مكرونجي Makaronjy
 (ترجمات الواجهة فقط — المنيو في menu.js والإعدادات في settings.js)
-v4: العملة العربية ﷼ (والإنجليزية SAR) + كل مفاتيح التفاصيل والتواصل
+v5: إضافات طبقة الترقية v15 + حذف المهجور
 ===================================================== */
 window.I18N = {
 ar: {
@@ -9,7 +9,6 @@ docTitle: 'مكرونجي | مكرونة بطعم لا يُقاوم',
 brandName: 'مكرونجي',
 brandTag: 'باستا • مقبلات • حلويات',
 heroTitle: 'مكرونجي',
-heroSubtitle: 'مكرونة بطعم لا يُقاوم',
 searchPh: '🔍 ابحث عن صنف...',
 clearSearch: '✕ مسح البحث',
 results: function(n){ return n + ' نتيجة'; },
@@ -28,7 +27,6 @@ getDir: 'التوجه للمطعم',
 call: 'الاتصال مباشر',
 calInfo: 'احتياج الفرد يومياً 2000 إلى 2500 سعرة حرارية وتختلف حسب الأشخاص',
 designBy: 'تصميم',
-yourOrder: 'طلبك',
 cartTitle: 'سلة الطلبات',
 notePh: '📝 توصية / ملاحظة',
 orderPickup: 'استلام من الفرع',
@@ -140,14 +138,33 @@ iosSteps:
 otherSteps:
   '<div class="sheet-step"><span class="num">١</span><p>افتح قائمة المتصفح (⋮ أو ⋯) أعلى الشاشة.</p></div>' +
   '<div class="sheet-step"><span class="num">٢</span><p>اختر <b>«تثبيت التطبيق»</b> أو <b>«إضافة إلى الشاشة الرئيسية»</b>.</p></div>' +
-  '<div class="sheet-step"><span class="num">٣</span><p>أكّد الإضافة — وستظهر أيقونة مكرونجي على جوالك 🎉</p></div>'
+  '<div class="sheet-step"><span class="num">٣</span><p>أكّد الإضافة — وستظهر أيقونة مكرونجي على جوالك 🎉</p></div>',
+/* ===== إضافات طبقة الترقية v15 ===== */
+orderTypeTitle: 'حدد نوع الطلب',
+chooseOrderType: 'اضغط هنا لاختيار نوع الطلب',
+pickup: 'الاستلام',
+delivery: 'التوصيل',
+restaurantDelivery: 'توصيل المطعم',
+deliveryAppsHint: 'إتمام الطلب والدفع داخل التطبيق الشريك',
+deliveryFee: 'رسوم التوصيل',
+addressLabel: 'عنوان التوصيل',
+addressPh: 'الحي، الشارع، أقرب معلم...',
+addressRequired: '⚠️ يرجى كتابة عنوان التوصيل',
+subtotal: 'المجموع الفرعي',
+totalAmount: 'المبلغ الإجمالي',
+viewCart: 'عرض السلة',
+sideMenuTitle: 'القائمة',
+sideFav: 'وجباتي المفضلة',
+back: 'العودة',
+confirm: 'تأكيد',
+chooseBranchFirst: '⚠️ اختر فرعاً أولاً',
+pickupBranch: 'اختر فرع الاستلام'
 },
 en: {
 docTitle: 'Makaronjy | Irresistible Pasta',
 brandName: 'Makaronjy',
 brandTag: 'Pasta • Sides • Desserts',
 heroTitle: 'Makaronjy',
-heroSubtitle: 'Irresistible pasta',
 searchPh: '🔍 Search for a dish...',
 clearSearch: '✕ Clear Search',
 results: function(n){ return (n===1) ? '1 result' : n + ' results'; },
@@ -166,7 +183,6 @@ getDir: 'Directions',
 call: 'Call Us',
 calInfo: 'An average adult needs 2,000 to 2,500 calories per day; needs vary by person',
 designBy: 'Design',
-yourOrder: 'Your Order',
 cartTitle: 'Order Cart',
 notePh: '📝 Recommendation / Note',
 orderPickup: 'Branch pickup',
@@ -276,8 +292,28 @@ iosSteps:
   '<div class="sheet-step"><span class="num">2</span><p>Scroll up and choose <b>"Add to Home Screen"</b> (＋ icon).</p></div>' +
   '<div class="sheet-step"><span class="num">3</span><p>Tap <b>"Add"</b> — the Makaronjy icon will appear on your home screen 🎉</p></div>',
 otherSteps:
-  '<div class="sheet-step"><span class="num">1</span><p>Open the browser menu (⋮ or ) at the top.</p></div>' +
+  '<div class="sheet-step"><span class="num">1</span><p>Open the browser menu (⋮ or ⋯) at the top.</p></div>' +
   '<div class="sheet-step"><span class="num">2</span><p>Choose <b>"Install App"</b> or <b>"Add to Home Screen"</b>.</p></div>' +
-  '<div class="sheet-step"><span class="num">3</span><p>Confirm — the Makaronjy icon will appear on your home screen 🎉</p></div>'
+  '<div class="sheet-step"><span class="num">3</span><p>Confirm — the Makaronjy icon will appear on your home screen 🎉</p></div>',
+/* ===== v15 Upgrade additions ===== */
+orderTypeTitle: 'Order type',
+chooseOrderType: 'Tap to choose order type',
+pickup: 'Pickup',
+delivery: 'Delivery',
+restaurantDelivery: 'Restaurant delivery',
+deliveryAppsHint: 'Checkout & payment inside the partner app',
+deliveryFee: 'Delivery fee',
+addressLabel: 'Delivery address',
+addressPh: 'District, street, nearest landmark...',
+addressRequired: '⚠️ Please enter delivery address',
+subtotal: 'Subtotal',
+totalAmount: 'Total amount',
+viewCart: 'View cart',
+sideMenuTitle: 'Menu',
+sideFav: 'My favorites',
+back: 'Back',
+confirm: 'Confirm',
+chooseBranchFirst: '⚠️ Choose a branch first',
+pickupBranch: 'Choose pickup branch'
 }
 };
