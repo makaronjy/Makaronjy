@@ -385,6 +385,97 @@ window.APP_SETTINGS = {
           "closed": false
         }
       ]
+    },
+    {
+      "nameAr": "الروابي",
+      "nameEn": "Al-Rawabi",
+      "addrAr": "الزبير بن العوام , الروابي , الرياض 11461",
+      "addrEn": "Al-Zubayr bin Al-Awwam, Al-Rawabi, Riyadh 11461",
+      "wa": "966567326558",
+      "lat": 24.694382,
+      "lng": 46.790105,
+      "map": "https://maps.app.goo.gl/sb9yK3bfk7aLApMaA",
+      "hours": [
+        {
+          "o": {
+            "h": 9,
+            "m": 0
+          },
+          "c": {
+            "h": 23,
+            "m": 0
+          },
+          "closed": false
+        },
+        {
+          "o": {
+            "h": 9,
+            "m": 0
+          },
+          "c": {
+            "h": 23,
+            "m": 0
+          },
+          "closed": false
+        },
+        {
+          "o": {
+            "h": 9,
+            "m": 0
+          },
+          "c": {
+            "h": 23,
+            "m": 0
+          },
+          "closed": false
+        },
+        {
+          "o": {
+            "h": 9,
+            "m": 0
+          },
+          "c": {
+            "h": 23,
+            "m": 0
+          },
+          "closed": false
+        },
+        {
+          "o": {
+            "h": 9,
+            "m": 0
+          },
+          "c": {
+            "h": 23,
+            "m": 0
+          },
+          "closed": false
+        },
+        {
+          "o": {
+            "h": 9,
+            "m": 0
+          },
+          "c": {
+            "h": 23,
+            "m": 0
+          },
+          "closed": false
+        },
+        {
+          "o": {
+            "h": 9,
+            "m": 0
+          },
+          "c": {
+            "h": 23,
+            "m": 0
+          },
+          "closed": false
+        }
+      ],
+      "id": "b-1791819751585",
+      "num": 5
     }
   ],
   "delivery": {
