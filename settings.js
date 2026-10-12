@@ -419,9 +419,30 @@ window.APP_SETTINGS = {
   },
   "banners": [
     {
-      "id": "bn-1791807561048",
-      "img": "img/banners/bn-1791807557604.png",
-      "v": 1791807561048,
+      "id": "bn-1791812380424",
+      "img": "img/banners/bn-1791812375973.png",
+      "v": 1791812380424,
+      "titleAr": "",
+      "titleEn": ""
+    },
+    {
+      "id": "bn-1791812389866",
+      "img": "img/banners/bn-1791812386874.png",
+      "v": 1791812389866,
+      "titleAr": "",
+      "titleEn": ""
+    },
+    {
+      "id": "bn-1791812399624",
+      "img": "img/banners/bn-1791812393907.png",
+      "v": 1791812399624,
+      "titleAr": "",
+      "titleEn": ""
+    },
+    {
+      "id": "bn-1791812411311",
+      "img": "img/banners/bn-1791812408040.png",
+      "v": 1791812411311,
       "titleAr": "",
       "titleEn": ""
     }
