@@ -510,9 +510,9 @@ window.APP_SETTINGS = {
   },
   "banners": [
     {
-      "id": "bn-1791848811284",
-      "img": "img/banners/bn-1791848806330.png",
-      "v": 1791848811284,
+      "id": "bn-1791848971805",
+      "img": "img/banners/bn-1791848968205.png",
+      "v": 1791848971805,
       "titleAr": "",
       "titleEn": ""
     }
