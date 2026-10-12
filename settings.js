@@ -432,5 +432,5 @@ window.APP_SETTINGS = {
     "showDesc": true,
     "showCal": true
   },
-  "deliveryFee": 5
+  "deliveryFee": 10
 };
