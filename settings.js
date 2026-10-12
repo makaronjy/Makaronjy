@@ -387,8 +387,8 @@ window.APP_SETTINGS = {
       ]
     },
     {
-      "nameAr": "الروابي",
-      "nameEn": "Al-Rawabi",
+      "nameAr": "فرع الروابي",
+      "nameEn": "Al-Rawabi Branch",
       "addrAr": "الزبير بن العوام , الروابي , الرياض 11461",
       "addrEn": "Al-Zubayr bin Al-Awwam, Al-Rawabi, Riyadh 11461",
       "wa": "966567326558",
