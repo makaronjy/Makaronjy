@@ -428,7 +428,7 @@ window.APP_SETTINGS = {
   ],
   "imagesVersion": 0,
   "display": {
-    "mode": "list",
+    "mode": "grid",
     "showDesc": true,
     "showCal": true
   },
