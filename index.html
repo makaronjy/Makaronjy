@@ -1,308 +1,283 @@
-/* =====================================================
-ملف اللغات — مكرونجي Makaronjy
-v6: مفاتيح طبقة الترقية + حذف المفاتيح المهجورة
-===================================================== */
-window.I18N = {
-ar: {
-docTitle: 'مكرونجي | مكرونة بطعم لا يُقاوم',
-brandName: 'مكرونجي',
-brandTag: 'باستا • مقبلات • حلويات',
-heroTitle: 'مكرونجي',
-searchPh: '🔍 ابحث عن صنف...',
-clearSearch: '✕ مسح البحث',
-results: function(n){ return n + ' نتيجة'; },
-open: 'مفتوح',
-closed: 'مغلق',
-welcomeTitle: 'أهلاً وسهلاً بكم',
-welcomeMsg: 'اطلبوا ألذ أطباق المكرونة <b>واستلموها جاهزة</b> من أقرب فرع لكم! 🍝',
-welcomeBtn: 'اطلب الآن 🍝',
-loading: 'جارٍ تجهيز الأطباق... 🍽️',
-loadDone: 'اكتمل التحميل ✔',
-skip: 'تخطي والذهاب للمنيو ⏭',
-featTitle: 'الأكثر مبيعاً',
-browseMenu: 'تصفح قائمة الطعام',
-branches: 'الفروع',
-calInfo: 'احتياج الفرد يومياً 2000 إلى 2500 سعرة حرارية وتختلف حسب الأشخاص',
-designBy: 'تصميم',
-cartTitle: 'سلة الطلبات',
-notePh: '📝 توصية / ملاحظة',
-orderPickup: 'استلام من الفرع',
-pickupNote: 'طلبك يكون جاهزاً عند وصولك للفرع',
-total: 'الإجمالي',
-taxInc: '(شامل الضريبة)',
-orderWa: 'إتمام الطلب عبر واتساب',
-orderSent: '✅ تم إرسال طلبك بنجاح',
-emptyCart: '🛒 <br>سلتك فارغة.. <br>أضف أصنافك المفضلة!',
-emptyMsg: 'سلتك فارغة 🛒',
-noResults: 'لا توجد نتائج 🔍',
-currency: '﷼',
-cal: 'سعرة',
-zeroCal: '💧 صفر سعرات',
-from: 'من',
-prevSec: 'القسم السابق',
-nextSec: 'القسم التالي',
-sizes: ['صغير','وسط','كبير'],
-waGreeting: 'السلام عليكم مكرونجي 🍝',
-waOrderTitle: 'طلب جديد',
-waOrderType: 'نوع الطلب',
-waNote: 'ملاحظة',
-waThanks: '🍝 شكراً لاختياركم مكرونجي',
-installApp: 'تثبيت التطبيق',
-sheetTitle: 'تثبيت تطبيق مكرونجي',
-installed: 'تم تثبيت التطبيق بنجاح ✔',
-backToExit: '⚠️ اضغط مرة أخرى للخروج من التطبيق',
-/* ===== الوجبات المفضلة ===== */
-favFabLabel: 'وجباتي المفضلة',
-favTitle: 'وجباتي المفضلة ❤️',
-favPageNote: 'وجباتك المحفوظة بانتظارك 🍽️ اضغط «اطلبها الآن» وستُضاف كل أصناف الوجبة إلى سلتك فوراً — أعد طلبك بضغطة واحدة!',
-favSaveBtn: '💾 حفظ الوجبة كمفضلة',
-favChooseSlot: 'اختر اسم الوجبة:',
-favOverwrite: 'هذه الخانة تحتوي على وجبة محفوظة، هل تريد استبدالها؟',
-favOrderNow: '🛒 اطلبها الآن',
-favDelete: '🗑 حذف',
-favEmptySlot: 'خانة فارغة — احفظ وجبة من السلة',
-favSavedOk: '✔ تم حفظ الوجبة بنجاح',
-favDeleted: 'تم حذف الوجبة',
-favAddedToCart: '🛒 تمت إضافة الوجبة إلى سلتك',
-favCartEmpty: '⚠️ السلة فارغة، أضف أصنافاً أولاً',
-favCancel: 'إلغاء',
-favSlots: ['فطور 🌅','غداء ☀️','عشاء 🌙'],
-favReplaceTitle: 'استبدال الوجبة المحفوظة',
-favConfirmYes: 'نعم، استبدال',
-/* ===== الفروع ===== */
-branchNearestBtn: '🎯 حدّد الفرع الأقرب لموقعي',
-branchNearestBadge: '🎯 الأقرب لك',
-branchGeoOn: '🎯 تم ترتيب الفروع حسب زمن الوصول الحقيقي',
-branchGeoDenied: '⚠️ لم نتمكن من تحديد موقعك — اختر فرعك يدوياً',
-branchSelected: function(n){ return '🍝 تم تحويل طلبك إلى: ' + n; },
-chooseBtn: 'اختر ✓',
-currentBranchFlag: '✓ فرعك الحالي',
-changeBranch: 'تغيير الفرع',
-waBranch: 'الفرع',
-/* ===== شركاء التوصيل ===== */
-orWord: 'أو',
-deliveryHeadAr: 'اطلب الآن عبر شركائنا في التوصيل 🛵',
-deliveryHeadEn: 'Order now via our delivery partners 🛵',
-/* ===== اختيار الفرع والموقع ===== */
-branchReconfirm: function(n){ return '✓ تم تأكيد فرعك: ' + n; },
-geoLocating: 'جارٍ تحديد موقعك...',
-geoDeniedPerm: 'لم تمنح إذن الموقع — يمكنك الاختيار يدوياً',
-geoOff: 'لم نتمكن من تحديد موقعك — فعّل خدمة الموقع (GPS) من إعدادات الهاتف ثم أعد المحاولة',
-calcRoutes: '🚗 جارٍ حساب المسافات والزحمة...',
-trafficLight: '🟢 زحمة خفيفة',
-trafficMed: '🟠 زحمة متوسطة',
-trafficHeavy: '🔴 زحمة شديدة',
-kmUnit: 'كم',
-minUnit: 'دقيقة',
-closedWeek: 'مغلق هذا الأسبوع',
-/* ===== حالة العمل الديناميكية ===== */
-days: ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'],
-closesAt: function(h){ return 'يغلق عند الساعة ' + h; },
-opensAt: function(h){ return 'يفتح عند الساعة ' + h; },
-opensOn: function(d,h){ return 'يفتح يوم ' + d + ' عند الساعة ' + h; },
-/* ===== إشعار المغلق ===== */
-closedTitle: 'المطعم مغلق',
-closedText: 'نعتذر منك، المطعم حالياً لا يستقبل الطلبات، ولكن بإمكانك اكتشاف وعرض قائمة الطعام',
-closedBtn: 'عرض قائمة الطعام',
-closedNote: 'مغلق يرجى العودة لاحقاً',
-/* ===== التواصل ===== */
-followUs: 'تابعنا على',
-/* ===== التوفر والنفد ===== */
-soldOut: 'نفد ❌',
-notAvailableBranch: 'غير متوفر في هذا الفرع',
-reconciled: '⚠️ أصناف لم تعد متوفرة أُزيلت من طلبك',
-bestBadge: 'الأكثر مبيعًا',
-/* ===== التحديث الحي ===== */
-liveUpdated: 'تم تحديث القائمة',
-/* ===== صفحة التفاصيل والإضافات ===== */
-addToCart: 'إضافة للسلة',
-addedToCart: '🛒 تمت الإضافة إلى سلتك',
-detailOptional: 'اختياري',
-detailMax: function(n){ return 'يمكنك إضافة ' + n + ' خيارات'; },
-detailMaxOne: 'اختر خياراً واحداً',
-modsInvalid: '⚠️ بعض الإضافات لم تعد متوفرة — أُزيلت من طلبك',
-oftenWith: 'غالبًا ما يتم طلبه مع',
-oftenWithEn: 'Often ordered with',
-oftenWithSub: 'عادة ما يضيف الأشخاص هذه العناصر',
-oftenWithSubEn: 'People usually add these items',
-iosSteps:
-  '<div class="sheet-step"><span class="num">١</span><p>من أسفل شاشة سفاري اضغط زر <b>المشاركة</b> (مربع يخرج منه سهم لأعلى ⬆️).</p></div>' +
-  '<div class="sheet-step"><span class="num">٢</span><p>مرّر القائمة لأعلى واختر <b>«إضافة إلى الشاشة الرئيسية»</b> (أيقونة ＋).</p></div>' +
-  '<div class="sheet-step"><span class="num">٣</span><p>اضغط <b>«إضافة»</b> — وستظهر أيقونة مكرونجي على جوالك 🎉</p></div>',
-otherSteps:
-  '<div class="sheet-step"><span class="num">١</span><p>افتح قائمة المتصفح (⋮ أو ⋯) أعلى الشاشة.</p></div>' +
-  '<div class="sheet-step"><span class="num">٢</span><p>اختر <b>«تثبيت التطبيق»</b> أو <b>«إضافة إلى الشاشة الرئيسية»</b>.</p></div>' +
-  '<div class="sheet-step"><span class="num">٣</span><p>أكّد الإضافة — وستظهر أيقونة مكرونجي على جوالك 🎉</p></div>',
-/* ===== إضافات طبقة الترقية ===== */
-orderTypeTitle: 'حدد نوع الطلب',
-chooseOrderType: 'اضغط هنا لاختيار نوع الطلب',
-pickup: 'الاستلام',
-delivery: 'التوصيل',
-restaurantDelivery: 'توصيل المطعم',
-deliveryAppsHint: 'إتمام الطلب والدفع داخل التطبيق الشريك',
-deliveryFee: 'رسوم التوصيل',
-addressLabel: 'عنوان التوصيل',
-addressPh: 'الحي، الشارع، أقرب معلم...',
-addressRequired: '⚠️ يرجى كتابة عنوان التوصيل',
-subtotal: 'المجموع الفرعي',
-totalAmount: 'المبلغ الإجمالي',
-viewCart: 'عرض السلة',
-sideMenuTitle: 'القائمة',
-sideFav: 'وجباتي المفضلة',
-back: 'العودة',
-confirm: 'تأكيد',
-chooseBranchFirst: '⚠️ اختر فرعاً أولاً',
-pickupBranch: 'اختر فرع الاستلام'
-},
-en: {
-docTitle: 'Makaronjy | Irresistible Pasta',
-brandName: 'Makaronjy',
-brandTag: 'Pasta • Sides • Desserts',
-heroTitle: 'Makaronjy',
-searchPh: '🔍 Search for a dish...',
-clearSearch: '✕ Clear Search',
-results: function(n){ return (n===1) ? '1 result' : n + ' results'; },
-open: 'Open',
-closed: 'Closed',
-welcomeTitle: 'Welcome',
-welcomeMsg: 'Order the most delicious pasta dishes <b>and pick them up ready</b> from your nearest branch! 🍝',
-welcomeBtn: 'Order Now 🍝',
-loading: 'Preparing your dishes... 🍽️',
-loadDone: 'Loading complete ✔',
-skip: 'Skip to menu ⏭',
-featTitle: 'Best Sellers',
-browseMenu: 'Browse the Menu',
-branches: 'Branches',
-calInfo: 'An average adult needs 2,000 to 2,500 calories per day; needs vary by person',
-designBy: 'Design',
-cartTitle: 'Order Cart',
-notePh: '📝 Recommendation / Note',
-orderPickup: 'Branch pickup',
-pickupNote: 'Your order will be ready upon arrival',
-total: 'Total',
-taxInc: '(VAT included)',
-orderWa: 'Complete Order via WhatsApp',
-orderSent: '✅ Your order was sent successfully',
-emptyCart: '🛒 <br>Your cart is empty.. <br>Add your favorite items!',
-emptyMsg: 'Your cart is empty 🛒',
-noResults: 'No results 🔍',
-currency: 'SAR',
-cal: 'cal',
-zeroCal: '💧 Zero calories',
-from: 'From',
-prevSec: 'Previous Section',
-nextSec: 'Next Section',
-sizes: ['Small','Medium','Large'],
-waGreeting: 'Hello Makaronjy 🍝',
-waOrderTitle: 'New Order',
-waOrderType: 'Order Type',
-waNote: 'Notes',
-waThanks: '🍝 Thank you for choosing Makaronjy',
-installApp: 'Install App',
-sheetTitle: 'Install Makaronjy App',
-installed: 'App installed successfully ✔',
-backToExit: '⚠️ Press back again to exit',
-/* ===== Favorite Meals ===== */
-favFabLabel: 'My Favorite Meals',
-favTitle: 'My Favorite Meals ❤️',
-favPageNote: 'Your saved meals are ready 🍽️ Tap "Order Now" and all items will be added to your cart instantly — reorder in one tap!',
-favSaveBtn: '💾 Save Meal as Favorite',
-favChooseSlot: 'Choose a meal name:',
-favOverwrite: 'This slot already has a saved meal. Replace it?',
-favOrderNow: '🛒 Order Now',
-favDelete: '🗑 Delete',
-favEmptySlot: 'Empty slot — save a meal from the cart',
-favSavedOk: '✔ Meal saved successfully',
-favDeleted: 'Meal deleted',
-favAddedToCart: '🛒 Meal added to your cart',
-favCartEmpty: '⚠️ Cart is empty, add items first',
-favCancel: 'Cancel',
-favSlots: ['Breakfast 🌅','Lunch ☀️','Dinner 🌙'],
-favReplaceTitle: 'Replace Saved Meal',
-favConfirmYes: 'Yes, Replace',
-/* ===== Branches ===== */
-branchNearestBtn: '🎯 Find My Nearest Branch',
-branchNearestBadge: '🎯 Nearest to You',
-branchGeoOn: '🎯 Branches sorted by real travel time',
-branchGeoDenied: '⚠️ Could not get your location — choose manually',
-branchSelected: function(n){ return '🍝 Your order branch: ' + n; },
-chooseBtn: 'Choose ✓',
-currentBranchFlag: '✓ Your Branch',
-changeBranch: 'Change Branch',
-waBranch: 'Branch',
-/* ===== Delivery partners ===== */
-orWord: 'OR',
-deliveryHeadAr: 'Order now via our delivery partners 🛵',
-deliveryHeadEn: 'اطلب الآن عبر شركائنا في التوصيل 🛵',
-/* ===== Branch selection & location ===== */
-branchReconfirm: function(n){ return '✓ Your branch confirmed: ' + n; },
-geoLocating: 'Locating you...',
-geoDeniedPerm: 'Location permission denied — you can choose manually',
-geoOff: 'Could not locate you — enable location (GPS) in phone settings and retry',
-calcRoutes: '🚗 Calculating routes & traffic...',
-trafficLight: '🟢 light traffic',
-trafficMed: '🟠 moderate traffic',
-trafficHeavy: '🔴 heavy traffic',
-kmUnit: 'km',
-minUnit: 'min',
-closedWeek: 'Closed this week',
-/* ===== Dynamic open status ===== */
-days: ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],
-closesAt: function(h){ return 'Closes at ' + h; },
-opensAt: function(h){ return 'Opens at ' + h; },
-opensOn: function(d,h){ return 'Opens ' + d + ' at ' + h; },
-/* ===== Closed notice ===== */
-closedTitle: 'The Restaurant Closed',
-closedText: 'We are sorry, the restaurant is not accepting orders right now, but you can still explore and view the menu',
-closedBtn: 'View Menu',
-closedNote: 'Closed — please come back later',
-/* ===== Social ===== */
-followUs: 'Follow us on',
-/* ===== Availability & Sold-out ===== */
-soldOut: 'Sold out ❌',
-notAvailableBranch: 'Not available at this branch',
-reconciled: '⚠️ Unavailable items were removed from your order',
-bestBadge: 'Best Seller',
-/* ===== Live update ===== */
-liveUpdated: 'Menu updated',
-/* ===== Detail page & add-ons ===== */
-addToCart: 'Add to Cart',
-addedToCart: '🛒 Added to your cart',
-detailOptional: 'Optional',
-detailMax: function(n){ return 'You can add ' + n + ' choices'; },
-detailMaxOne: 'Choose one option',
-modsInvalid: '⚠️ Some add-ons are no longer available — removed from your order',
-oftenWith: 'Often ordered with',
-oftenWithEn: 'Often ordered with',
-oftenWithSub: 'People usually add these items',
-oftenWithSubEn: 'People usually add these items',
-iosSteps:
-  '<div class="sheet-step"><span class="num">1</span><p>In Safari, tap the <b>Share</b> button at the bottom (a square with an up arrow ⬆️).</p></div>' +
-  '<div class="sheet-step"><span class="num">2</span><p>Scroll up and choose <b>"Add to Home Screen"</b> (＋ icon).</p></div>' +
-  '<div class="sheet-step"><span class="num">3</span><p>Tap <b>"Add"</b> — the Makaronjy icon will appear on your home screen 🎉</p></div>',
-otherSteps:
-  '<div class="sheet-step"><span class="num">1</span><p>Open the browser menu (⋮ or ⋯) at the top.</p></div>' +
-  '<div class="sheet-step"><span class="num">2</span><p>Choose <b>"Install App"</b> or <b>"Add to Home Screen"</b>.</p></div>' +
-  '<div class="sheet-step"><span class="num">3</span><p>Confirm — the Makaronjy icon will appear on your home screen 🎉</p></div>',
-/* ===== Upgrade layer additions ===== */
-orderTypeTitle: 'Order type',
-chooseOrderType: 'Tap to choose order type',
-pickup: 'Pickup',
-delivery: 'Delivery',
-restaurantDelivery: 'Restaurant delivery',
-deliveryAppsHint: 'Checkout & payment inside the partner app',
-deliveryFee: 'Delivery fee',
-addressLabel: 'Delivery address',
-addressPh: 'District, street, nearest landmark...',
-addressRequired: '⚠️ Please enter delivery address',
-subtotal: 'Subtotal',
-totalAmount: 'Total amount',
-viewCart: 'View cart',
-sideMenuTitle: 'Menu',
-sideFav: 'My favorites',
-back: 'Back',
-confirm: 'Confirm',
-chooseBranchFirst: '⚠️ Choose a branch first',
-pickupBranch: 'Choose pickup branch'
-}
-};
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#5a1830">
+<link rel="manifest" href="manifest.json">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="مكرونجي">
+<link rel="apple-touch-icon" href="img/icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="img/icon-192.png">
+<meta name="application-name" content="مكرونجي">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="format-detection" content="telephone=no">
+<meta name="msapplication-tap-highlight" content="no">
+<title>مكرونجي | مكرونة بطعم لا يُقاوم</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&family=Aref+Ruqaa:wght@700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="style.css">
+<script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+
+<!-- ===== شاشة الترحيب ===== -->
+<div id="welcome">
+  <div class="w-card" id="wCard">
+    <button class="w-close" onclick="skipIntro()" aria-label="إغلاق">✕</button>
+    <img src="img/welcome.png" data-appimg="img/welcome.png" alt="مطاعم مكرونجي" decoding="async">
+    <h2 data-i18n="welcomeTitle">أهلاً وسهلاً بكم</h2>
+    <p data-i18n="welcomeMsg" data-i18n-html="1"></p>
+    <div class="w-actions">
+      <button class="w-btn-primary" onclick="skipIntro()" data-i18n="welcomeBtn">اطلب الآن 🍝</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== الهيدر ===== -->
+<header class="topbar">
+  <button class="menu-btn" id="menuBtn" onclick="openSideMenu()" aria-label="القائمة الجانبية">
+    <span class="mb-line"></span><span class="mb-line"></span><span class="mb-line"></span>
+  </button>
+  <div class="brand">
+    <div>
+      <b data-i18n="brandName">مكرونجي</b>
+      <small data-i18n="brandTag">باستا • مقبلات • حلويات</small>
+    </div>
+  </div>
+  <button class="lang-btn" id="langBtn" onclick="toggleLang()" aria-label="تبديل اللغة">
+    <span class="lang-seg" data-lang="ar">AR</span>
+    <span class="lang-seg" data-lang="en">EN</span>
+  </button>
+</header>
+
+<!-- ===== الكاروسيل ===== -->
+<section class="hero" id="hero">
+  <div class="banners" id="bannersBox" hidden>
+    <div class="banners-track" id="bannersTrack"></div>
+    <div class="banners-dots" id="bannersDots"></div>
+  </div>
+</section>
+
+<!-- ===== الصف الثابت + وضع البحث العصري ===== -->
+<div class="sticky-row" id="stickyRow">
+  <button class="ordertype-card" id="orderTypeCard" onclick="openOrderType()">
+    <span class="ot-texts">
+      <b class="ot-head" id="otHead">حدد نوع الطلب</b>
+      <small class="ot-sub" id="otSub">اضغط هنا لاختيار نوع الطلب</small>
+    </span>
+    <span class="ot-chev">⌄</span>
+  </button>
+  <button class="search-btn" id="searchBtn" onclick="toggleSearchMode()" aria-label="بحث">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+  </button>
+  <div class="sr-search" id="srSearch" hidden>
+    <div class="sr-input-row">
+      <input class="search sr-input" id="search" data-i18n-ph="searchPh" placeholder="🔍 ابحث عن صنف...">
+      <button class="sr-cancel" id="srCancel" onclick="closeSearchMode()" aria-label="إغلاق البحث">✕</button>
+    </div>
+    <div class="search-stats" id="searchStats">
+      <span id="statsCount">0 نتيجة</span>
+      <button class="clear-btn" onclick="clearSearch()" data-i18n="clearSearch">✕ مسح</button>
+    </div>
+  </div>
+</div>
+
+<nav class="cats" id="cats"></nav>
+<main id="menu"></main>
+
+<footer>
+  <div class="credit">
+    <span class="design-text" data-i18n="designBy">تصميم</span>
+    <a href="https://abdul3ziz95.com/" target="_blank" rel="noopener noreferrer">Abdul3ziz95</a>
+  </div>
+</footer>
+
+<!-- ===== الأكثر مبيعاً ===== -->
+<div id="featured">
+  <button class="f-close" onclick="closeFeatured()" aria-label="إغلاق">✕</button>
+  <div class="f-top">
+    <img src="img/logo.png" data-appimg="img/logo.png" alt="مكرونجي" class="f-logo" decoding="async">
+    <h2 class="f-title" data-i18n="featTitle">الأكثر مبيعاً</h2>
+  </div>
+  <div class="f-stage" id="featStage">
+    <button class="f-arrow f-right" onclick="manualNav(-1)" aria-label="السابق">❯</button>
+    <div class="f-img-box" id="featAnim">
+      <img id="featImg" src="" alt="" decoding="async">
+      <div class="f-caption"><b id="featCaption"></b></div>
+    </div>
+    <button class="f-arrow f-left" onclick="manualNav(1)" aria-label="التالي">❮</button>
+  </div>
+  <div class="f-dots" id="featDots"></div>
+  <button class="f-menu-btn" onclick="closeFeatured()" data-i18n="browseMenu">تصفح قائمة الطعام</button>
+</div>
+
+<!-- ===== sheet التثبيت ===== -->
+<div class="install-sheet" id="installSheet" onclick="if(event.target===this) closeSheet()">
+  <div class="sheet-card">
+    <div class="sheet-head">
+      <span class="sheet-ico">📲</span>
+      <b data-i18n="sheetTitle">تثبيت تطبيق مكرونجي</b>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <div class="sheet-steps" id="sheetBody"></div>
+  </div>
+</div>
+
+<!-- ===== درج السلة ===== -->
+<div id="overlay" onclick="closeCart()"></div>
+<aside id="drawer">
+  <div class="d-head">🛒 <span data-i18n="cartTitle">سلة الطلبات</span> <button onclick="closeCart()">✕</button></div>
+  <div class="d-items" id="dItems"></div>
+  <div class="d-foot">
+    <div class="closed-note" id="closedNote">🕐 <span id="closedNoteTxt">مغلق يرجى العودة لاحقاً</span></div>
+    <div class="pickup-note" id="pickupNoteRow">🛍️ <span data-i18n="pickupNote">طلبك يكون جاهزاً عند وصولك للفرع</span></div>
+    <div class="delivery-box" id="deliveryBox" hidden>
+      <label class="d-lbl" for="dAddress" data-i18n="addressLabel">عنوان التوصيل</label>
+      <input id="dAddress" class="d-address" data-i18n-ph="addressPh" placeholder="الحي، الشارع، أقرب معلم...">
+    </div>
+    <textarea id="cnotes" rows="2" data-i18n-ph="notePh" placeholder="📝 توصية / ملاحظة"></textarea>
+    <button class="save-fav-btn" id="saveFavBtn" data-i18n="favSaveBtn">💾 حفظ الوجبة كمفضلة</button>
+    <div class="total-row sub" id="subRow" hidden><span data-i18n="subtotal">المجموع الفرعي</span><span id="dSub">0 ريال</span></div>
+    <div class="total-row sub" id="feeRow" hidden><span data-i18n="deliveryFee">رسوم التوصيل</span><span id="dFee">10 ريال</span></div>
+    <div class="total-row">
+      <span><span data-i18n="total">الإجمالي</span> <small data-i18n="taxInc">(شامل الضريبة)</small></span>
+      <span id="dTotal">0 ريال</span>
+    </div>
+    <button class="checkout" onclick="checkout()">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.297-.15 1.255-.463 2.39-1.475.883-.788 1.48-1.761 1.653-2.059.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 2.479-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.223 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.86 11.86 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893.003-2.698-1.04-5.32-3.48-8.413z"/></svg>
+      <span data-i18n="orderWa">إتمام الطلب عبر واتساب</span>
+    </button>
+  </div>
+</aside>
+
+<!-- ===== زر التثبيت ===== -->
+<div class="fabs">
+  <button class="fab-install" id="installBtn" onclick="installApp()" aria-label="تثبيت التطبيق">
+    <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+  </button>
+</div>
+
+<!-- ===== عناصر مخفية تحمي دوال الكود ===== -->
+<div id="legacyHidden" hidden aria-hidden="true">
+  <button class="fab fab-cart" onclick="openCart()">
+    <span class="cart-icon-wrap" aria-hidden="true"></span>
+    <span class="cart-txt">طلبك</span>
+    <span class="cart-count" id="cartCount">0</span>
+  </button>
+  <button class="fav-fab" id="favFab" aria-label="وجباتي المفضلة">❤️<span id="favCount" class="fav-badge">0</span></button>
+  <span id="branchCurrent">🍝 —</span>
+  <span id="changeBranchLbl">تغيير الفرع</span>
+</div>
+
+<!-- ===== المفضلة ===== -->
+<div class="fav-sheet" id="favSheet" onclick="if(event.target===this) closeFavSheet()">
+  <div class="fav-sheet-card">
+    <button id="favClose" class="fav-close" onclick="closeFavSheet()">✕</button>
+    <h3 id="favTitleEl" data-i18n="favTitle">وجباتي المفضلة ❤️</h3>
+    <p id="favNoteEl" class="fav-note" data-i18n="favPageNote"></p>
+    <div id="favList" class="fav-list"></div>
+  </div>
+</div>
+
+<div class="slot-picker" id="slotPicker" onclick="if(event.target===this) closeSlotPicker()">
+  <div class="slot-picker-card">
+    <h4 id="slotPickerTitle" data-i18n="favChooseSlot">اختر اسم الوجبة:</h4>
+    <div class="slot-btns" id="slotBtns">
+      <button class="slot-btn" data-slot="0"></button>
+      <button class="slot-btn" data-slot="1"></button>
+      <button class="slot-btn" data-slot="2"></button>
+    </div>
+    <button class="slot-cancel" id="slotCancel" onclick="closeSlotPicker()">✕ <span data-i18n="favCancel">إلغاء</span></button>
+  </div>
+</div>
+
+<div class="confirm-modal" id="confirmModal" onclick="if(event.target===this) resolveConfirm(false)">
+  <div class="confirm-card">
+    <div class="confirm-ico">🔄</div>
+    <h4 id="confirmTitle">استبدال الوجبة المحفوظة</h4>
+    <p id="confirmMsg"></p>
+    <div class="confirm-actions">
+      <button class="confirm-yes" id="confirmYes" onclick="resolveConfirm(true)">نعم، استبدال</button>
+      <button class="confirm-no" id="confirmNo" onclick="resolveConfirm(false)">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<div class="ad-modal" id="adModal" onclick="if(event.target===this) closeAd()">
+  <div class="ad-card">
+    <button class="ad-close" onclick="closeAd()">✕</button>
+    <div class="ad-body">
+      <div class="ad-medal" id="adMedal">🍝</div>
+      <h4 class="ad-title" id="adTitle"></h4>
+      <p class="ad-text" id="adText"></p>
+      <button class="ad-btn" id="adBtn" onclick="closeAd()">حسناً 🍝</button>
+    </div>
+  </div>
+</div>
+
+<div class="closed-modal" id="closedModal" onclick="if(event.target===this) closeClosedNotice()">
+  <div class="closed-card">
+    <button class="closed-close" id="closedClose" aria-label="إغلاق">✕</button>
+    <img class="closed-img" src="img/closed.png" data-appimg="img/closed.png" alt="المطعم مغلق" decoding="async">
+    <h3 class="closed-title" id="closedTitle">المطعم مغلق</h3>
+    <p class="closed-text" id="closedText">نعتذر منك، المطعم حالياً لا يستقبل الطلبات</p>
+    <div class="closed-openat" id="closedOpenAt">🕐 يفتح عند الساعة ١ م</div>
+    <button class="closed-btn" id="closedBtn">عرض قائمة الطعام</button>
+  </div>
+</div>
+
+<!-- ===== القائمة الجانبية ===== -->
+<div id="sideMenuBack" class="sm-back" hidden onclick="closeSideMenu()"></div>
+<aside id="sideMenu" aria-hidden="true">
+  <div class="sm-head"><b data-i18n="sideMenuTitle">القائمة</b><button onclick="closeSideMenu()">✕</button></div>
+  <button class="sm-item" id="smFav" onclick="openFavsFromMenu()">❤️ <span data-i18n="sideFav">وجباتي المفضلة</span> <span class="sm-badge" id="smFavCount">0</span></button>
+  <div class="sm-social-title" id="smSocialTitle">تابعنا على</div>
+  <div class="sm-social" id="smSocial"></div>
+</aside>
+
+<!-- ===== صفحة تحديد نوع الطلب ===== -->
+<div id="orderTypePage" aria-hidden="true">
+  <header class="otp-head">
+    <button class="otp-back" onclick="closeOrderType()">‹ <span data-i18n="back">العودة</span></button>
+    <b data-i18n="orderTypeTitle">حدد نوع الطلب</b><span class="otp-spacer"></span>
+  </header>
+  <div class="otp-modes">
+    <button class="otp-mode" id="modeDelivery" onclick="setOrderMode('delivery')">🛵 <span data-i18n="delivery">التوصيل</span></button>
+    <button class="otp-mode active" id="modePickup" onclick="setOrderMode('pickup')">🛍️ <span data-i18n="pickup">الاستلام</span></button>
+  </div>
+  <div class="otp-apps-zone" id="otpAppsZone" hidden>
+    <b class="otp-zone-title" id="otpAppsTitle">اطلب الآن عبر شركائنا في التوصيل 🛵</b>
+    <small class="otp-apps-hint" id="otpAppsHint">إتمام الطلب والدفع داخل التطبيق الشريك</small>
+    <div class="otp-apps" id="otpApps"></div>
+  </div>
+  <div class="otp-branch-zone" id="otpBranchZone">
+    <b class="otp-zone-title" id="otpZoneTitle">اختر فرع الاستلام</b>
+    <button class="otp-nearest" id="otpNearest" onclick="pickNearestBranch()"><span class="ping"></span><span id="otpNearestLbl">🎯 حدّد الفرع الأقرب لموقعي</span></button>
+    <div id="otpMap" class="otp-map"></div>
+    <div class="otp-list" id="otpList"></div>
+  </div>
+  <button class="otp-confirm" id="otpConfirm" onclick="confirmOrderType()" data-i18n="confirm">تأكيد</button>
+</div>
+
+<!-- ===== شريط الإتمام السفلي ===== -->
+<div class="checkout-bar" id="checkoutBar" hidden>
+  <button class="cb-main" onclick="openCart()">
+    <span class="cb-icon">🛒<span class="cb-count" id="cbCount">0</span></span>
+    <span class="cb-total"><span data-i18n="totalAmount">المبلغ الإجمالي</span> <b id="cbTotal">0 ﷼</b></span>
+  </button>
+  <button class="cb-view" onclick="openCart()" data-i18n="viewCart">عرض السلة</button>
+</div>
+
+<div id="toast"><span id="toastMsg"></span></div>
+
+<script src="i18n.js"></script>
+<script src="menu.js"></script>
+<script src="settings.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
