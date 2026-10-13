@@ -546,5 +546,6 @@ window.APP_SETTINGS = {
     "mode": "list",
     "showDesc": true,
     "showCal": true
-  }
+  },
+  "deliveryFeeMode": "free"
 };
