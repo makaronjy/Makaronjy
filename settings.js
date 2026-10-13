@@ -478,9 +478,32 @@ window.APP_SETTINGS = {
       "num": 5
     }
   ],
-  "delivery": {
-    "fee": 5
-  },
+  "delivery": [
+    {
+      "id": "d-jahez",
+      "nameAr": "جاهز",
+      "nameEn": "Jahez",
+      "url": "https://jahez.go.link/avE5E",
+      "color": "#e30613",
+      "img": "img/d-jahez.png"
+    },
+    {
+      "id": "d-hungerstation",
+      "nameAr": "هنقرستيشن",
+      "nameEn": "HungerStation",
+      "url": "https://hungerstation.go.link/?c=SA&s=c&v=96730&so=mls&adj_t=1sdhhuza_1spi9ypp&adj_og_title=%D9%85%D9%83%D8%B1%D9%88%D9%86%D8%AC%D9%8A&adj_og_image=https://images.deliveryhero.io/image/hungerstation/restaurant/logo_ar/f72851cd66e6b14e1bceee9156ddf6b2.jpg",
+      "color": "#ffb700",
+      "img": "img/d-hungerstation.png"
+    },
+    {
+      "id": "d-keeta",
+      "nameAr": "كيتا",
+      "nameEn": "Keeta",
+      "url": "https://url.mykeeta.com/qXA45r7z",
+      "color": "#ffd400",
+      "img": "img/d-keeta.png"
+    }
+  ],
   "social": [
     {
       "id": "s-ig",
@@ -508,6 +531,7 @@ window.APP_SETTINGS = {
     "btnAr": "حسناً 🍝",
     "btnEn": "Got it 🍝"
   },
+  "deliveryFee": 10,
   "banners": [
     {
       "id": "bn-1791849065565",
@@ -522,6 +546,5 @@ window.APP_SETTINGS = {
     "mode": "list",
     "showDesc": true,
     "showCal": true
-  },
-  "deliveryFee": 10
+  }
 };
