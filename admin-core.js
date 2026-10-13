@@ -816,8 +816,7 @@ r.content ? r.content.sha : r.sha;
 }
 
 /* =====================================================
-   ===== v15: سلايدر الصفحة الرئيسية + رسوم التوصيل =====
-   (واجهة تُحقن داخل تبويب الإعلان — بدون تعديل admin.html)
+   ===== v15.4: السلايدر + أنظمة رسوم التوصيل =====
 ===================================================== */
 function migrateBanners(){
 var S0 = STATE.SETTINGS;
@@ -827,8 +826,21 @@ if(!b || typeof b !== `object`) return;
 if(!b.id) b.id = `bn-` + (i + 1);
 if(typeof b.v !== `number`) b.v = 0;
 });
+/* أنظمة الرسوم: مجاني / ثابت / لكل فرع */
+if(S0.deliveryFeeMode !== `free` &&
+   S0.deliveryFeeMode !== `fixed` &&
+   S0.deliveryFeeMode !== `perBranch`){
+S0.deliveryFeeMode = `fixed`;
+}
 if(typeof S0.deliveryFee !== `number`){
 S0.deliveryFee = 5;
+}
+if(S0.deliveryFeeMode === `perBranch`){
+branches().forEach(function(b){
+if(typeof b.deliveryFee !== `number`){
+b.deliveryFee = S0.deliveryFee;
+}
+});
 }
 }
 function v15Style(){
@@ -850,6 +862,11 @@ st.textContent =
 `.v15-add{border:none;border-radius:12px;padding:.7rem 1.2rem;background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--dark);font-weight:900;cursor:pointer;font-family:inherit}` +
 `.v15-pub{border:none;border-radius:12px;padding:.7rem 1.2rem;background:var(--wa);color:#fff;font-weight:900;cursor:pointer;font-family:inherit}` +
 `.v15-fee{width:110px;border:1.5px solid var(--line);border-radius:10px;padding:.55rem .6rem;font-family:inherit;font-weight:900;font-size:1rem;text-align:center}` +
+`.v15-sel{border:1.5px solid var(--line);border-radius:10px;padding:.55rem .6rem;font-family:inherit;font-weight:800;background:#fff;color:var(--ink)}` +
+`.v15-bfees{display:flex;flex-direction:column;gap:.5rem;margin-top:.7rem}` +
+`.v15-bfee-row{display:flex;align-items:center;gap:.6rem;background:#fff;border:1.5px solid var(--line);border-radius:10px;padding:.45rem .6rem}` +
+`.v15-bfee-row span{flex:1;font-weight:800;font-size:.85rem;color:var(--ink)}` +
+`.v15-bfee-row small{color:var(--muted);font-weight:700}` +
 `.v15-empty{color:var(--muted);font-weight:700;font-size:.8rem;padding:.6rem;border:1.5px dashed var(--line);border-radius:10px;text-align:center}`;
 document.head.appendChild(st);
 }
@@ -894,10 +911,16 @@ fee.id = `v15FeeCard`;
 fee.innerHTML =
 `<h3>🛵 رسوم توصيل المطعم / Restaurant Delivery Fee</h3>` +
 `<div class="v15-row">` +
+`<select class="v15-sel" id="v15FeeMode">` +
+`<option value="free">مجاني / Free</option>` +
+`<option value="fixed">ثابت لكل الفروع / Fixed</option>` +
+`<option value="perBranch">سعر لكل فرع / Per branch</option>` +
+`</select>` +
 `<input type="number" min="0" step="0.5" class="v15-fee" id="v15FeeInput">` +
-`<span>ريال / SAR</span>` +
+`<span id="v15FeeUnit">ريال / SAR</span>` +
 `<button class="v15-pub" id="feePublishBtn">🚀 نشر / Publish</button>` +
-`</div>`;
+`</div>` +
+`<div class="v15-bfees" id="v15BranchFees"></div>`;
 feeHost.insertBefore(fee, feeHost.firstChild);
 el(`bnAddBtn`).addEventListener(`click`, function(){
 el(`bnFile`).click();
@@ -926,10 +949,30 @@ toast(`فشل الرفع: ` + err.message, `error`);
 });
 el(`bnPublishBtn`).addEventListener(`click`, publishV15);
 el(`feePublishBtn`).addEventListener(`click`, publishV15);
+el(`v15FeeMode`).addEventListener(`change`, function(e){
+STATE.SETTINGS.deliveryFeeMode = e.target.value;
+if(e.target.value === `perBranch`){
+branches().forEach(function(b){
+if(typeof b.deliveryFee !== `number`){
+b.deliveryFee = STATE.SETTINGS.deliveryFee || 0;
+}
+});
+}
+renderFeeAdmin();
+});
 el(`v15FeeInput`).addEventListener(`change`, function(e){
 var v = parseFloat(e.target.value);
 STATE.SETTINGS.deliveryFee =
-(isFinite(v) && v >= 0) ? v : 5;
+(isFinite(v) && v >= 0) ? v : 0;
+});
+el(`v15BranchFees`).addEventListener(`change`, function(e){
+var id = e.target.getAttribute ?
+e.target.getAttribute(`data-bfee`) : null;
+if(!id) return;
+var b = branches().find(function(x){ return x.id === id; });
+if(!b) return;
+var v = parseFloat(e.target.value);
+b.deliveryFee = (isFinite(v) && v >= 0) ? v : 0;
 });
 el(`bnAdminList`).addEventListener(`click`,
 async function(e){
@@ -969,13 +1012,10 @@ function renderBannersAdmin(){
 var box = el(`bnAdminList`);
 if(!box || !STATE) return;
 var list = STATE.SETTINGS.banners || [];
-var fi = el(`v15FeeInput`);
-if(fi) fi.value = STATE.SETTINGS.deliveryFee;
 if(!list.length){
 box.innerHTML =
 `<div class="v15-empty">لا توجد بانرات — أضف أول بانر ليظهر السلايدر بالتطبيق / No banners yet</div>`;
-return;
-}
+}else{
 box.innerHTML = list.map(function(b, i){
 return `<div class="bn-adm">` +
 `<div class="img-prev"><img src="` +
@@ -986,6 +1026,39 @@ esc(b.img) + (b.v ? `?v=` + b.v : ``) + `"></div>` +
 `<button class="bn-del" data-bndel="` + i + `">🗑</button>` +
 `</div></div>`;
 }).join(``);
+}
+renderFeeAdmin();
+}
+function renderFeeAdmin(){
+if(!STATE) return;
+var S0 = STATE.SETTINGS;
+var sel = el(`v15FeeMode`);
+var inp = el(`v15FeeInput`);
+var unit = el(`v15FeeUnit`);
+var wrap = el(`v15BranchFees`);
+if(!sel || !inp) return;
+sel.value = S0.deliveryFeeMode || `fixed`;
+inp.value = S0.deliveryFee;
+var isFree = (S0.deliveryFeeMode === `free`);
+inp.style.display = isFree ? `none` : ``;
+if(unit) unit.style.display = isFree ? `none` : ``;
+if(wrap){
+if(S0.deliveryFeeMode === `perBranch`){
+wrap.style.display = ``;
+wrap.innerHTML = branches().map(function(b){
+var val = (typeof b.deliveryFee === `number`)
+? b.deliveryFee : (S0.deliveryFee || 0);
+return `<div class="v15-bfee-row"><span>` +
+esc(brName(b)) + `</span>` +
+`<input type="number" min="0" step="0.5" class="v15-fee" ` +
+`data-bfee="` + esc(b.id) + `" value="` + val + `">` +
+`<small>ريال</small></div>`;
+}).join(``);
+}else{
+wrap.style.display = `none`;
+wrap.innerHTML = ``;
+}
+}
 }
 async function uploadBannerImg(path, file){
 var cur = await getFile(path).catch(function(){
