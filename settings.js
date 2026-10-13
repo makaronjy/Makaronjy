@@ -32,7 +32,7 @@ window.APP_SETTINGS = {
       "wa": "966561296463",
       "lat": 24.591045,
       "lng": 46.647204,
-      "map": "https://maps.app.goo.gl/sb9yK3bfk7aLApMaA",
+      "map": "https://maps.app.goo.gl/qwS3kpF2JUeHBCrH6",
       "hours": [
         {
           "o": {
@@ -111,7 +111,8 @@ window.APP_SETTINGS = {
           },
           "closed": false
         }
-      ]
+      ],
+      "deliveryFee": 10
     },
     {
       "id": "b-malqa",
@@ -123,7 +124,7 @@ window.APP_SETTINGS = {
       "wa": "966568183145",
       "lat": 24.801454,
       "lng": 46.597488,
-      "map": "https://maps.app.goo.gl/7pmyuR4prVnyGke77",
+      "map": "https://maps.app.goo.gl/VjqWsGHn3xZgWoGu9",
       "hours": [
         {
           "o": {
@@ -202,7 +203,8 @@ window.APP_SETTINGS = {
           },
           "closed": false
         }
-      ]
+      ],
+      "deliveryFee": 10
     },
     {
       "id": "b-yasmeen",
@@ -214,7 +216,7 @@ window.APP_SETTINGS = {
       "wa": "966561203593",
       "lat": 24.817399,
       "lng": 46.656308,
-      "map": "https://maps.app.goo.gl/WxasXA9oWLbSTCjq8",
+      "map": "https://maps.app.goo.gl/59Rpm3zbqfFzstev8?g_st=ac",
       "hours": [
         {
           "o": {
@@ -293,7 +295,8 @@ window.APP_SETTINGS = {
           },
           "closed": false
         }
-      ]
+      ],
+      "deliveryFee": 10
     },
     {
       "id": "b-suwaidi",
@@ -305,7 +308,7 @@ window.APP_SETTINGS = {
       "wa": "966544030086",
       "lat": 24.572364,
       "lng": 46.621672,
-      "map": "https://maps.app.goo.gl/r7APZu7AgQz8Wk1d9",
+      "map": "https://maps.app.goo.gl/tCieuNxohr4kyVrK7",
       "hours": [
         {
           "o": {
@@ -384,7 +387,8 @@ window.APP_SETTINGS = {
           },
           "closed": false
         }
-      ]
+      ],
+      "deliveryFee": 10
     },
     {
       "nameAr": "فرع الروابي",
@@ -394,7 +398,7 @@ window.APP_SETTINGS = {
       "wa": "966567326558",
       "lat": 24.694382,
       "lng": 46.790105,
-      "map": "https://maps.app.goo.gl/sb9yK3bfk7aLApMaA",
+      "map": "https://maps.app.goo.gl/AxGgzM4JUFSfciyu7?g_st=ac",
       "hours": [
         {
           "o": {
@@ -475,7 +479,8 @@ window.APP_SETTINGS = {
         }
       ],
       "id": "b-1791819751585",
-      "num": 5
+      "num": 5,
+      "deliveryFee": 10
     }
   ],
   "delivery": [
