@@ -536,7 +536,7 @@ window.APP_SETTINGS = {
     "btnAr": "حسناً 🍝",
     "btnEn": "Got it 🍝"
   },
-  "deliveryFee": 10,
+  "deliveryFee": 5,
   "banners": [
     {
       "id": "bn-1791849065565",
@@ -552,5 +552,5 @@ window.APP_SETTINGS = {
     "showDesc": true,
     "showCal": true
   },
-  "deliveryFeeMode": "free"
+  "deliveryFeeMode": "fixed"
 };
