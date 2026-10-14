@@ -552,5 +552,5 @@ window.APP_SETTINGS = {
     "showDesc": true,
     "showCal": true
   },
-  "deliveryFeeMode": "fixed"
+  "deliveryFeeMode": "free"
 };
