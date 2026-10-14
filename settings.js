@@ -69,7 +69,7 @@ window.APP_SETTINGS = {
         },
         {
           "o": {
-            "h": 13,
+            "h": 11,
             "m": 0
           },
           "c": {
