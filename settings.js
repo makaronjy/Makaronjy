@@ -539,13 +539,6 @@ window.APP_SETTINGS = {
   "deliveryFee": 5,
   "banners": [
     {
-      "id": "bn-1791849065565",
-      "img": "img/banners/bn-1791849061081.png",
-      "v": 1791849065565,
-      "titleAr": "",
-      "titleEn": ""
-    },
-    {
       "id": "bn-1791979657418",
       "img": "img/banners/bn-1791979651125.png",
       "v": 1791979657418,
