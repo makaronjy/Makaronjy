@@ -26,7 +26,7 @@ let CFG = null;
 let STATE = null;
 let modalOnSave = null;
 let ALANG =
-localStorage.getItem(`mk_admin_lang`) || `ar`;
+(localStorage.getItem(`mk_admin_lang`) === `en`) ? `en` : `ar`;
 /* ===== أدوات عامة ===== */
 const el = function(id){
 return document.getElementById(id);
@@ -149,7 +149,7 @@ function toast(title, kind, sub){
 kind = kind || `info`;
 var wrap = el(`toasts`);
 var icons = {
-success:`✔`, error:`✖`, info:`ℹ`, warn:`⚠`
+success:`✔`, error:`✖`, info:`ℹ`, warn:``
 };
 var div = document.createElement(`div`);
 div.className = `toast ` + kind;
@@ -336,10 +336,10 @@ if(status === 403){
 if(msg.includes(`rate limit`)){
 return { key:`errGeneric`, detail:`Rate limit` };
 }
-return { key:`errPermission`, detail: e.message };
+return { key:`errPermission`, detail:`e.message` };
 }
 if(status === 404){
-return { key:`errNotFound`, detail: e.message };
+return { key:`errNotFound`, detail:`e.message` };
 }
 return {
 key:`errGeneric`,
@@ -814,7 +814,6 @@ menuText(), STATE.shas.menu, msg);
 STATE.shas.menu =
 r.content ? r.content.sha : r.sha;
 }
-
 /* =====================================================
    ===== v15.4: السلايدر + أنظمة رسوم التوصيل =====
 ===================================================== */
@@ -862,7 +861,7 @@ st.textContent =
 `.v15-add{border:none;border-radius:12px;padding:.7rem 1.2rem;background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--dark);font-weight:900;cursor:pointer;font-family:inherit}` +
 `.v15-pub{border:none;border-radius:12px;padding:.7rem 1.2rem;background:var(--wa);color:#fff;font-weight:900;cursor:pointer;font-family:inherit}` +
 `.v15-fee{width:110px;border:1.5px solid var(--line);border-radius:10px;padding:.55rem .6rem;font-family:inherit;font-weight:900;font-size:1rem;text-align:center}` +
-`.v15-sel{border:1.5px solid var(--line);border-radius:10px;padding:.55rem .6rem;font-family:inherit;font-weight:800;background:#fff;color:var(--ink)}` +
+`.v15-sel{width:110px;border:1.5px solid var(--line);border-radius:10px;padding:.55rem .6rem;font-family:inherit;font-weight:800;background:#fff;color:var(--ink)}` +
 `.v15-bfees{display:flex;flex-direction:column;gap:.5rem;margin-top:.7rem}` +
 `.v15-bfee-row{display:flex;align-items:center;gap:.6rem;background:#fff;border:1.5px solid var(--line);border-radius:10px;padding:.45rem .6rem}` +
 `.v15-bfee-row span{flex:1;font-weight:800;font-size:.85rem;color:var(--ink)}` +
@@ -1008,6 +1007,19 @@ toast(`✔ تم الحذف — اضغط نشر`, `success`);
 }
 });
 }
+function retryAdminBn(im){
+if(!im || im.dataset.retrying) return;
+var n = (+im.dataset.retry || 0) + 1;
+if(n > 6) return;
+im.dataset.retry = n;
+im.dataset.retrying = `1`;
+var s = im.getAttribute(`src`);
+setTimeout(function(){
+delete im.dataset.retrying;
+im.removeAttribute(`src`);
+im.src = s + (s.indexOf(`?`) >= 0 ? `&` : `?`) + `rr=` + Date.now();
+}, 5000);
+}
 function renderBannersAdmin(){
 var box = el(`bnAdminList`);
 if(!box || !STATE) return;
@@ -1016,10 +1028,12 @@ if(!list.length){
 box.innerHTML =
 `<div class="v15-empty">لا توجد بانرات — أضف أول بانر ليظهر السلايدر بالتطبيق / No banners yet</div>`;
 }else{
+var bnAdmStamp = Date.now();
 box.innerHTML = list.map(function(b, i){
+var bq = (b.v ? `?v=` + b.v : ``) + (b.v ? `&r=` : `?r=`) + bnAdmStamp;
 return `<div class="bn-adm">` +
 `<div class="img-prev"><img src="` +
-esc(b.img) + (b.v ? `?v=` + b.v : ``) + `"></div>` +
+esc(b.img) + bq + `" onerror="retryAdminBn(this)"></div>` +
 `<div class="bn-adm-act">` +
 `<button class="bn-up" data-bnup="` + i + `">↑</button>` +
 `<button class="bn-dn" data-bndn="` + i + `">↓</button>` +
