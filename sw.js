@@ -1,9 +1,9 @@
 /* =====================================================
    Service Worker — مكرونجي (sw.js)
-   الإصدار v12 — طبقة الترقية v15 + كاش Leaflet/OpenStreetMap
+   الإصدار v13 — طبقة الترقية v15 + كاش Leaflet/OpenStreetMap
 ===================================================== */
 
-const CACHE = 'makaronjy-v12';
+const CACHE = 'makaronjy-v13';
 
 /* ===== الملفات الأساسية للتخزين المسبق ===== */
 const CORE = [
