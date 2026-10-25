@@ -1,6 +1,6 @@
 /* =====================================================
 مكرونجي — سكربت التطبيق الرئيسي (app.js)
-v15.5: طبقة الترقية الخامسة — إصلاحات شاملة
+v15.5: رجوع سلس لكل النوافذ + استعادة موضع التمرير
 ===================================================== */
 /* ===== استعادة لقطة محلية عند فشل تحميل الملفات ===== */
 (function(){
@@ -27,15 +27,48 @@ function pushGuard(){
   if(guardOn) return;
   try{ history.pushState({rb:1}, ''); guardOn = true; }catch(e){}
 }
-/* ===== Stack للـ overlays مع حفظ scrollY ===== */
+/* ===== Stack للنوافذ: حالة تاريخ + موضع تمرير لكل نافذة ===== */
 let overlayStack = [];
+const LOCK_TYPES = ['detail','featured','sidemenu','fav','slot','welcome'];
+function restoreScroll(y){
+  setTimeout(()=>{ window.scrollTo({top:y, behavior:'instant'}); }, 30);
+}
 function pushOverlay(type){
   const scrollY = window.scrollY || window.pageYOffset || 0;
   overlayStack.push({ type, scrollY });
+  try{ history.pushState({rb:1, ov:type}, ''); guardOn = true; }catch(e){}
 }
-function popOverlay(){
-  if(!overlayStack.length) return null;
-  return overlayStack.pop();
+function dropOverlay(type){
+  for(let i=overlayStack.length-1;i>=0;i--){
+    if(overlayStack[i].type===type){
+      return overlayStack.splice(i,1)[0];
+    }
+  }
+  return null;
+}
+function settleOverlay(type){
+  const en = dropOverlay(type);
+  if(en && LOCK_TYPES.indexOf(type) >= 0) restoreScroll(en.scrollY);
+  return en;
+}
+function closeByType(t){
+  if(t==='detail') closeDetail();
+  else if(t==='cart') closeCart();
+  else if(t==='sidemenu') closeSideMenu();
+  else if(t==='fav') closeFavSheet();
+  else if(t==='slot') closeSlotPicker();
+  else if(t==='otp') closeOrderType();
+  else if(t==='search') closeSearchMode();
+  else if(t==='toast') hideActionToast();
+  else if(t==='featured') closeFeatured();
+  else if(t==='ad') closeAd();
+  else if(t==='closed') closeClosedNotice();
+  else if(t==='sheet') closeSheet();
+  else if(t==='welcome'){
+    introFinished = true;
+    el('welcome').classList.remove('show');
+    document.body.style.overflow='';
+  }
 }
 pushGuard();
 document.addEventListener('DOMContentLoaded', pushGuard);
@@ -195,7 +228,7 @@ function modPriceFor(it, ref){
   const rit = findMenuItem(ref);
   return rit ? rit.prices[0] : 0;
 }
-/* ===== تحديث موضعي لبطاقة إضافة واحدة (بدون إعادة بناء الكروسيل) ===== */
+/* ===== تحديث موضعي لبطاقة إضافة واحدة (بدون وميض) ===== */
 function updateAddOnCard(ref){
   const box = el('dtMods');
   if(!box || !dtState) return;
@@ -317,10 +350,10 @@ function installApp(){
   } else {
     fillSheet();
     installSheet.classList.add('show');
-    pushGuard();
+    pushOverlay('sheet');
   }
 }
-function closeSheet(){ installSheet.classList.remove('show'); }
+function closeSheet(){ installSheet.classList.remove('show'); settleOverlay('sheet'); }
 /* ===== أيقونات التواصل ===== */
 const SOC_SVG = {
   instagram:'<svg viewBox="0 0 24 24"><path d="M7.8 2h8.4C19.4 2 22 4.6 22 7.8v8.4a5.8 5.8 0 0 1-5.8 5.8H7.8C4.6 22 2 19.4 2 16.2V7.8A5.8 5.8 0 0 1 7.8 2m-.2 2A3.6 3.6 0 0 0 4 7.6v8.8C4 18.4 5.6 20 7.6 20h8.8a3.6 3.6 0 0 0 3.6-3.6V7.6C20 5.6 18.4 4 16.4 4m.9 2.8a1.2 1.2 0 1 1 0 2.4 1.2 1.2 0 0 1 0-2.4M12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10m0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6"/></svg>',
@@ -328,7 +361,7 @@ const SOC_SVG = {
   email:'<svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>',
   facebook:'<svg viewBox="0 0 24 24"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>',
   x:'<svg viewBox="0 0 24 24"><path d="M18.9 1.15h3.68l-8.04 9.19L24 22.85h-7.41l-5.8-7.58-6.64 7.58H.47l8.6-9.83L0 1.15h7.59l5.24 6.93 6.07-6.93zm-1.29 19.5h2.04L6.49 3.24H4.3l13.31 17.41z"/></svg>',
-  youtube:'<svg viewBox="0 0 24 24"><path d="M10 15l5.19-3L10 9v6m11.56-7.83c.13.47.22 1.1.28 1.9.07.8.1 1.49.1 2.13L22 12c0 2.19-.16 3.8-.44 4.83-.25.9-.83 1.48-1.73 1.73-.47.13-1.33.22-2.65.28-1.3.07-2.49.1-3.59.1L12 19c-4.19 0-6.8-.16-7.83-.44-.9-.25-1.48-.83-1.73-1.73-.13-.47-.22-1.1-.28-1.9-.07-.8-.1-1.49-.1-2.13L2 12c0-2.19.16-3.8.44-4.83.25-.9 1.48-1.73 1.73-1.73.47-.13 1.33-.22 2.65-.28 1.3-.07 2.49-.1 3.59-.1L12 5c4.19 0 6.8.16 7.83.44.9.25 1.48.83 1.73 1.73z"/></svg>',
+  youtube:'<svg viewBox="0 0 24 24"><path d="M10 15l5.19-3L10 9v6m11.56-7.83c.13.47.22 1.1.28 1.9.07.8.1 1.49.1 2.13L22 12c0 2.19-.16 3.8-.44 4.83-.25.9-.83 1.48-1.73 1.73-.47.13-1.33.22-2.65.28-1.3.07-2.49.1-3.59.1L12 19c-4.19 0-6.8-.16-7.83-.44-.9-.25-1.48-.83-1.73-1.73-.13-.47-.22-1.1-.28-1.9-.07-.8-.1-1.49-.1-2.13L2 12c0-2.19.16-3.8.44-4.83.25-.9.83-1.48 1.73-1.73.47-.13 1.33-.22 2.65-.28 1.3-.07 2.49-.1 3.59-.1L12 5c4.19 0 6.8.16 7.83.44.9.25 1.48.83 1.73 1.73z"/></svg>',
   whatsapp:'<svg viewBox="0 0 24 24"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2m.01 1.67c2.2 0 4.26.86 5.82 2.42a8.2 8.2 0 0 1 2.41 5.83c0 4.54-3.7 8.23-8.24 8.23-1.48 0-2.93-.39-4.19-1.15l-.3-.17-3.12.82.83-3.04-.2-.31a8.26 8.26 0 0 1-1.26-4.38c0-4.54 3.7-8.23 8.25-8.23M8.53 7.33c-.16 0-.43.06-.66.31-.22.25-.87.85-.87 2.07 0 1.22.89 2.39 1 2.56.14.17 1.76 2.67 4.25 3.73 2.08.89 2.5.71 2.95.66.45-.04 1.45-.59 1.65-1.16.21-.57.21-1.05.15-1.16-.06-.1-.23-.16-.48-.27-.25-.14-1.47-.73-1.69-.81-.23-.08-.38-.12-.55.12-.16.25-.64.81-.78.97-.15.17-.29.19-.53.06-.25-.12-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72-.12-.24-.01-.37.11-.5.11-.11.27-.29.37-.44.13-.14.17-.25.25-.41.08-.17.04-.31-.02-.43-.06-.11-.56-1.35-.77-1.84-.2-.48-.4-.42-.55-.43-.14 0-.3-.01-.46-.01z"/></svg>',
   custom:'<svg viewBox="0 0 24 24"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>'
 };
@@ -528,9 +561,9 @@ function showClosedNotice(){
   openAtEl.style.display = line ? '' : 'none';
   el('closedBtn').textContent = tt('closedBtn','عرض قائمة الطعام','View Menu');
   el('closedModal').classList.add('show');
-  pushGuard();
+  pushOverlay('closed');
 }
-function closeClosedNotice(){ el('closedModal').classList.remove('show'); }
+function closeClosedNotice(){ el('closedModal').classList.remove('show'); settleOverlay('closed'); }
 el('closedBtn').addEventListener('click', ()=>{
   closeClosedNotice();
   const m = el('menu');
@@ -552,9 +585,9 @@ function showAdOnce(){
   el('adText').textContent = ar ? ad.textAr : ad.textEn;
   el('adBtn').textContent = ar ? (ad.btnAr || 'حسناً 🍝') : (ad.btnEn || 'Got it 🍝');
   el('adModal').classList.add('show');
-  pushGuard();
+  pushOverlay('ad');
 }
-function closeAd(){ el('adModal').classList.remove('show'); }
+function closeAd(){ el('adModal').classList.remove('show'); settleOverlay('ad'); }
 /* ===== الأكثر مبيعاً ===== */
 let featIndex = 0, featAuto = true, featToken = 0, autoTimeout = null;
 const featImg = el('featImg');
@@ -604,7 +637,7 @@ function stopFeatAuto(){ clearTimeout(autoTimeout); autoTimeout = null; }
 function startFeatAuto(){ stopFeatAuto(); scheduleAuto(); }
 function manualNav(d){ featAuto=false; stopFeatAuto(); showFeat(featIndex+d, d<0?'prev':'next', false); }
 function openFeatured(){
-  pushGuard();
+  pushOverlay('featured');
   renderFeatDots();
   el('featured').classList.add('show');
   document.body.style.overflow='hidden';
@@ -616,6 +649,7 @@ function openFeatured(){
 function closeFeatured(){
   el('featured').classList.remove('show');
   document.body.style.overflow='';
+  settleOverlay('featured');
   stopFeatAuto();
   showAdOnce();
 }
@@ -649,7 +683,7 @@ if(firstVisit){
   setTimeout(()=>{
     el('welcome').classList.add('show');
     document.body.style.overflow='hidden';
-    pushGuard();
+    pushOverlay('welcome');
   }, 250);
   const assets = ['img/logo.png','img/welcome.png','img/bg.png',
     ...bestItems().map(it=> itemImgUrl(it)).filter(Boolean)];
@@ -679,6 +713,7 @@ function finishIntro(){
   setTimeout(()=>{
     el('welcome').classList.remove('show');
     document.body.style.overflow='';
+    settleOverlay('welcome');
     setTimeout(afterWelcome, 400);
   }, wait);
 }
@@ -687,6 +722,7 @@ function skipIntro(){
   introFinished = true;
   el('welcome').classList.remove('show');
   document.body.style.overflow='';
+  settleOverlay('welcome');
   afterWelcome();
 }
 el('welcome').addEventListener('click', e=>{ if(e.target.id==='welcome') skipIntro(); });
@@ -943,17 +979,13 @@ function openDetail(si, ii){
   renderDetailBar();
   el('detail').classList.add('show');
   document.body.style.overflow = 'hidden';
-  pushGuard();
 }
 function closeDetail(){
   if(!detailShown()) return;
   el('detail').classList.remove('show');
   document.body.style.overflow = '';
   dtState = null;
-  const overlay = popOverlay();
-  if(overlay && overlay.type === 'detail' && typeof overlay.scrollY === 'number'){
-    setTimeout(()=>{ window.scrollTo({top: overlay.scrollY, behavior:'instant'}); }, 30);
-  }
+  settleOverlay('detail');
 }
 /* ===== لوحة المفاتيح والرجوع ===== */
 document.addEventListener('keydown', e=>{
@@ -972,16 +1004,16 @@ document.addEventListener('keydown', e=>{
 });
 let lastBackPress = 0;
 window.addEventListener('popstate', ()=>{
-  guardOn = false;
-  /* إذا التفاصيل مفتوحة: أغلقها فقط بنفس سلوك زر X (بدون goHome) */
-  if(detailShown() && overlayStack.length){
-    const last = overlayStack[overlayStack.length-1];
-    if(last && last.type === 'detail'){
-      closeDetail();
-      pushGuard();
-      return;
-    }
+  /* أغلق آخر نافذة مفتوحة فقط + استعادة موضع التمرير */
+  if(overlayStack.length){
+    const entry = overlayStack.pop();
+    guardOn = false;
+    closeByType(entry.type);
+    if(LOCK_TYPES.indexOf(entry.type) >= 0) restoreScroll(entry.scrollY);
+    if(overlayStack.length) pushGuard();
+    return;
   }
+  guardOn = false;
   const anyOverlay = welcomeShown() || sheetShown() || drawerShown() || featuredShown() || adShown() || gateShown() || closedShown() || detailShown() || actionToastShown() || el('favSheet').classList.contains('show') || el('slotPicker').classList.contains('show') || confirmShown();
   if(anyOverlay){
     goHome();
@@ -1206,7 +1238,14 @@ function showSection(si, scroll=false){
   document.querySelectorAll('.chip').forEach((c,i)=> c.classList.toggle('active', i===si));
   if(scroll){
     const target = document.getElementById('sec-'+si);
-    if(target) requestAnimationFrame(()=>{ target.scrollIntoView({behavior:'smooth', block:'start'}); });
+    if(target) requestAnimationFrame(()=>{
+      const tb = document.querySelector('.topbar');
+      const sr = el('stickyRow');
+      const ct = el('cats');
+      const off = (tb?tb.offsetHeight:56)+(sr?sr.offsetHeight:66)+(ct?ct.offsetHeight:48)+10;
+      const y = target.getBoundingClientRect().top + window.scrollY - off;
+      window.scrollTo({top:y, behavior:'smooth'});
+    });
   }
 }
 showSection(0);
@@ -1397,7 +1436,7 @@ function renderFavSheet(){
   el('favList').innerHTML = html;
 }
 function openFavSheet(){
-  pushGuard();
+  pushOverlay('fav');
   renderFavSheet();
   el('favSheet').classList.add('show');
   document.body.style.overflow = 'hidden';
@@ -1405,6 +1444,7 @@ function openFavSheet(){
 function closeFavSheet(){
   el('favSheet').classList.remove('show');
   document.body.style.overflow = '';
+  settleOverlay('fav');
 }
 function openSlotPicker(){
   if(!cart.size){ toast(tt('favCartEmpty','⚠️ السلة فارغة، أضف أصنافاً أولاً','⚠️ Cart is empty, add items first')); return; }
@@ -1413,9 +1453,10 @@ function openSlotPicker(){
   document.querySelectorAll('#slotBtns .slot-btn').forEach((b, i) => {
     b.innerHTML = slots[i] + (favs[i] ? `<small>✔ ${currentLang==='ar'?'موجودة':'Saved'}</small>` : '');
   });
+  pushOverlay('slot');
   el('slotPicker').classList.add('show');
 }
-function closeSlotPicker(){ el('slotPicker').classList.remove('show'); }
+function closeSlotPicker(){ el('slotPicker').classList.remove('show'); settleOverlay('slot'); }
 async function saveFavToSlot(i){
   const favs = getFavs();
   if(favs[i]){
@@ -1584,7 +1625,7 @@ function showActionToast(msg, yesLbl, noLbl, onYes){
   el('atNo').textContent = noLbl;
   atOnYes = onYes || null;
   d.classList.add('show');
-  pushGuard();
+  pushOverlay('toast');
   clearTimeout(atTimer);
   atTimer = setTimeout(()=> hideActionToast(), 9000);
 }
@@ -1594,6 +1635,7 @@ function hideActionToast(){
   d.classList.remove('show');
   atOnYes = null;
   clearTimeout(atTimer);
+  settleOverlay('toast');
 }
 
 /* ===== نوع الطلب والتوصيل ===== */
@@ -1616,7 +1658,7 @@ window.addEventListener('resize', refreshStickyMetrics);
 /* ===== الكاروسيل ===== */
 let bnIndex = 0, bnTimer = null, bnTouchX = null;
 function bannersList(){ return Array.isArray(S().banners) ? S().banners.filter(b=> b && b.img && b.hidden !== true) : []; }
-/* ===== إعادة محاولة تحميل صورة بانر فشلت (حتى يكتمل نشر GitHub) ===== */
+/* ===== إعادة محاولة تحميل صورة بانر فشلت ===== */
 function retryBannerImg(im){
   if(!im || im.dataset.retrying) return;
   const n = (+im.dataset.retry || 0) + 1;
@@ -1687,7 +1729,7 @@ function stopBanners(){ if(bnTimer){ clearInterval(bnTimer); bnTimer = null; } }
 /* ===== القائمة الجانبية ===== */
 function smShown(){ return document.body.classList.contains('sm-open'); }
 function openSideMenu(){
-  pushGuard();
+  pushOverlay('sidemenu');
   document.body.classList.add('sm-open');
   el('sideMenuBack').hidden = false;
   el('sideMenu').setAttribute('aria-hidden','false');
@@ -1697,6 +1739,7 @@ function closeSideMenu(){
   document.body.classList.remove('sm-open');
   el('sideMenuBack').hidden = true;
   el('sideMenu').setAttribute('aria-hidden','true');
+  settleOverlay('sidemenu');
 }
 function openFavsFromMenu(){
   closeSideMenu();
@@ -1713,7 +1756,7 @@ function toggleSearchMode(){
   if(searchModeOn()){ closeSearchMode(); return; }
   el('stickyRow').classList.add('searching');
   el('srSearch').hidden = false;
-  pushGuard();
+  pushOverlay('search');
   setTimeout(()=>{ const s = el('search'); if(s) s.focus(); }, 80);
   refreshStickyMetrics();
 }
@@ -1722,6 +1765,7 @@ function closeSearchMode(){
   el('stickyRow').classList.remove('searching');
   el('srSearch').hidden = true;
   if(isSearching) clearSearch();
+  settleOverlay('search');
   refreshStickyMetrics();
 }
 
@@ -1730,7 +1774,7 @@ let nearestId = null;
 let otpMap = null, otpMarkers = {};
 function otpShown(){ return el('orderTypePage').classList.contains('show'); }
 function openOrderType(){
-  pushGuard();
+  pushOverlay('otp');
   renderOtpList();
   refreshOtpTexts();
   initOtpMap();
@@ -1739,6 +1783,7 @@ function openOrderType(){
 }
 function closeOrderType(){
   el('orderTypePage').classList.remove('show');
+  settleOverlay('otp');
   syncBarVisibility();
 }
 function setOrderMode(m){
@@ -2052,7 +2097,7 @@ function updateCart(){
 
 /* ===== السلة فتح/إغلاق ===== */
 function openCart(){
-  pushGuard();
+  pushOverlay('cart');
   el('drawer').classList.add('show');
   el('overlay').classList.add('show');
   el('checkoutBar').classList.add('hide-scroll');
@@ -2060,6 +2105,7 @@ function openCart(){
 function closeCart(){
   el('drawer').classList.remove('show');
   el('overlay').classList.remove('show');
+  settleOverlay('cart');
   syncBarVisibility();
 }
 
@@ -2213,6 +2259,7 @@ function goHome(){
   if(el('favSheet').classList.contains('show')) closeFavSheet();
   if(el('slotPicker').classList.contains('show')) closeSlotPicker();
   if(confirmShown()) resolveConfirm(false);
+  overlayStack.length = 0;
 }
 
 /* ===== الإقلاع ===== */
