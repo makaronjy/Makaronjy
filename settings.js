@@ -551,6 +551,13 @@ window.APP_SETTINGS = {
       "v": 1791995655463,
       "titleAr": "",
       "titleEn": ""
+    },
+    {
+      "id": "bn-1792969035670",
+      "img": "img/banners/bn-1792969030965.png",
+      "v": 1792969035670,
+      "titleAr": "",
+      "titleEn": ""
     }
   ],
   "imagesVersion": 0,
