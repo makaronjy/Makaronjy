@@ -615,7 +615,7 @@ var dn = e.target.closest(`.mv_down`);
 var ref = up ? up.dataset.ref : (dn ? dn.dataset.ref : null);
 if(!ref) return;
 var i1 = modsRefsArr.indexOf(ref);
-var i2 = up ? i1 - 1 : i2 + 1;
+var i2 = up ? i1 - 1 : i1 + 1;
 if(i1 < 0 || i2 < 0 || i2 >= modsRefsArr.length) return;
 modsRefsArr[i1] = modsRefsArr[i2];
 modsRefsArr[i2] = ref;
@@ -922,7 +922,7 @@ el(`dispCal`).checked = d.showCal !== false;
 el(`saveDisplay`).addEventListener(`click`,
 async function(){
 STATE.SETTINGS.display = {
-mode: el(`dispList`).checked,
+mode: el(`dispList`).checked ? `list` : `grid`,
 showDesc: el(`dispDesc`).checked,
 showCal: el(`dispCal`).checked
 };
@@ -1196,7 +1196,7 @@ var s = (x && x.key===k) ? ` selected` : ``;
 var nm = (ALANG===`ar`)
 ? SOCIAL_PLATFORMS[k].ar
 : SOCIAL_PLATFORMS[k].en;
-return `<option value="` + k + `">` +
+return `<option value="` + k + `"` + s + `>` +
 esc(nm) + `</option>`;
 }).join(``);
 var custSel = (x && x.key===`custom`) ? ` selected` : ``;
@@ -1479,7 +1479,7 @@ exportedAt: new Date().toISOString(),
 MENU: STATE.MENU,
 SETTINGS: STATE.SETTINGS
 };
-var blob = new Blob([JSON.stringify(data, null, 2),
+var blob = new Blob([JSON.stringify(data, null, 2)],
 {type:`application/json`});
 var a = document.createElement(`a`);
 a.href = URL.createObjectURL(blob);
