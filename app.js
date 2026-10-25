@@ -1,7 +1,6 @@
 /* =====================================================
 مكرونجي — سكربت التطبيق الرئيسي (app.js)
-v15.4: أنظمة رسوم التوصيل الثلاثة + تنبيه الفرع غير الأقرب
-       + زرّا الاتصال والتوجه + حذف حقل العنوان
+v15.5: طبقة الترقية الخامسة — إصلاحات شاملة
 ===================================================== */
 /* ===== استعادة لقطة محلية عند فشل تحميل الملفات ===== */
 (function(){
@@ -27,6 +26,16 @@ if('serviceWorker' in navigator){
 function pushGuard(){
   if(guardOn) return;
   try{ history.pushState({rb:1}, ''); guardOn = true; }catch(e){}
+}
+/* ===== Stack للـ overlays مع حفظ scrollY ===== */
+let overlayStack = [];
+function pushOverlay(type){
+  const scrollY = window.scrollY || window.pageYOffset || 0;
+  overlayStack.push({ type, scrollY });
+}
+function popOverlay(){
+  if(!overlayStack.length) return null;
+  return overlayStack.pop();
 }
 pushGuard();
 document.addEventListener('DOMContentLoaded', pushGuard);
@@ -185,6 +194,21 @@ function modsSubEn(){ return tt('oftenWithSubEn','People usually add these items
 function modPriceFor(it, ref){
   const rit = findMenuItem(ref);
   return rit ? rit.prices[0] : 0;
+}
+/* ===== تحديث موضعي لبطاقة إضافة واحدة (بدون إعادة بناء الكروسيل) ===== */
+function updateAddOnCard(ref){
+  const box = el('dtMods');
+  if(!box || !dtState) return;
+  const card = box.querySelector('.dt-ocard[data-ref="'+ref+'"]');
+  if(!card) return;
+  const ctrl = card.querySelector('.dt-octrl');
+  if(!ctrl) return;
+  const q = dtState.sel[ref] || 0;
+  if(q > 0){
+    ctrl.innerHTML = '<span class="dt-mini"><button class="dec" data-mact="dec" data-ref="'+ref+'">−</button><span>'+q+'</span><button data-mact="inc" data-ref="'+ref+'">+</button></span>';
+  } else {
+    ctrl.innerHTML = '<button class="dt-pick" data-mact="inc" data-ref="'+ref+'">+</button>';
+  }
 }
 /* ===== مفاتيح السلة ===== */
 function cartKey(id, sizeIdx){ return id+'|'+sizeIdx; }
@@ -825,7 +849,7 @@ function ensureDetailSheet(){
         if(dtState.sel[ref] <= 0) delete dtState.sel[ref];
       }
     }
-    renderDetailMods();
+    updateAddOnCard(ref);
     renderDetailBar();
   });
   return d;
@@ -862,7 +886,7 @@ function renderDetailMods(){
     const ctrl = q > 0
       ? `<span class="dt-mini"><button class="dec" data-mact="dec" data-ref="${ref}">−</button><span>${q}</span><button data-mact="inc" data-ref="${ref}">+</button></span>`
       : `<button class="dt-pick" data-mact="inc" data-ref="${ref}">+</button>`;
-    return `<div class="dt-ocard">
+    return `<div class="dt-ocard" data-ref="${ref}">
       <div class="dt-oimg"><img src="${thumb}" alt="${itemName(rit)}" loading="lazy"></div>
       <b>${itemName(rit)}</b>
       <span class="dt-oprice">+${rit.prices[0]} ${T().currency}</span>
@@ -879,6 +903,7 @@ function renderDetailMods(){
 }
 function openDetail(si, ii){
   ensureDetailSheet();
+  pushOverlay('detail');
   const it = MENU[si].items[ii];
   let sizeIdx = -1;
   let qty = 0;
@@ -925,6 +950,10 @@ function closeDetail(){
   el('detail').classList.remove('show');
   document.body.style.overflow = '';
   dtState = null;
+  const overlay = popOverlay();
+  if(overlay && overlay.type === 'detail' && typeof overlay.scrollY === 'number'){
+    setTimeout(()=>{ window.scrollTo({top: overlay.scrollY, behavior:'instant'}); }, 30);
+  }
 }
 /* ===== لوحة المفاتيح والرجوع ===== */
 document.addEventListener('keydown', e=>{
@@ -944,6 +973,15 @@ document.addEventListener('keydown', e=>{
 let lastBackPress = 0;
 window.addEventListener('popstate', ()=>{
   guardOn = false;
+  /* إذا التفاصيل مفتوحة: أغلقها فقط بنفس سلوك زر X (بدون goHome) */
+  if(detailShown() && overlayStack.length){
+    const last = overlayStack[overlayStack.length-1];
+    if(last && last.type === 'detail'){
+      closeDetail();
+      pushGuard();
+      return;
+    }
+  }
   const anyOverlay = welcomeShown() || sheetShown() || drawerShown() || featuredShown() || adShown() || gateShown() || closedShown() || detailShown() || actionToastShown() || el('favSheet').classList.contains('show') || el('slotPicker').classList.contains('show') || confirmShown();
   if(anyOverlay){
     goHome();
@@ -992,7 +1030,7 @@ function buildMenu(){
     cats.appendChild(chip);
     const s = document.createElement('section');
     s.className='section'; s.id='sec-'+si;
-    s.innerHTML = `<h3 class="ribbon">${sec.i} ${secTitle}</h3><div class="${DO.mode==='list'?'listwrap':'grid'}"></div>`;
+    s.innerHTML = `<h3 class="ribbon"><span class="rib-ico">${sec.i}</span> ${secTitle}</h3><div class="${DO.mode==='list'?'listwrap':'grid'}"></div>`;
     const g = s.querySelector('.listwrap, .grid');
     sec.items.forEach((it,ii)=>{
       const view = views[ii];
@@ -1578,6 +1616,20 @@ window.addEventListener('resize', refreshStickyMetrics);
 /* ===== الكاروسيل ===== */
 let bnIndex = 0, bnTimer = null, bnTouchX = null;
 function bannersList(){ return Array.isArray(S().banners) ? S().banners.filter(b=> b && b.img && b.hidden !== true) : []; }
+/* ===== إعادة محاولة تحميل صورة بانر فشلت (حتى يكتمل نشر GitHub) ===== */
+function retryBannerImg(im){
+  if(!im || im.dataset.retrying) return;
+  const n = (+im.dataset.retry || 0) + 1;
+  if(n > 6) return;
+  im.dataset.retry = n;
+  im.dataset.retrying = '1';
+  const s = im.getAttribute('src');
+  setTimeout(()=>{
+    delete im.dataset.retrying;
+    im.removeAttribute('src');
+    im.src = s;
+  }, 5000);
+}
 function renderBanners(){
   const box = el('bannersBox'), track = el('bannersTrack'), dots = el('bannersDots');
   if(!box || !track) return;
@@ -1588,7 +1640,7 @@ function renderBanners(){
   const ar = currentLang==='ar';
   track.innerHTML = list.map(b=>{
     const cap = ar ? (b.titleAr||'') : (b.titleEn||b.titleAr||'');
-    return `<div class="bn-slide"><img src="${b.img}${b.v ? '?v='+b.v : ''}" alt="${socEsc(cap||'')}" loading="lazy">${cap ? `<div class="bn-cap">${socEsc(cap)}</div>` : ''}</div>`;
+    return `<div class="bn-slide"><img src="${b.img}${b.v ? '?v='+b.v : ''}" alt="${socEsc(cap||'')}" loading="lazy" onerror="retryBannerImg(this)">${cap ? `<div class="bn-cap">${socEsc(cap)}</div>` : ''}</div>`;
   }).join('');
   if(dots){
     dots.innerHTML = list.map((_,i)=> `<i data-bn="${i}" class="${i===0?'on':''}"></i>`).join('');
@@ -2190,5 +2242,29 @@ function goHome(){
         if(t) localStorage.setItem('mk_snap_' + (f === 'menu.js' ? 'menu' : 'settings'), t);
       }).catch(function(){});
     });
+    /* ===== prefetch كل الصور لتخزينها في الـSW (عمل دون إنترنت) ===== */
+    (function prefetchAllImages(){
+      const urls = [];
+      MENU.forEach(sec=>{
+        sec.items.forEach(it=>{
+          const u = itemImgUrl(it);
+          if(u && urls.indexOf(u) < 0) urls.push(u);
+        });
+      });
+      bannersList().forEach(b=>{
+        if(b.img){
+          const u = b.img + (b.v ? '?v='+b.v : '');
+          if(urls.indexOf(u) < 0) urls.push(u);
+        }
+      });
+      const delivery = (S() && S().delivery) || [];
+      delivery.forEach(d=>{
+        if(d.img && urls.indexOf(d.img) < 0) urls.push(d.img);
+      });
+      ['img/logo.png','img/bg.png','img/welcome.png','img/closed.png','img/icon-192.png'].forEach(u=>{
+        if(urls.indexOf(u) < 0) urls.push(u);
+      });
+      urls.forEach(u=>{ fetch(u).catch(()=>{}); });
+    })();
   }
 })();
