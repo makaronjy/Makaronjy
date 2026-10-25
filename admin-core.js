@@ -149,7 +149,7 @@ function toast(title, kind, sub){
 kind = kind || `info`;
 var wrap = el(`toasts`);
 var icons = {
-success:`✔`, error:`✖`, info:`ℹ`, warn:``
+success:`✔`, error:`✖`, info:`ℹ`, warn:`⚠`
 };
 var div = document.createElement(`div`);
 div.className = `toast ` + kind;
@@ -336,10 +336,10 @@ if(status === 403){
 if(msg.includes(`rate limit`)){
 return { key:`errGeneric`, detail:`Rate limit` };
 }
-return { key:`errPermission`, detail:`e.message` };
+return { key:`errPermission`, detail: e.message };
 }
 if(status === 404){
-return { key:`errNotFound`, detail:`e.message` };
+return { key:`errNotFound`, detail: e.message };
 }
 return {
 key:`errGeneric`,
@@ -802,17 +802,42 @@ function settingsText(){
 return `window.APP_SETTINGS = ` +
 JSON.stringify(STATE.SETTINGS, null, 2) + `;\n`;
 }
+/* ===== نشر ذاتي الشفاء: بصمة حديثة قبل كل رفع + إعادة محاولة عند التعارض ===== */
 async function publishSettings(msg){
+try{
+var cur = await getFile(`settings.js`);
+STATE.shas.settings = cur.sha;
 var r = await putFile(`settings.js`,
 settingsText(), STATE.shas.settings, msg);
 STATE.shas.settings =
 r.content ? r.content.sha : r.sha;
+}catch(e){
+if(e.http !== 409 && e.http !== 412) throw e;
+var cur2 = await getFile(`settings.js`);
+STATE.shas.settings = cur2.sha;
+var r2 = await putFile(`settings.js`,
+settingsText(), STATE.shas.settings, msg);
+STATE.shas.settings =
+r2.content ? r2.content.sha : r2.sha;
+}
 }
 async function publishMenu(msg){
+try{
+var cur = await getFile(`menu.js`);
+STATE.shas.menu = cur.sha;
 var r = await putFile(`menu.js`,
 menuText(), STATE.shas.menu, msg);
 STATE.shas.menu =
 r.content ? r.content.sha : r.sha;
+}catch(e){
+if(e.http !== 409 && e.http !== 412) throw e;
+var cur2 = await getFile(`menu.js`);
+STATE.shas.menu = cur2.sha;
+var r2 = await putFile(`menu.js`,
+menuText(), STATE.shas.menu, msg);
+STATE.shas.menu =
+r2.content ? r2.content.sha : r2.sha;
+}
 }
 /* =====================================================
    ===== v15.4: السلايدر + أنظمة رسوم التوصيل =====
