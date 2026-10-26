@@ -1,6 +1,6 @@
 /* =====================================================
 مكرونجي — سكربت التطبيق الرئيسي (app.js)
-v15.6: أكورديون تطبيقات التوصيل + نصوص الطلب المباشر
+v15.7: أكورديون تطبيقات التوصيل — طي ذكي بدون إطار
 ===================================================== */
 /* ===== استعادة لقطة محلية عند فشل تحميل الملفات ===== */
 (function(){
@@ -442,7 +442,35 @@ function openDeliveryApp(event, idx){
   }, 1500);
   return false;
 }
-/* ===== أكورديون تطبيقات التوصيل: زر واحد يطوي/يفتح لوحة الشركاء ===== */
+/* ===== أكورديون تطبيقات التوصيل: زر واحد + طي ذكي (خارج المنطقة / مغادرة الصفحة / 5 ثوانٍ) ===== */
+let appsAutoTimer = null;
+function appsZoneOpen(){
+  const z = el('otpAppsZone');
+  return !!z && z.classList.contains('apps-open');
+}
+function clearAppsAutoTimer(){
+  if(appsAutoTimer){ clearTimeout(appsAutoTimer); appsAutoTimer = null; }
+}
+function collapseAppsPanel(){
+  const z = el('otpAppsZone');
+  if(!z) return;
+  z.classList.remove('apps-open');
+  const b = el('otpAppsToggle');
+  if(b) b.setAttribute('aria-expanded','false');
+  clearAppsAutoTimer();
+}
+function armAppsAutoTimer(){
+  clearAppsAutoTimer();
+  appsAutoTimer = setTimeout(collapseAppsPanel, 5000);
+}
+function expandAppsPanel(){
+  const z = el('otpAppsZone');
+  if(!z) return;
+  z.classList.add('apps-open');
+  const b = el('otpAppsToggle');
+  if(b) b.setAttribute('aria-expanded','true');
+  armAppsAutoTimer();
+}
 function ensureAppsAccordion(){
   const zone = el('otpAppsZone');
   if(!zone || el('otpAppsToggle')) return;
@@ -464,9 +492,18 @@ function ensureAppsAccordion(){
   zone.appendChild(btn);
   zone.appendChild(panel);
   btn.addEventListener('click', ()=>{
-    const open = zone.classList.toggle('apps-open');
-    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if(appsZoneOpen()) collapseAppsPanel(); else expandAppsPanel();
   });
+  /* أي لمسة داخل المنطقة المفتوحة تعيد مؤقّت الـ5 ثوانٍ من الصفر */
+  zone.addEventListener('pointerdown', ()=>{
+    if(appsZoneOpen()) armAppsAutoTimer();
+  }, {passive:true});
+  /* الضغط خارج المنطقة المفتوحة يطويها، واللمسة الخارجية تؤدي وظيفتها العادية */
+  document.addEventListener('click', (e)=>{
+    if(!appsZoneOpen()) return;
+    if(zone.contains(e.target)) return;
+    collapseAppsPanel();
+  }, true);
 }
 ensureAppsAccordion();
 /* ===== اللغة ===== */
@@ -1802,6 +1839,7 @@ let otpMap = null, otpMarkers = {};
 function otpShown(){ return el('orderTypePage').classList.contains('show'); }
 function openOrderType(){
   pushOverlay('otp');
+  collapseAppsPanel();
   renderOtpList();
   refreshOtpTexts();
   initOtpMap();
@@ -1811,6 +1849,7 @@ function openOrderType(){
 function closeOrderType(){
   el('orderTypePage').classList.remove('show');
   settleOverlay('otp');
+  collapseAppsPanel();
   syncBarVisibility();
 }
 function setOrderMode(m){
@@ -1818,6 +1857,7 @@ function setOrderMode(m){
   el('modePickup').classList.toggle('active', m==='pickup');
   el('modeDelivery').classList.toggle('active', m==='delivery');
   el('otpAppsZone').hidden = (m !== 'delivery');
+  collapseAppsPanel();
   refreshOtpTexts();
   renderOtpList();
   refreshOrderCard();
