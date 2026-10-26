@@ -560,12 +560,14 @@ body.sm-open{ overflow:hidden; }
 .otp-mode.active{ background:var(--gold); color:var(--dark); box-shadow:0 6px 16px -6px rgba(224,145,47,.7); }
 .otp-apps-zone{ flex:0 0 auto; padding:6px 16px 10px; }
 #otpApps .gd-tiles{ margin-top:.5rem; }
-/* ===== v15.6: أكورديون زر تطبيقات التوصيل ===== */
+/* ===== v15.6→v15.7: أكورديون زر تطبيقات التوصيل — مغلق بطاقة، مفتوح بلا إطار ===== */
 .otp-apps-toggle{ width:100%; border:1.5px solid var(--line); cursor:pointer; border-radius:16px; background:var(--card);
   display:flex; align-items:center; gap:10px; padding:12px 14px; font-family:inherit; text-align:start;
-  box-shadow:0 3px 10px -4px rgba(60,16,32,.15); transition:transform .15s, border-color .2s; }
+  box-shadow:0 3px 10px -4px rgba(60,16,32,.15);
+  transition:transform .15s, border-color .25s, background .25s, box-shadow .25s, padding .25s; }
 .otp-apps-toggle:active{ transform:scale(.985); }
-.otp-apps-zone.apps-open .otp-apps-toggle{ border-color:var(--gold); }
+/* عند الفتح: يختفي الإطار والخلفية تماماً — المحتوى على الصفحة مباشرة */
+.otp-apps-zone.apps-open .otp-apps-toggle{ border-color:transparent; background:transparent; box-shadow:none; padding:6px 2px; }
 .oat-txt{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
 .oat-main{ color:var(--brown); font-weight:900; font-size:.95rem; }
 .oat-sub{ color:var(--muted); font-size:.72rem; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
