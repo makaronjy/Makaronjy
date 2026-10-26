@@ -1,6 +1,6 @@
 /* =====================================================
 مكرونجي — سكربت التطبيق الرئيسي (app.js)
-v15.7: أكورديون تطبيقات التوصيل — طي ذكي بدون إطار
+v15.8: سطر واحد للعنوان + تأكيد عند اختيار الفرع + فقاعة فوق الدبوس
 ===================================================== */
 /* ===== استعادة لقطة محلية عند فشل تحميل الملفات ===== */
 (function(){
@@ -916,7 +916,7 @@ function ensureDetailSheet(){
     if(dtState.qty > 0){
       cart.set(cartKey(it.id, dtState.sizeIdx),
         {id:it.id, sizeIdx:dtState.sizeIdx, qty:dtState.qty});
-    }
+    });
     modsRefs(it).forEach(ref=>{
       const q = dtState.sel[ref] || 0;
       const k = cartKey(ref, -1);
@@ -1876,25 +1876,30 @@ function refreshOtpTexts(){
   const z = el('otpZoneTitle');
   if(z){
     if(m==='delivery'){
+      /* v15.8: سطر واحد مدمج: دعوة للطلب المباشر + قيمة التوصيل */
       const mode = deliveryFeeMode();
-      let pillCls = '', pillTxt;
+      let feePart;
       if(mode==='free'){
-        pillCls = ' ok';
-        pillTxt = tt('freeDeliveryPill','🎉 التوصيل مجاني','🎉 Free delivery');
+        feePart = tt('freeDeliveryPill','التوصيل مجاني 🎉','free delivery 🎉');
       } else if(mode==='perBranch'){
-        pillTxt = tt('feePerBranchPill','🛵 رسوم التوصيل حسب الفرع','🛵 Delivery fee per branch');
+        feePart = tt('feePerBranchPill','الرسوم حسب الفرع','fee per branch');
       } else {
-        pillTxt = tt('feeFixedPill','🛵 رسوم التوصيل: ','🛵 Delivery fee: ') + feeLabel(deliveryFeeFor(null));
+        feePart = tt('feeFixedPill','التوصيل ','delivery ') + feeLabel(deliveryFeeFor(null));
       }
-      z.innerHTML = '<span class="ozt-main">' +
-        tt('directOrderTitle','اطلب من المطعم مباشرة — اختر فرعك واطلب فوراً 🍝','Order direct from us — pick your branch & order now 🍝') +
-        '</span><span class="ozt-pill' + pillCls + '">' + pillTxt + '</span>';
+      z.textContent = tt('directOrderTitle','🍝 اطلب مباشرة — ','🍝 Order direct — ') + feePart;
     } else {
       z.textContent = tt('pickupBranch','اختر فرع الاستلام','Choose pickup branch');
     }
   }
   const nl = el('otpNearestLbl'); if(nl) nl.textContent = tt('branchNearestBtn','🎯 حدّد الفرع الأقرب لموقعي','🎯 Find My Nearest Branch');
   const cf = el('otpConfirm'); if(cf) cf.textContent = tt('confirm','تأكيد','Confirm');
+  syncOtpConfirm();
+}
+/* ===== v15.8: زر تأكيد اختيار الفرع يظهر فقط عند وجود فرع ===== */
+function syncOtpConfirm(){
+  const cf = el('otpConfirm');
+  if(!cf) return;
+  cf.classList.toggle('show', !!currentBranch());
 }
 /* v15.4: بطاقة الفرع + شريحة الرسوم + زرّا الاتصال والتوجه */
 function renderOtpList(){
@@ -1953,6 +1958,7 @@ function applyBranchSelect(id){
   refreshOrderCard();
   updateCart();
   updateStatus();
+  syncOtpConfirm();
   if(b) toast(tFn('branchSelected', branchName(b), n=>'🍝 تم تحويل طلبك إلى: '+n, n=>'🍝 Your order branch: '+n));
 }
 function requestBranchSelect(id){
@@ -2048,7 +2054,8 @@ function initOtpMap(){
     const pts = [];
     branches().forEach(b=>{
       if(typeof b.lat !== 'number' || typeof b.lng !== 'number') return;
-      const icon = L.divIcon({ className:'', html:'<div class="mk-pin"></div>', iconSize:[34,34], iconAnchor:[17,34] });
+      /* v15.8: popupAnchor يرفع فقاعة الاسم فوق الدبوس بدل تغطيته */
+      const icon = L.divIcon({ className:'', html:'<div class="mk-pin"></div>', iconSize:[34,34], iconAnchor:[17,34], popupAnchor:[0,-38] });
       const mk = L.marker([b.lat, b.lng], { icon }).addTo(otpMap);
       mk.bindPopup(branchName(b));
       otpMarkers[b.id] = mk;
@@ -2062,7 +2069,7 @@ function markOtpMe(la, lo){
   if(!otpMap || !window.L) return;
   try{
     if(otpMap._meMark) otpMap.removeLayer(otpMap._meMark);
-    const icon = L.divIcon({ className:'', html:'<div class="mk-pin me"></div>', iconSize:[34,34], iconAnchor:[17,34] });
+    const icon = L.divIcon({ className:'', html:'<div class="mk-pin me"></div>', iconSize:[34,34], iconAnchor:[17,34], popupAnchor:[0,-38] });
     otpMap._meMark = L.marker([la, lo], { icon }).addTo(otpMap);
     otpMap.setView([la, lo], 12);
   }catch(e){}
