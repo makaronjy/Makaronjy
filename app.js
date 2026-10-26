@@ -317,7 +317,7 @@ const installSheet = el('installSheet');
 const sheetBody = el('sheetBody');
 const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 function runningAsApp(){
-  return window.matchMedia('(display-mode: standalone').matches ||
+  return window.matchMedia('(display-mode: standalone)').matches ||
          window.matchMedia('(display-mode: fullscreen)').matches ||
          window.navigator.standalone === true;
 }
@@ -916,7 +916,7 @@ function ensureDetailSheet(){
     if(dtState.qty > 0){
       cart.set(cartKey(it.id, dtState.sizeIdx),
         {id:it.id, sizeIdx:dtState.sizeIdx, qty:dtState.qty});
-    });
+    }
     modsRefs(it).forEach(ref=>{
       const q = dtState.sel[ref] || 0;
       const k = cartKey(ref, -1);
@@ -1068,7 +1068,6 @@ document.addEventListener('keydown', e=>{
 });
 let lastBackPress = 0;
 window.addEventListener('popstate', ()=>{
-  /* أغلق آخر نافذة مفتوحة فقط + استعادة موضع التمرير */
   if(overlayStack.length){
     const entry = overlayStack.pop();
     guardOn = false;
@@ -1876,7 +1875,6 @@ function refreshOtpTexts(){
   const z = el('otpZoneTitle');
   if(z){
     if(m==='delivery'){
-      /* v15.8: سطر واحد مدمج: دعوة للطلب المباشر + قيمة التوصيل */
       const mode = deliveryFeeMode();
       let feePart;
       if(mode==='free'){
@@ -2054,7 +2052,6 @@ function initOtpMap(){
     const pts = [];
     branches().forEach(b=>{
       if(typeof b.lat !== 'number' || typeof b.lng !== 'number') return;
-      /* v15.8: popupAnchor يرفع فقاعة الاسم فوق الدبوس بدل تغطيته */
       const icon = L.divIcon({ className:'', html:'<div class="mk-pin"></div>', iconSize:[34,34], iconAnchor:[17,34], popupAnchor:[0,-38] });
       const mk = L.marker([b.lat, b.lng], { icon }).addTo(otpMap);
       mk.bindPopup(branchName(b));
@@ -2154,7 +2151,7 @@ function updateCart(){
   if(subRow){ subRow.hidden = !(m==='delivery' && cart.size); el('dSub').textContent = total+' '+TT.currency; }
   if(feeRow){ feeRow.hidden = !(m==='delivery' && cart.size); el('dFee').textContent = feeLabel(fee); }
   const dBox = el('deliveryBox');
-  if(dBox) dBox.hidden = true;   /* v15.4: حقل العنوان محذوف نهائياً */
+  if(dBox) dBox.hidden = true;
   const pNote = el('pickupNoteRow');
   if(pNote) pNote.style.display = (m==='delivery') ? 'none' : '';
   const saveBtn = el('saveFavBtn');
@@ -2375,7 +2372,6 @@ function goHome(){
         if(t) localStorage.setItem('mk_snap_' + (f === 'menu.js' ? 'menu' : 'settings'), t);
       }).catch(function(){});
     });
-    /* ===== prefetch كل الصور لتخزينها في الـSW (عمل دون إنترنت) ===== */
     (function prefetchAllImages(){
       const urls = [];
       MENU.forEach(sec=>{
