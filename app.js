@@ -1,6 +1,6 @@
 /* =====================================================
 مكرونجي — سكربت التطبيق الرئيسي (app.js)
-v15.5: رجوع سلس لكل النوافذ + استعادة موضع التمرير
+v15.6: أكورديون تطبيقات التوصيل + نصوص الطلب المباشر
 ===================================================== */
 /* ===== استعادة لقطة محلية عند فشل تحميل الملفات ===== */
 (function(){
@@ -317,7 +317,7 @@ const installSheet = el('installSheet');
 const sheetBody = el('sheetBody');
 const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 function runningAsApp(){
-  return window.matchMedia('(display-mode: standalone)').matches ||
+  return window.matchMedia('(display-mode: standalone').matches ||
          window.matchMedia('(display-mode: fullscreen)').matches ||
          window.navigator.standalone === true;
 }
@@ -442,6 +442,33 @@ function openDeliveryApp(event, idx){
   }, 1500);
   return false;
 }
+/* ===== أكورديون تطبيقات التوصيل: زر واحد يطوي/يفتح لوحة الشركاء ===== */
+function ensureAppsAccordion(){
+  const zone = el('otpAppsZone');
+  if(!zone || el('otpAppsToggle')) return;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'otp-apps-toggle';
+  btn.id = 'otpAppsToggle';
+  btn.setAttribute('aria-expanded','false');
+  btn.innerHTML =
+    '<span class="oat-txt">' +
+      '<span class="oat-main">🛵 <span id="otpAppsToggleLbl"></span></span>' +
+      '<span class="oat-sub" id="otpAppsToggleSub"></span>' +
+    '</span>' +
+    '<span class="oat-chev">⌄</span>';
+  const panel = document.createElement('div');
+  panel.className = 'otp-apps-panel';
+  panel.id = 'otpAppsPanel';
+  while(zone.firstChild) panel.appendChild(zone.firstChild);
+  zone.appendChild(btn);
+  zone.appendChild(panel);
+  btn.addEventListener('click', ()=>{
+    const open = zone.classList.toggle('apps-open');
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+}
+ensureAppsAccordion();
 /* ===== اللغة ===== */
 function applyLang(lang){
   currentLang = lang;
@@ -1801,15 +1828,27 @@ function refreshOtpTexts(){
   const m = getOrderMode();
   const appsT = el('otpAppsTitle'); if(appsT) appsT.textContent = tt('deliveryHeadAr','اطلب الآن عبر شركائنا في التوصيل 🛵','Order now via our delivery partners 🛵');
   const appsH = el('otpAppsHint'); if(appsH) appsH.textContent = tt('deliveryAppsHint','إتمام الطلب والدفع داخل التطبيق الشريك','Checkout & payment inside the partner app');
+  const atl = el('otpAppsToggleLbl'); if(atl) atl.textContent = tt('deliveryAppsBtn','تطبيقات التوصيل','Delivery Apps');
+  const ats = el('otpAppsToggleSub');
+  if(ats){
+    ats.textContent = deliveryApps().map(x=> currentLang==='ar' ? x.nameAr : (x.nameEn || x.nameAr)).join(' • ');
+  }
   const z = el('otpZoneTitle');
   if(z){
     if(m==='delivery'){
       const mode = deliveryFeeMode();
-      let feeTxt;
-      if(mode==='free') feeTxt = tt('freeDelivery','مجاني','Free');
-      else if(mode==='perBranch') feeTxt = tt('feePerBranch','السعر حسب الفرع','Fee per branch');
-      else feeTxt = feeLabel(deliveryFeeFor(null));
-      z.textContent = tt('restaurantDelivery','توصيل المطعم','Restaurant delivery') + ' (' + feeTxt + ')';
+      let pillCls = '', pillTxt;
+      if(mode==='free'){
+        pillCls = ' ok';
+        pillTxt = tt('freeDeliveryPill','🎉 التوصيل مجاني','🎉 Free delivery');
+      } else if(mode==='perBranch'){
+        pillTxt = tt('feePerBranchPill','🛵 رسوم التوصيل حسب الفرع','🛵 Delivery fee per branch');
+      } else {
+        pillTxt = tt('feeFixedPill','🛵 رسوم التوصيل: ','🛵 Delivery fee: ') + feeLabel(deliveryFeeFor(null));
+      }
+      z.innerHTML = '<span class="ozt-main">' +
+        tt('directOrderTitle','اطلب من المطعم مباشرة — اختر فرعك واطلب فوراً 🍝','Order direct from us — pick your branch & order now 🍝') +
+        '</span><span class="ozt-pill' + pillCls + '">' + pillTxt + '</span>';
     } else {
       z.textContent = tt('pickupBranch','اختر فرع الاستلام','Choose pickup branch');
     }
