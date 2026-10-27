@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لوحة مشرف الفرع | مكرونجي</title>
+<link rel="icon" href="img/logo.png">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --brown:#8e2a4a; --brown2:#a4385c; --dark:#5a1830;
+  --gold:#e0912f; --gold2:#f2b95f; --cream:#faf3ea; --card:#fffdf9;
+  --ink:#2b1a15; --muted:#8a6f63; --line:#eadfd2;
+  --wa:#128c5e; --ok:#1e5b4f; --err:#b91c1c;
+}
+*,::before,::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{
+  font-family:'Cairo',sans-serif;background:var(--cream);
+  background-image:radial-gradient(#efe3d3 1px,transparent 1px);background-size:22px 22px;
+  color:var(--ink);min-height:100vh;padding-bottom:3rem;
+}
+
+/* ─── الشريط العلوي ─── */
+.topbar{
+  position:sticky;top:0;z-index:50;
+  background:rgba(90,24,48,.97);backdrop-filter:blur(8px);
+  color:#fff;display:flex;align-items:center;gap:.6rem;
+  padding:.7rem 1rem;box-shadow:0 4px 18px rgba(0,0,0,.25);
+}
+.topbar .brand{display:flex;align-items:center;gap:.5rem;min-width:0;}
+.topbar .brand img{width:40px;height:40px;border-radius:50%;border:2px solid var(--gold);object-fit:cover;}
+.topbar .brand b{font-size:.95rem;font-weight:900;display:block;line-height:1.2;}
+.topbar .brand small{color:var(--gold2);font-size:.7rem;font-weight:700;}
+.topbar .spacer{flex:1;}
+.bell{
+  position:relative;background:#ffffff14;border:1px solid #ffffff2b;
+  border-radius:50px;padding:.35rem .8rem;color:#fff;
+  font-family:inherit;font-weight:900;font-size:.8rem;cursor:pointer;
+}
+.bell .cnt{
+  position:absolute;top:-6px;inset-inline-end:-6px;
+  background:var(--err);color:#fff;border-radius:50px;
+  min-width:20px;height:20px;font-size:.68rem;font-weight:900;
+  display:flex;align-items:center;justify-content:center;padding:0 4px;
+}
+.icon-btn{
+  background:#ffffff14;border:1px solid #ffffff2b;border-radius:50px;
+  padding:.35rem .7rem;color:#fff;font-family:inherit;
+  font-weight:900;font-size:.8rem;cursor:pointer;
+}
+.icon-btn.off{opacity:.5;}
+
+/* ─── الإحصائيات ─── */
+.stats{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;
+  max-width:1100px;margin:1rem auto;padding:0 1rem;
+}
+.stat{
+  background:var(--card);border:1.5px solid var(--line);border-radius:16px;
+  padding:.8rem;text-align:center;
+}
+.stat b{display:block;font-size:1.35rem;font-weight:900;color:var(--brown);}
+.stat small{color:var(--muted);font-size:.72rem;font-weight:800;}
+
+/* ─── الأقسام ─── */
+.wrap{max-width:1100px;margin:0 auto;padding:0 1rem;}
+.sec-title{
+  display:flex;align-items:center;gap:.5rem;
+  font-size:1.05rem;font-weight:900;color:var(--brown);
+  margin:1.4rem 0 .7rem;
+}
+.sec-title .pill{
+  background:var(--brown);color:#fff;border-radius:50px;
+  padding:.1rem .6rem;font-size:.72rem;font-weight:900;
+}
+
+/* ─── بطاقة الطلب ─── */
+.order-card{
+  background:var(--card);border:1.5px solid var(--line);border-radius:18px;
+  padding:1rem;margin-bottom:.8rem;
+  box-shadow:0 2px 8px rgba(90,24,48,.06);
+}
+.order-card.new{border-color:var(--gold);box-shadow:0 0 0 3px #e0912f22,0 8px 22px rgba(90,24,48,.12);}
+.oc-head{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:.6rem;}
+.oc-num{
+  background:var(--dark);color:var(--gold2);border-radius:10px;
+  padding:.2rem .7rem;font-weight:900;font-size:.95rem;direction:ltr;
+}
+.oc-cust{font-weight:900;font-size:.95rem;}
+.oc-phone{color:var(--muted);font-weight:800;font-size:.8rem;direction:ltr;}
+.oc-total{margin-inline-start:auto;font-weight:900;color:var(--ok);font-size:1rem;}
+.oc-line{font-size:.85rem;font-weight:700;color:var(--ink);margin:.25rem 0;line-height:1.7;}
+.oc-line .lbl{color:var(--muted);}
+.oc-items{
+  background:#fff;border:1px dashed var(--line);border-radius:12px;
+  padding:.5rem .7rem;margin:.5rem 0;font-size:.83rem;font-weight:800;line-height:1.9;
+}
+.oc-note{
+  background:#fff6e6;border:1px dashed var(--gold);border-radius:10px;
+  padding:.4rem .7rem;font-size:.8rem;font-weight:800;color:#a06b1c;margin:.4rem 0;
+}
+.oc-actions{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.7rem;}
+.btn{
+  border:none;border-radius:12px;padding:.6rem 1rem;
+  font-family:inherit;font-weight:900;font-size:.83rem;cursor:pointer;transition:.2s;
+}
+.btn:active{transform:scale(.96);}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+.btn-ok{background:var(--ok);color:#fff;}
+.btn-err{background:#fee2e2;color:var(--err);}
+.btn-gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--dark);}
+.btn-wa{background:var(--wa);color:#fff;}
+.btn-plain{background:#f3e7d7;color:var(--brown2);}
+.sel{
+  border:1.5px solid var(--line);border-radius:10px;padding:.55rem .6rem;
+  font-family:inherit;font-weight:800;background:#fff;color:var(--ink);
+}
+.map-link{
+  color:var(--brown2);font-weight:900;font-size:.8rem;text-decoration:none;
+  border-bottom:1.5px dashed var(--gold);
+}
+
+/* ─── فارغ ─── */
+.empty{
+  text-align:center;color:var(--muted);font-weight:800;
+  padding:1.6rem;border:1.5px dashed var(--line);border-radius:16px;font-size:.9rem;
+}
+
+/* ─── توست ─── */
+#toast{position:fixed;bottom:1.2rem;inset-inline:0;display:flex;flex-direction:column;align-items:center;gap:.5rem;z-index:4000;pointer-events:none;}
+.toast{
+  background:var(--dark);color:#fff;border-radius:50px;
+  padding:.6rem 1.4rem;font-weight:900;font-size:.85rem;
+  box-shadow:0 10px 30px rgba(0,0,0,.3);animation:pop .3s ease;
+}
+.toast.err{background:var(--err);}
+.toast.ok{background:var(--ok);}
+@keyframes pop{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
+
+/* ─── الطباعة (تقرير PDF) ─── */
+#reportArea{display:none;}
+@media print{
+  body *{visibility:hidden;}
+  #reportArea, #reportArea *{visibility:visible;}
+  #reportArea{display:block;position:absolute;inset:0;padding:2rem;}
+  #reportArea h2{margin-bottom:1rem;}
+  #reportArea table{width:100%;border-collapse:collapse;font-size:12px;}
+  #reportArea th,#reportArea td{border:1px solid #999;padding:6px;text-align:right;}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ الشريط العلوي ═══ -->
+<div class="topbar">
+  <div class="brand">
+    <img src="img/logo.png" alt="مكرونجي">
+    <div>
+      <b id="supName">...</b>
+      <small id="supBranch">...</small>
+    </div>
+  </div>
+  <div class="spacer"></div>
+  <button class="bell" id="bellBtn">🔔 <span class="cnt" id="bellCnt" hidden>0</span></button>
+  <button class="icon-btn" id="soundBtn" onclick="toggleSound()">🔊</button>
+  <button class="icon-btn" onclick="printReport()">📄</button>
+  <button class="icon-btn" onclick="logout()">خروج 🚪</button>
+</div>
+
+<!-- ═══ الإحصائيات ═══ -->
+<div class="stats">
+  <div class="stat"><b id="stOrders">0</b><small>طلبات اليوم</small></div>
+  <div class="stat"><b id="stRevenue">0</b><small>مبيعات اليوم (ريال)</small></div>
+  <div class="stat"><b id="stDrivers">0</b><small>سائقون متاحون</small></div>
+</div>
+
+<div class="wrap">
+
+  <!-- ═══ طلبات جديدة ═══ -->
+  <div class="sec-title">🔔 طلبات جديدة <span class="pill" id="cntNew">0</span></div>
+  <div id="listNew"></div>
+
+  <!-- ═══ قيد التنفيذ ═══ -->
+  <div class="sec-title">🍳 قيد التنفيذ <span class="pill" id="cntProg">0</span></div>
+  <div id="listProgress"></div>
+
+  <!-- ═══ توصيلات نشطة ═══ -->
+  <div class="sec-title">🚗 توصيلات نشطة <span class="pill" id="cntActive">0</span></div>
+  <div id="listActive"></div>
+
+  <!-- ═══ سُلّم اليوم ═══ -->
+  <div class="sec-title">✅ سُلّم اليوم <span class="pill" id="cntDone">0</span></div>
+  <div id="listDone"></div>
+
+</div>
+
+<!-- ═══ منطقة التقرير (للطباعة) ═══ -->
+<div id="reportArea"></div>
+
+<div id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════
+   إعدادات الربط
+   ═══════════════════════════════════════════ */
+const API_BASE = 'https://makaronjy-api.makaronjy.workers.dev';
+const REFRESH_MS = 7000; // تحديث كل 7 ثوانٍ (وضع polling المجاني)
+
+let TOKEN = localStorage.getItem('mk_staff_token');
+let USER = JSON.parse(localStorage.getItem('mk_staff_user') || 'null');
+let DRIVERS = [];
+let LAST_ORDERS = [];
+let knownPending = new Set();
+let soundOn = localStorage.getItem('sup_sound') !== 'off';
+let audioCtx = null;
+
+/* ─── حماية الصفحة ─── */
+(function guard() {
+  if (!TOKEN || !USER) { location.href = 'login.html'; return; }
+  if (USER.role !== 'supervisor' && USER.role !== 'super_admin') { location.href = 'login.html'; return; }
+  if (USER.mustChangePassword) { location.href = 'login.html'; return; }
+  if (USER.role === 'super_admin') {
+    // المالك لوحته الرئيسية admin.html
+    if (!confirm('أنت المالك – لوحتك الشاملة في admin.html\nهل تريد البقاء في عرض المشرف؟')) {
+      location.href = 'admin.html'; return;
+    }
+  }
+  document.getElementById('supName').textContent = USER.name;
+  updateSoundBtn();
+})();
+
+/* ─── غلاف API ─── */
+async function api(path, opts = {}) {
+  const res = await fetch(API_BASE + path, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + TOKEN,
+      ...(opts.headers || {}),
+    },
+  });
+  if (res.status === 401) {
+    localStorage.removeItem('mk_staff_token');
+    localStorage.removeItem('mk_staff_user');
+    location.href = 'login.html';
+    throw new Error('unauthorized');
+  }
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'خطأ');
+  return data;
+}
+
+/* ─── توست ─── */
+function toast(msg, kind) {
+  const t = document.createElement('div');
+  t.className = 'toast ' + (kind || '');
+  t.textContent = msg;
+  document.getElementById('toast').appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+
+/* ─── تنبيه صوتي (WebAudio – بدون ملفات) ─── */
+function beep() {
+  if (!soundOn) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.connect(g); g.connect(audioCtx.destination);
+    o.frequency.value = 880;
+    g.gain.setValueAtTime(0.25, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.6);
+    o.start(); o.stop(audioCtx.currentTime + 0.65);
+  } catch (e) {}
+}
+function toggleSound() {
+  soundOn = !soundOn;
+  localStorage.setItem('sup_sound', soundOn ? 'on' : 'off');
+  updateSoundBtn();
+  if (soundOn) beep();
+}
+function updateSoundBtn() {
+  const b = document.getElementById('soundBtn');
+  b.textContent = soundOn ? '🔊' : '🔇';
+  b.classList.toggle('off', !soundOn);
+}
+
+/* ─── تطبيع رقم الجوال لـ wa.me ─── */
+function normalizePhone(p) {
+  const d = (p || '').replace(/\D/g, '');
+  if (d.startsWith('0')) return '966' + d.slice(1);
+  if (d.startsWith('966')) return d;
+  return d;
+}
+
+/* ─── رسالة واتس التحقق (من بيانات العميل) ─── */
+function waVerify(o) {
+  const msg =
+`أهلاً ${o.customer_name} 🍝
+هذا مشرف فرع ${USER.branchName || ''} بمكرونجي
+نؤكد استلام طلبك رقم ${o.number}
+بقيمة ${o.total} ريال (${o.payment_method === 'cod' ? 'الدفع عند الاستلام' : 'مدفوع'})
+سيكون جاهزاً خلال 20-30 دقيقة تقريباً
+شكراً لثقتك 🙏`;
+  window.open('https://wa.me/' + normalizePhone(o.customer_phone) + '?text=' + encodeURIComponent(msg), '_blank');
+}
+
+/* ─── تحميل البيانات ─── */
+async function loadAll(first) {
+  try {
+    const [ordersRes, driversRes] = await Promise.all([
+      api('/api/supervisor/orders'),
+      api('/api/supervisor/drivers'),
+    ]);
+    DRIVERS = driversRes.drivers || [];
+    LAST_ORDERS = ordersRes.orders || [];
+    render(first);
+  } catch (e) {
+    if (e.message !== 'unauthorized') toast('تعذر التحديث — سيتم重试', 'err');
+  }
+}
+
+/* ─── العرض ─── */
+function render(first) {
+  const orders = LAST_ORDERS;
+
+  const isNew = o => o.status === 'pending';
+  const isProg = o => ['accepted', 'preparing', 'ready'].includes(o.status);
+  const isActive = o => ['driver_assigned', 'driver_at_restaurant', 'out_for_delivery'].includes(o.status);
+  const isDone = o => o.status === 'delivered';
+
+  const news = orders.filter(isNew);
+  const progs = orders.filter(isProg);
+  const actives = orders.filter(isActive);
+  const dones = orders.filter(isDone);
+
+  // تنبيه صوتي للطلبات الجديدة
+  if (!first) {
+    let newOne = false;
+    news.forEach(o => {
+      if (!knownPending.has(o.number)) { newOne = true; knownPending.add(o.number); }
+    });
+    if (newOne) beep();
+  } else {
+    news.forEach(o => knownPending.add(o.number));
+  }
+
+  // العدادات
+  document.getElementById('cntNew').textContent = news.length;
+  document.getElementById('cntProg').textContent = progs.length;
+  document.getElementById('cntActive').textContent = actives.length;
+  document.getElementById('cntDone').textContent = dones.length;
+  const bellCnt = document.getElementById('bellCnt');
+  bellCnt.hidden = news.length === 0;
+  bellCnt.textContent = news.length;
+
+  // الإحصائيات
+  const today = orders; // القائمة محدودة بآخر 100 – كافية لليوم
+  document.getElementById('stOrders').textContent = today.length;
+  document.getElementById('stRevenue').textContent =
+    today.filter(isDone).reduce((s, o) => s + o.total, 0);
+  document.getElementById('stDrivers').textContent = DRIVERS.length;
+
+  // القوائم
+  document.getElementById('listNew').innerHTML =
+    news.length ? news.map(o => cardNew(o)).join('') :
+    '<div class="empty">لا توجد طلبات جديدة حالياً 📭</div>';
+
+  document.getElementById('listProgress').innerHTML =
+    progs.length ? progs.map(o => cardProgress(o)).join('') :
+    '<div class="empty">لا توجد طلبات قيد التنفيذ</div>';
+
+  document.getElementById('listActive').innerHTML =
+    actives.length ? actives.map(o => cardActive(o)).join('') :
+    '<div class="empty">لا توجد توصيلات نشطة</div>';
+
+  document.getElementById('listDone').innerHTML =
+    dones.length ? dones.slice(0, 20).map(o => cardDone(o)).join('') :
+    '<div class="empty">لم يُسلّم أي طلب بعد</div>';
+}
+
+/* ─── بطاقة طلب جديد ─── */
+function cardNew(o) {
+  return `
+  <div class="order-card new">
+    <div class="oc-head">
+      <span class="oc-num">${o.number}</span>
+      <span class="oc-cust">👤 ${o.customer_name}</span>
+      <a class="oc-phone" href="tel:${o.customer_phone}">${o.customer_phone}</a>
+      <span class="oc-total">${o.total} ريال</span>
+    </div>
+    ${o.customer_address ? `<div class="oc-line"><span class="lbl">📍 العنوان:</span> ${o.customer_address}
+      ${o.customer_lat ? `— <a class="map-link" target="_blank" href="https://www.google.com/maps?q=${o.customer_lat},${o.customer_lng}">عرض على الخريطة 🗺️</a>` : ''}</div>` : ''}
+    <div class="oc-items">${o.items.map(i => `▪️ ${i.qty}× ${i.name}${i.size ? ' (' + i.size + ')' : ''} — ${i.qty * i.price} ريال`).join('<br>')}</div>
+    ${o.notes ? `<div class="oc-note">📝 ${o.notes}</div>` : ''}
+    <div class="oc-line"><span class="lbl">💵 الدفع:</span> ${o.payment_method === 'cod' ? 'عند الاستلام' : 'بطاقة'}</div>
+    <div class="oc-actions">
+      <button class="btn btn-ok" onclick="act(${o.id},'accepted')">✅ تأكيد</button>
+      <button class="btn btn-err" onclick="act(${o.id},'cancelled')">❌ رفض</button>
+      <button class="btn btn-wa" onclick='waVerify(${JSON.stringify(o).replace(/'/g, "&#39;")})'>📱 واتس للتحقق</button>
+    </div>
+  </div>`;
+}
+
+/* ─── بطاقة قيد التنفيذ ─── */
+function cardProgress(o) {
+  let actions = '';
+  if (o.status === 'accepted') {
+    actions = `<button class="btn btn-gold" onclick="act(${o.id},'preparing')">👨🍳 قيد التحضير</button>
+               <button class="btn btn-wa" onclick='waVerify(${JSON.stringify(o).replace(/'/g, "&#39;")})'>📱 واتس</button>`;
+  } else if (o.status === 'preparing') {
+    actions = `<button class="btn btn-gold" onclick="act(${o.id},'ready')">📦 الطلب جاهز</button>`;
+  } else if (o.status === 'ready') {
+    actions = `
+      <select class="sel" id="drv-${o.id}">
+        <option value="">— اختر سائقاً —</option>
+        ${DRIVERS.map(d => `<option value="${d.id}">${d.name}</option>`).join('')}
+      </select>
+      <button class="btn btn-ok" onclick="assign(${o.id})">🚗 تعيين</button>`;
+  }
+  return `
+  <div class="order-card">
+    <div class="oc-head">
+      <span class="oc-num">${o.number}</span>
+      <span class="oc-cust">👤 ${o.customer_name}</span>
+      <span class="oc-total">${o.total} ريال</span>
+    </div>
+    <div class="oc-line"><span class="lbl">الحالة:</span> ${o.status_text}</div>
+    <div class="oc-actions">${actions}</div>
+  </div>`;
+}
+
+/* ─── بطاقة توصيل نشط ─── */
+function cardActive(o) {
+  const mapLink = (o.driver_lat && o.driver_lng)
+    ? `<a class="map-link" target="_blank" href="https://www.google.com/maps?q=${o.driver_lat},${o.driver_lng}">🗺️ موقع السائق الآن</a>`
+    : '';
+  return `
+  <div class="order-card">
+    <div class="oc-head">
+      <span class="oc-num">${o.number}</span>
+      <span class="oc-cust">🚗 ${o.driver_name || 'سائق غير معروف'}</span>
+      ${o.driver_phone ? `<a class="oc-phone" href="tel:${o.driver_phone}">${o.driver_phone}</a>` : ''}
+    </div>
+    <div class="oc-line"><span class="lbl">👤 العميل:</span> ${o.customer_name} — <a class="oc-phone" href="tel:${o.customer_phone}">${o.customer_phone}</a></div>
+    <div class="oc-line"><span class="lbl">الحالة:</span> ${o.status_text} ${mapLink}</div>
+    <div class="oc-line"><a class="map-link" target="_blank" href="track.html?order=${encodeURIComponent(o.number)}">🔎 فتح صفحة تتبع العميل</a></div>
+  </div>`;
+}
+
+/* ─── بطاقة تسليم ─── */
+function cardDone(o) {
+  return `
+  <div class="order-card">
+    <div class="oc-head">
+      <span class="oc-num">${o.number}</span>
+      <span class="oc-cust">👤 ${o.customer_name}</span>
+      <span class="oc-total">${o.total} ريال</span>
+    </div>
+    <div class="oc-line"><span class="lbl">🚗 السائق:</span> ${o.driver_name || '—'}</div>
+  </div>`;
+}
+
+/* ─── تغيير حالة ─── */
+async function act(id, status) {
+  if (status === 'cancelled' && !confirm('هل أنت متأكد من رفض هذا الطلب؟')) return;
+  try {
+    await api(`/api/orders/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    });
+    toast('تم تحديث الحالة ✅', 'ok');
+    loadAll(false);
+  } catch (e) {
+    toast('⚠️ ' + e.message, 'err');
+  }
+}
+
+/* ─── تعيين سائق ─── */
+async function assign(id) {
+  const sel = document.getElementById('drv-' + id);
+  const driverId = sel ? sel.value : '';
+  if (!driverId) { toast('⚠️ اختر سائقاً أولاً', 'err'); return; }
+  try {
+    const r = await api(`/api/orders/${id}/assign`, {
+      method: 'PUT',
+      body: JSON.stringify({ driver_id: parseInt(driverId) }),
+    });
+    toast('تم تعيين ' + r.driver_name + ' 🚗', 'ok');
+    loadAll(false);
+  } catch (e) {
+    toast('⚠️ ' + e.message, 'err');
+  }
+}
+
+/* ─── تقرير قابل للطباعة / PDF ─── */
+function printReport() {
+  const orders = LAST_ORDERS;
+  const done = orders.filter(o => o.status === 'delivered');
+  const revenue = done.reduce((s, o) => s + o.total, 0);
+  const fees = done.reduce((s, o) => s + o.delivery_fee, 0);
+
+  document.getElementById('reportArea').innerHTML = `
+    <h2>🍝 مكرونجي — تقرير فرع ${USER.branchName || ''}</h2>
+    <p>التاريخ: ${new Date().toLocaleString('ar-SA')}</p>
+    <p>إجمالي الطلبات المعروضة: ${orders.length} | المسلّمة: ${done.length} | الإيراد: ${revenue} ريال | رسوم توصيل: ${fees} ريال</p>
+    <table>
+      <tr><th>رقم الطلب</th><th>العميل</th><th>الجوال</th><th>الإجمالي</th><th>الحالة</th><th>السائق</th></tr>
+      ${orders.map(o => `
+        <tr>
+          <td>${o.number}</td>
+          <td>${o.customer_name}</td>
+          <td>${o.customer_phone}</td>
+          <td>${o.total}</td>
+          <td>${o.status_text}</td>
+          <td>${o.driver_name || '—'}</td>
+        </tr>`).join('')}
+    </table>
+    <p style="margin-top:1rem">للحفظ PDF: اختر "حفظ كـ PDF" من نافذة الطباعة</p>
+  `;
+  window.print();
+}
+
+/* ─── خروج ─── */
+function logout() {
+  if (!confirm('هل تريد تسجيل الخروج؟')) return;
+  localStorage.removeItem('mk_staff_token');
+  localStorage.removeItem('mk_staff_user');
+  location.href = 'login.html';
+}
+
+/* ─── الإقلاع ─── */
+loadAll(true);
+setInterval(() => loadAll(false), REFRESH_MS);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) loadAll(false);
+});
+</script>
+
+</body>
+</html>
