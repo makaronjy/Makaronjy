@@ -1,0 +1,116 @@
+# ═══════════════════════════════════════════
+#  مكرونجي - إعدادات Cloudflare Worker
+#  نظام تتبع الطلبات الحي
+# ═══════════════════════════════════════════
+
+# ───────────────────────────────────────────
+#  الإعدادات الأساسية
+# ───────────────────────────────────────────
+name = "makaronjy-api"
+main = "worker/index.js"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# ───────────────────────────────────────────
+#  إعدادات النشر
+# ───────────────────────────────────────────
+[build]
+command = ""
+
+[site]
+bucket = "./public"
+
+# ───────────────────────────────────────────
+#  المتغيرات البيئية العامة (غير السرية)
+#  هذه تظهر في الكود - لا تضع فيها أشياء حساسة
+# ───────────────────────────────────────────
+[vars]
+# رابط الموقع الرئيسي
+SITE_URL = "https://makaronjy.pages.dev"
+
+# وضع التتبع الحي: "polling" (مجاني) أو "websocket" (مدفوع)
+LIVE_MODE = "polling"
+
+# مدة صلاحية الجلسة (بالثواني) - 30 يوم
+SESSION_DURATION = 2592000
+
+# مدة صلاحية JWT (بالثواني) - 7 أيام
+JWT_DURATION = 604800
+
+# حدود الأمان
+MAX_LOGIN_ATTEMPTS = 5
+LOCKOUT_DURATION = 900  # 15 دقيقة بالثواني
+
+# حدود API
+RATE_LIMIT_PER_MINUTE = 100
+
+# ───────────────────────────────────────────
+#  قاعدة البيانات D1
+# ───────────────────────────────────────────
+[[d1_databases]]
+binding = "DB"
+database_name = "makaronjy-db"
+database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # ⚠️ استبدل هذا بعد إنشاء الداتابيز
+
+# ───────────────────────────────────────────
+#  تخزين R2 (للصور والنسخ الاحتياطي)
+# ───────────────────────────────────────────
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "makaronjy-images"
+preview_bucket_name = "makaronjy-images-preview"
+
+[[r2_buckets]]
+binding = "BACKUPS"
+bucket_name = "makaronjy-backups"
+preview_bucket_name = "makaronjy-backups-preview"
+
+# ───────────────────────────────────────────
+#  KV Storage (للـ Rate Limiting والـ Cache)
+# ───────────────────────────────────────────
+[[kv_namespaces]]
+binding = "KV"
+id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"  # ⚠️ استبدل هذا بعد إنشاء KV
+
+# ───────────────────────────────────────────
+#  Cron Triggers (المهام المجدولة)
+#  يعمل فقط في الخطة المدفوعة
+# ───────────────────────────────────────────
+[triggers]
+crons = [
+  "0 3 * * *",  # يومياً الساعة 3 فجراً: تنظيف + نسخ احتياطي
+  "0 */6 * * *"  # كل 6 ساعات: تنظيف الجلسات المنتهية
+]
+
+# ───────────────────────────────────────────
+#  إعدادات البيئة المختلفة
+# ───────────────────────────────────────────
+
+# بيئة التطوير (Development)
+[env.dev]
+name = "makaronjy-api-dev"
+vars = { ENVIRONMENT = "development", LIVE_MODE = "polling" }
+
+# بيئة الإنتاج (Production)
+[env.production]
+name = "makaronjy-api"
+vars = { ENVIRONMENT = "production", LIVE_MODE = "polling" }
+
+# ═══════════════════════════════════════════
+#  ⚠️ المتغيرات السرية (Secrets)
+#  ═══════════════════════════════════════════
+#
+#  هذه لا تُكتب هنا! تُضاف عبر الأمر:
+#
+#  npx wrangler secret put JWT_SECRET
+#  npx wrangler secret put BCRYPT_SALT
+#  npx wrangler secret put ADMIN_API_KEY
+#  npx wrangler secret put MOYASAR_SECRET_KEY
+#  npx wrangler secret put MOYASAR_WEBHOOK_SECRET
+#  npx wrangler secret put TAP_SECRET_KEY
+#  npx wrangler secret put TAP_WEBHOOK_SECRET
+#
+#  هذه الأسرار تُخزن مشفرة في Cloudflare
+#  ولا يمكن لأحد رؤيتها (حتى أنت)
+#
+# ═══════════════════════════════════════════
