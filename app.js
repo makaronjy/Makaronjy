@@ -442,7 +442,7 @@ function openDeliveryApp(event, idx){
   }, 1500);
   return false;
 }
-/* ===== أكورديون تطبيقات التوصيل: زر واحد + طي ذكي (خارج المنطقة / مغادرة الصفحة / 5 ثوانٍ) ===== */
+/* ===== أكورديون تطبيقات التوصيل: زر واحد + طي ذكي ===== */
 let appsAutoTimer = null;
 function appsZoneOpen(){
   const z = el('otpAppsZone');
@@ -494,11 +494,9 @@ function ensureAppsAccordion(){
   btn.addEventListener('click', ()=>{
     if(appsZoneOpen()) collapseAppsPanel(); else expandAppsPanel();
   });
-  /* أي لمسة داخل المنطقة المفتوحة تعيد مؤقّت الـ5 ثوانٍ من الصفر */
   zone.addEventListener('pointerdown', ()=>{
     if(appsZoneOpen()) armAppsAutoTimer();
   }, {passive:true});
-  /* الضغط خارج المنطقة المفتوحة يطويها، واللمسة الخارجية تؤدي وظيفتها العادية */
   document.addEventListener('click', (e)=>{
     if(!appsZoneOpen()) return;
     if(zone.contains(e.target)) return;
@@ -1607,11 +1605,10 @@ cats.addEventListener('wheel', ()=> pauseCats(3000), {passive:true});
    ===== طبقة الترقية v15.4 =====
 ===================================================== */
 
-/* ===== تنسيقات جديدة تُحقن ذاتياً (لا تعديل على style.css) ===== */
+/* ===== تنسيقات جديدة تُحقن ذاتياً ===== */
 (function injectUpgradeCss(){
   const st = document.createElement('style');
   st.textContent =
-    /* أزرار الاتصال والتوجه داخل بطاقة الفرع */
     '.oc-acts{display:flex;gap:6px;align-items:center}' +
     '.oc-act{width:38px;height:38px;flex:0 0 38px;border-radius:12px;display:flex;align-items:center;justify-content:center;' +
     'background:#fff;border:1.5px solid var(--line);color:var(--brown2);transition:transform .15s,background .2s}' +
@@ -1621,7 +1618,6 @@ cats.addEventListener('wheel', ()=> pauseCats(3000), {passive:true});
     '.oc-act.dir{background:#fff6e6;border-color:#f0dcb8;color:#a06b1c}' +
     '.oc-hours{display:block;color:var(--muted);font-size:.72rem;font-weight:700;margin-top:4px}' +
     '.oc-fee{background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--dark)}' +
-    /* توست التنبيه بزر تأكيد */
     '#actionToast{position:fixed;left:12px;right:12px;bottom:calc(92px + env(safe-area-inset-bottom));z-index:3500;' +
     'display:flex;gap:10px;align-items:center;background:linear-gradient(120deg,var(--brown2),var(--dark));' +
     'color:#fff;border:1.5px solid var(--gold);border-radius:18px;padding:12px 14px;' +
@@ -1637,7 +1633,7 @@ cats.addEventListener('wheel', ()=> pauseCats(3000), {passive:true});
   document.head.appendChild(st);
 })();
 
-/* ===== أنظمة رسوم التوصيل: مجاني / ثابت / لكل فرع ===== */
+/* ===== أنظمة رسوم التوصيل ===== */
 function deliveryFeeMode(){
   const m = S().deliveryFeeMode;
   return (m==='free' || m==='fixed' || m==='perBranch') ? m : 'fixed';
@@ -1657,7 +1653,7 @@ function feeLabel(f){
   return (f === 0) ? tt('freeDelivery','مجاني','Free') : (f + ' ' + TT.currency);
 }
 
-/* ===== توست التنبيه العصري (زر تأكيد + إلغاء) ===== */
+/* ===== توست التنبيه العصري ===== */
 let atTimer = null, atOnYes = null;
 function ensureActionToast(){
   if(el('actionToast')) return el('actionToast');
@@ -1721,7 +1717,6 @@ window.addEventListener('resize', refreshStickyMetrics);
 /* ===== الكاروسيل ===== */
 let bnIndex = 0, bnTimer = null, bnTouchX = null;
 function bannersList(){ return Array.isArray(S().banners) ? S().banners.filter(b=> b && b.img && b.hidden !== true) : []; }
-/* ===== إعادة محاولة تحميل صورة بانر فشلت ===== */
 function retryBannerImg(im){
   if(!im || im.dataset.retrying) return;
   const n = (+im.dataset.retry || 0) + 1;
@@ -2133,7 +2128,7 @@ function syncBarVisibility(){
   }, {passive:true});
 })();
 
-/* ===== تحديث السلة + الرسوم (بدون حقل العنوان) ===== */
+/* ===== تحديث السلة + الرسوم ===== */
 function updateCart(){
   const TT = T();
   let count=0, total=0;
@@ -2213,7 +2208,7 @@ function updateBranchFooter(){
   if(otpShown()) refreshOtpTexts();
 }
 
-/* ===== الدفع واتساب (بدون عنوان) ===== */
+/* ===== الدفع واتساب ===== */
 function checkout(){
   if(orderLocked()) return;
   const TT = T();
