@@ -282,3 +282,31 @@ chooseBranchFirst: '⚠️ Choose a branch first',
 pickupBranch: 'Choose pickup branch'
 }
 };
+/* ===== v15.8: مفاتيح النصوص الجديدة تُدمج تلقائياً في اللغتين ===== */
+(function(){
+  var ADD = {
+    ar: {
+      deliveryAppsBtn: 'تطبيقات التوصيل',
+      directOrderTitle: '🍝 اطلب مباشرة — ',
+      freeDeliveryPill: 'التوصيل مجاني 🎉',
+      feePerBranchPill: 'الرسوم حسب الفرع',
+      feeFixedPill: 'التوصيل '
+    },
+    en: {
+      deliveryAppsBtn: 'Delivery Apps',
+      directOrderTitle: '🍝 Order direct — ',
+      freeDeliveryPill: 'free delivery 🎉',
+      feePerBranchPill: 'fee per branch',
+      feeFixedPill: 'delivery '
+    }
+  };
+  if (window.I18N) {
+    Object.keys(ADD).forEach(function(lang){
+      if (window.I18N[lang]) {
+        Object.keys(ADD[lang]).forEach(function(k){
+          if (window.I18N[lang][k] === undefined) window.I18N[lang][k] = ADD[lang][k];
+        });
+      }
+    });
+  }
+})();
