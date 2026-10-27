@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>دخول الموظفين | مكرونجي</title>
+<link rel="icon" href="img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════
+   مكرونجي - صفحة دخول الموظفين
+   ═══════════════════════════════════════════ */
+:root{
+  --brown:#8e2a4a; --brown2:#a4385c; --dark:#5a1830;
+  --gold:#e0912f; --gold2:#f2b95f; --cream:#faf3ea; --card:#fffdf9;
+  --ink:#2b1a15; --muted:#8a6f63; --line:#eadfd2;
+  --ok:#1e5b4f; --err:#b91c1c;
+}
+*,::before,::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:'Cairo',sans-serif;
+  background:var(--cream);
+  background-image:radial-gradient(#efe3d3 1px,transparent 1px);
+  background-size:22px 22px;
+  color:var(--ink);
+  min-height:100vh;
+  display:flex;align-items:center;justify-content:center;
+  padding:1rem;
+}
+
+/* ─── بطاقة الدخول ─── */
+.login-wrap{width:min(420px,100%);}
+.login-card{
+  background:var(--card);
+  border:2px solid var(--gold);
+  border-radius:22px;
+  padding:2rem 1.5rem;
+  box-shadow:0 24px 70px rgba(90,24,48,.18);
+  text-align:center;
+  position:relative;
+}
+.login-card img.logo{
+  width:88px;height:88px;border-radius:50%;
+  object-fit:cover;border:3px solid var(--gold);
+  box-shadow:0 8px 24px rgba(142,42,74,.25);
+  background:#e8a04c;margin-bottom:.8rem;
+}
+.login-card h1{
+  color:var(--brown);font-size:1.4rem;font-weight:900;margin-bottom:.2rem;
+}
+.login-card p.sub{
+  color:var(--muted);font-size:.85rem;font-weight:700;margin-bottom:1.5rem;
+}
+
+/* ─── الحقول ─── */
+.field{margin-bottom:1rem;text-align:start;}
+.field label{
+  display:block;font-size:.85rem;font-weight:900;
+  color:var(--brown2);margin-bottom:.35rem;
+}
+.field input{
+  width:100%;padding:.85rem 1rem;
+  border:1.5px solid var(--line);border-radius:12px;
+  font-family:inherit;font-size:1rem;font-weight:700;
+  background:#fff;color:var(--ink);outline:none;
+  transition:.2s;
+}
+.field input:focus{
+  border-color:var(--gold);
+  box-shadow:0 0 0 3px #e0912f33;
+}
+.field input.ltr{direction:ltr;text-align:left;}
+
+/* ─── زر الدخول ─── */
+.btn-login{
+  width:100%;padding:.95rem;
+  background:linear-gradient(135deg,var(--gold),var(--gold2));
+  color:var(--dark);border:none;border-radius:12px;
+  font-family:inherit;font-size:1.05rem;font-weight:900;
+  cursor:pointer;transition:.25s;
+  box-shadow:0 6px 16px rgba(224,145,47,.4);
+  margin-top:.5rem;
+}
+.btn-login:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(224,145,47,.5);}
+.btn-login:active{transform:scale(.97);}
+.btn-login:disabled{opacity:.55;cursor:not-allowed;transform:none;}
+
+/* ─── لافتة الخطأ ─── */
+.err-banner{
+  display:none;align-items:center;gap:.5rem;
+  background:#fee2e2;border:1.5px solid #ef444455;color:var(--err);
+  border-radius:12px;padding:.65rem .9rem;
+  font-size:.82rem;font-weight:800;line-height:1.6;
+  margin-bottom:1rem;text-align:start;
+}
+.err-banner.show{display:flex;}
+
+/* ─── لافتة النجاح ─── */
+.ok-banner{
+  display:none;align-items:center;gap:.5rem;
+  background:#dcf5e8;border:1.5px solid #128c5e33;color:var(--ok);
+  border-radius:12px;padding:.65rem .9rem;
+  font-size:.82rem;font-weight:800;line-height:1.6;
+  margin-bottom:1rem;text-align:start;
+}
+.ok-banner.show{display:flex;}
+
+/* ─── تبديل اللغة ─── */
+.lang-toggle{
+  position:absolute;top:.8rem;inset-inline-end:.8rem;
+  display:inline-flex;background:#00000008;border:1px solid var(--line);
+  border-radius:50px;padding:3px;gap:2px;
+}
+.lang-toggle button{
+  padding:.28rem .7rem;border-radius:50px;border:none;
+  background:transparent;color:var(--muted);
+  font-family:inherit;font-weight:900;font-size:.72rem;cursor:pointer;
+}
+.lang-toggle button.active{
+  background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--dark);
+}
+
+/* ─── شاشة تغيير كلمة المرور ─── */
+#changeScreen{display:none;}
+.note-box{
+  background:#fff6e6;border:1.5px dashed var(--gold);
+  border-radius:12px;padding:.7rem .9rem;
+  font-size:.8rem;font-weight:800;color:var(--muted);
+  line-height:1.7;margin-bottom:1.2rem;text-align:start;
+}
+
+/* ─── تحميل ─── */
+.spinner{
+  display:inline-block;width:18px;height:18px;
+  border:3px solid #ffffff55;border-top-color:#fff;
+  border-radius:50%;animation:spin .8s linear infinite;
+  vertical-align:middle;margin-inline-end:.4rem;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ─── تذييل ─── */
+.foot{
+  text-align:center;margin-top:1.2rem;
+  color:var(--muted);font-size:.75rem;font-weight:700;
+}
+</style>
+</head>
+<body>
+
+<div class="login-wrap">
+  <div class="login-card">
+
+    <!-- تبديل اللغة -->
+    <div class="lang-toggle">
+      <button id="langAr" class="active" onclick="setLang('ar')">AR</button>
+      <button id="langEn" onclick="setLang('en')">EN</button>
+    </div>
+
+    <!-- ═══ شاشة الدخول ═══ -->
+    <div id="loginScreen">
+      <img class="logo" src="img/logo.png" alt="مكرونجي">
+      <h1 data-t="title">دخول الموظفين</h1>
+      <p class="sub" data-t="subtitle">مشرفو الفروع والسائقون فقط</p>
+
+      <div class="err-banner" id="loginErr"></div>
+
+      <div class="field">
+        <label data-t="username">اسم المستخدم</label>
+        <input type="text" id="username" class="ltr" autocomplete="username"
+               placeholder="supervisor.badiah">
+      </div>
+
+      <div class="field">
+        <label data-t="password">كلمة المرور</label>
+        <input type="password" id="password" autocomplete="current-password"
+               placeholder="••••••••">
+      </div>
+
+      <button class="btn-login" id="btnLogin" onclick="doLogin()">
+        <span data-t="login">دخول</span>
+      </button>
+    </div>
+
+    <!-- ═══ شاشة تغيير كلمة المرور (أول دخول) ═══ -->
+    <div id="changeScreen">
+      <img class="logo" src="img/logo.png" alt="مكرونجي">
+      <h1 data-t="changeTitle">تغيير كلمة المرور</h1>
+
+      <div class="note-box" data-t="changeNote">
+        هذه أول مرة تدخل بها. لحماية حسابك، اختر كلمة مرور جديدة:
+        8 أحرف على الأقل، وتحتوي حرفاً كبيراً وحرفاً صغيراً ورقماً.
+      </div>
+
+      <div class="err-banner" id="changeErr"></div>
+      <div class="ok-banner" id="changeOk"></div>
+
+      <div class="field">
+        <label data-t="newPass">كلمة المرور الجديدة</label>
+        <input type="password" id="newPass" class="ltr" autocomplete="new-password">
+      </div>
+
+      <div class="field">
+        <label data-t="confirmPass">تأكيد كلمة المرور</label>
+        <input type="password" id="confirmPass" class="ltr" autocomplete="new-password">
+      </div>
+
+      <button class="btn-login" id="btnChange" onclick="doChangePassword()">
+        <span data-t="savePass">حفظ ومتابعة</span>
+      </button>
+    </div>
+
+  </div>
+
+  <div class="foot">🍝 <span data-t="brand">مكرونجي</span> — <span data-t="rights">جميع الحقوق محفوظة</span></div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════
+   إعدادات الربط
+   ⚠️ غيّر هذا الرابط لرابط الـ Worker لديك بعد النشر
+   ═══════════════════════════════════════════ */
+const API_BASE = 'https://makaronjy-api.makaronjy.workers.dev';
+
+/* ─── الترجمات ─── */
+const T = {
+  ar: {
+    title: 'دخول الموظفين',
+    subtitle: 'مشرفو الفروع والسائقون فقط',
+    username: 'اسم المستخدم',
+    password: 'كلمة المرور',
+    login: 'دخول',
+    logging: 'جارٍ الدخول...',
+    changeTitle: 'تغيير كلمة المرور',
+    changeNote: 'هذه أول مرة تدخل بها. لحماية حسابك، اختر كلمة مرور جديدة: 8 أحرف على الأقل، وتحتوي حرفاً كبيراً وحرفاً صغيراً ورقماً.',
+    newPass: 'كلمة المرور الجديدة',
+    confirmPass: 'تأكيد كلمة المرور',
+    savePass: 'حفظ ومتابعة',
+    saving: 'جارٍ الحفظ...',
+    brand: 'مكرونجي',
+    rights: 'جميع الحقوق محفوظة',
+    errEmpty: '⚠️ أدخل اسم المستخدم وكلمة المرور',
+    errPassMismatch: '⚠️ كلمتا المرور غير متطابقتين',
+    errPassWeak: '⚠️ كلمة المرور ضعيفة: 8 أحرف + حرف كبير + حرف صغير + رقم',
+    okChanged: '✅ تم تغيير كلمة المرور بنجاح',
+  },
+  en: {
+    title: 'Staff Login',
+    subtitle: 'Branch supervisors & drivers only',
+    username: 'Username',
+    password: 'Password',
+    login: 'Login',
+    logging: 'Logging in...',
+    changeTitle: 'Change Password',
+    changeNote: 'First login detected. Choose a new password: at least 8 characters, with an uppercase, a lowercase and a number.',
+    newPass: 'New Password',
+    confirmPass: 'Confirm Password',
+    savePass: 'Save & Continue',
+    saving: 'Saving...',
+    brand: 'Makaronjy',
+    rights: 'All rights reserved',
+    errEmpty: '⚠️ Enter username and password',
+    errPassMismatch: '⚠️ Passwords do not match',
+    errPassWeak: '⚠️ Weak password: 8 chars + uppercase + lowercase + number',
+    okChanged: '✅ Password changed successfully',
+  }
+};
+
+let LANG = localStorage.getItem('mk_staff_lang') || 'ar';
+
+function setLang(lang) {
+  LANG = lang;
+  localStorage.setItem('mk_staff_lang', lang);
+  document.documentElement.lang = lang;
+  document.documentElement.dir = (lang === 'ar') ? 'rtl' : 'ltr';
+  document.getElementById('langAr').classList.toggle('active', lang === 'ar');
+  document.getElementById('langEn').classList.toggle('active', lang === 'en');
+  document.querySelectorAll('[data-t]').forEach(elm => {
+    const key = elm.getAttribute('data-t');
+    if (T[lang][key]) elm.textContent = T[lang][key];
+  });
+}
+
+function tt(key) { return T[LANG][key] || key; }
+
+function showErr(id, msg) {
+  const b = document.getElementById(id);
+  b.textContent = msg;
+  b.classList.add('show');
+}
+function hideErr(id) {
+  document.getElementById(id).classList.remove('show');
+}
+
+/* ─── فك التوكن محلياً (للتحقق من الصلاحية فقط) ─── */
+function decodeJwtPayload(token) {
+  try {
+    const payload = token.split('.')[1];
+    let str = payload.replace(/-/g, '+').replace(/_/g, '/');
+    while (str.length % 4) str += '=';
+    return JSON.parse(atob(str));
+  } catch (e) { return null; }
+}
+
+/* ─── التوجيه حسب الدور ─── */
+function redirectByRole(user) {
+  if (user.role === 'super_admin') {
+    location.href = 'admin.html';
+  } else if (user.role === 'supervisor') {
+    location.href = 'supervisor.html';
+  } else if (user.role === 'driver') {
+    location.href = 'driver.html';
+  } else {
+    location.href = 'index.html';
+  }
+}
+
+/* ─── عند فتح الصفحة: فحص جلسة محفوظة ─── */
+(function checkExistingSession() {
+  setLang(LANG);
+  const token = localStorage.getItem('mk_staff_token');
+  const userRaw = localStorage.getItem('mk_staff_user');
+  if (!token || !userRaw) return;
+
+  const payload = decodeJwtPayload(token);
+  if (!payload || !payload.exp || payload.exp < Math.floor(Date.now() / 1000)) {
+    // منتهي → نمسح ونبقى في شاشة الدخول
+    localStorage.removeItem('mk_staff_token');
+    localStorage.removeItem('mk_staff_user');
+    return;
+  }
+
+  const user = JSON.parse(userRaw);
+
+  // لو ما زال مطالباً بتغيير كلمة المرور → شاشة التغيير
+  if (user.mustChangePassword) {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('changeScreen').style.display = 'block';
+    return;
+  }
+
+  redirectByRole(user);
+})();
+
+/* ─── تسجيل الدخول ─── */
+async function doLogin() {
+  hideErr('loginErr');
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value;
+
+  if (!username || !password) {
+    showErr('loginErr', tt('errEmpty'));
+    return;
+  }
+
+  const btn = document.getElementById('btnLogin');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>' + tt('logging');
+
+  try {
+    const res = await fetch(API_BASE + '/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      showErr('loginErr', '⚠️ ' + (data.error || 'خطأ غير معروف'));
+      return;
+    }
+
+    // حفظ الجلسة (30 يوماً عبر exp داخل التوكن)
+    localStorage.setItem('mk_staff_token', data.token);
+    localStorage.setItem('mk_staff_user', JSON.stringify(data.user));
+
+    // أول دخول → إجبار تغيير كلمة المرور
+    if (data.user.mustChangePassword) {
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('changeScreen').style.display = 'block';
+      return;
+    }
+
+    redirectByRole(data.user);
+
+  } catch (e) {
+    showErr('loginErr', '⚠️ تعذر الاتصال بالخادم — تحقق من الإنترنت');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span data-t="login">' + tt('login') + '</span>';
+  }
+}
+
+/* ─── تغيير كلمة المرور ─── */
+async function doChangePassword() {
+  hideErr('changeErr');
+  hideErr('changeOk');
+
+  const newPass = document.getElementById('newPass').value;
+  const confirmPass = document.getElementById('confirmPass').value;
+
+  if (newPass !== confirmPass) {
+    showErr('changeErr', tt('errPassMismatch'));
+    return;
+  }
+  if (newPass.length < 8 || !/[A-Z]/.test(newPass) || !/[a-z]/.test(newPass) || !/[0-9]/.test(newPass)) {
+    showErr('changeErr', tt('errPassWeak'));
+    return;
+  }
+
+  const token = localStorage.getItem('mk_staff_token');
+  const btn = document.getElementById('btnChange');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>' + tt('saving');
+
+  try {
+    const res = await fetch(API_BASE + '/api/auth/change-password', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token,
+      },
+      body: JSON.stringify({ new_password: newPass }),
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      showErr('changeErr', '⚠️ ' + (data.error || 'خطأ غير معروف'));
+      return;
+    }
+
+    // تحديث بيانات المستخدم المحفوظة
+    const user = JSON.parse(localStorage.getItem('mk_staff_user') || '{}');
+    user.mustChangePassword = false;
+    localStorage.setItem('mk_staff_user', JSON.stringify(user));
+
+    showErr('changeOk', tt('okChanged'));
+    document.getElementById('changeOk').classList.add('show');
+
+    setTimeout(() => redirectByRole(user), 900);
+
+  } catch (e) {
+    showErr('changeErr', '⚠️ تعذر الاتصال بالخادم — تحقق من الإنترنت');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span>' + tt('savePass') + '</span>';
+  }
+}
+
+/* ─── Enter للدخول ─── */
+document.getElementById('password').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+document.getElementById('confirmPass').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doChangePassword();
+});
+</script>
+
+</body>
+</html>
