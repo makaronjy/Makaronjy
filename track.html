@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تتبع طلبك | مكرونجي</title>
+<link rel="icon" href="img/logo.png">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root{
+  --brown:#8e2a4a; --brown2:#a4385c; --dark:#5a1830;
+  --gold:#e0912f; --gold2:#f2b95f; --cream:#faf3ea; --card:#fffdf9;
+  --ink:#2b1a15; --muted:#8a6f63; --line:#eadfd2;
+  --wa:#128c5e; --ok:#1e5b4f; --err:#b91c1c;
+}
+*,::before,::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{
+  font-family:'Cairo',sans-serif;background:var(--cream);
+  background-image:radial-gradient(#efe3d3 1px,transparent 1px);background-size:22px 22px;
+  color:var(--ink);min-height:100vh;padding-bottom:2rem;
+}
+.wrap{max-width:560px;margin:0 auto;padding:0 1rem;}
+
+/* ─── الترويسة ─── */
+.head{text-align:center;padding:1.2rem 0 .6rem;}
+.head img{width:64px;height:64px;border-radius:50%;border:2px solid var(--gold);object-fit:cover;background:#e8a04c;}
+.head h1{font-size:1.15rem;font-weight:900;color:var(--brown);margin-top:.4rem;}
+.order-num{
+  display:inline-block;background:var(--dark);color:var(--gold2);
+  border-radius:50px;padding:.25rem 1.1rem;font-weight:900;
+  margin-top:.4rem;direction:ltr;font-size:1rem;
+}
+
+/* ─── الخريطة ─── */
+.map-box{
+  height:280px;border-radius:18px;overflow:hidden;
+  border:2px solid var(--gold);box-shadow:0 8px 26px rgba(90,24,48,.15);
+  margin:.8rem 0;
+}
+#map{height:100%;width:100%;background:#e8e4dc;}
+
+/* ─── مؤشر التحديث الحي ─── */
+.live{
+  display:flex;align-items:center;justify-content:center;gap:.45rem;
+  font-size:.75rem;font-weight:800;color:var(--ok);padding:.2rem 0 .6rem;
+}
+.live .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);animation:pulse 1.5s infinite;}
+.live.stale{color:var(--err);}
+.live.stale .dot{background:var(--err);animation:none;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ─── بطاقة الحالة ─── */
+.card{
+  background:var(--card);border:1.5px solid var(--line);border-radius:18px;
+  padding:1.1rem;margin-bottom:.8rem;box-shadow:0 2px 8px rgba(90,24,48,.06);
+}
+.status-main{display:flex;align-items:center;gap:.8rem;margin-bottom:1rem;}
+.status-ic{
+  width:56px;height:56px;border-radius:50%;background:#fff6e6;
+  display:flex;align-items:center;justify-content:center;font-size:1.7rem;flex-shrink:0;
+}
+.status-main h3{font-size:1.02rem;font-weight:900;color:var(--ink);}
+.status-main p{font-size:.78rem;color:var(--muted);font-weight:700;margin-top:.15rem;}
+
+/* ─── شريط المراحل ─── */
+.steps{display:flex;justify-content:space-between;position:relative;margin-top:.4rem;}
+.steps::before{content:'';position:absolute;top:15px;right:9%;left:9%;height:3px;background:var(--line);}
+.steps .bar{
+  position:absolute;top:15px;right:9%;height:3px;background:var(--gold);
+  transition:width .6s ease;width:0;
+}
+.step{display:flex;flex-direction:column;align-items:center;position:relative;z-index:1;}
+.step .ic{
+  width:32px;height:32px;border-radius:50%;background:#eee;
+  display:flex;align-items:center;justify-content:center;font-size:.9rem;
+  margin-bottom:.3rem;transition:.3s;
+}
+.step.done .ic{background:var(--ok);color:#fff;}
+.step.now .ic{background:var(--gold);box-shadow:0 0 0 4px #e0912f33;}
+.step small{font-size:.62rem;color:var(--muted);font-weight:800;text-align:center;max-width:60px;}
+
+/* ─── بطاقة السائق ─── */
+.driver{display:flex;align-items:center;gap:.8rem;}
+.driver .av{
+  width:48px;height:48px;border-radius:50%;background:var(--gold);
+  display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0;
+}
+.driver b{display:block;font-size:.95rem;font-weight:900;}
+.driver small{color:var(--muted);font-size:.75rem;font-weight:700;}
+.call-btn{
+  margin-inline-start:auto;width:44px;height:44px;border-radius:50%;
+  background:var(--ok);color:#fff;border:none;font-size:1.15rem;cursor:pointer;
+}
+
+/* ─── تفاصيل الطلب ─── */
+.items .row{
+  display:flex;justify-content:space-between;gap:.6rem;
+  padding:.4rem 0;border-bottom:1px solid #f0e8dc;font-size:.86rem;font-weight:800;
+}
+.items .row:last-child{border-bottom:none;}
+.tot{
+  display:flex;justify-content:space-between;padding-top:.7rem;margin-top:.3rem;
+  border-top:2px solid var(--line);font-weight:900;font-size:1.05rem;color:var(--brown);
+}
+
+/* ─── زر واتس ─── */
+.wa-btn{
+  width:100%;padding:.95rem;border:none;border-radius:14px;
+  background:var(--wa);color:#fff;font-family:inherit;
+  font-size:1rem;font-weight:900;cursor:pointer;
+  box-shadow:0 8px 22px rgba(18,140,94,.35);transition:.2s;
+}
+.wa-btn:active{transform:scale(.97);}
+.wa-note{text-align:center;font-size:.7rem;color:var(--muted);font-weight:700;margin-top:.4rem;}
+
+/* ─── خطأ / تحميل ─── */
+.center-box{text-align:center;padding:3rem 1rem;color:var(--muted);font-weight:800;}
+.spinner{
+  width:42px;height:42px;border:4px solid #eee;border-top-color:var(--gold);
+  border-radius:50%;margin:0 auto 1rem;animation:spin 1s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="head">
+    <img src="img/logo.png" alt="مكرونجي">
+    <h1 data-t="title">تتبع طلبك</h1>
+    <div class="order-num" id="orderNum">—</div>
+  </div>
+
+  <!-- تحميل / خطأ -->
+  <div id="loadBox" class="center-box">
+    <div class="spinner"></div>
+    <span data-t="loading">جارٍ تحميل بيانات الطلب...</span>
+  </div>
+
+  <!-- المحتوى -->
+  <div id="content" style="display:none">
+
+    <div class="map-box"><div id="map"></div></div>
+
+    <div class="live" id="liveBadge">
+      <span class="dot"></span><span id="liveTxt">تحديث لحظي</span>
+    </div>
+
+    <!-- الحالة + المراحل -->
+    <div class="card">
+      <div class="status-main">
+        <div class="status-ic" id="statusIc">⏳</div>
+        <div>
+          <h3 id="statusTxt">...</h3>
+          <p id="etaTxt">...</p>
+        </div>
+      </div>
+      <div class="steps" id="stepsBox">
+        <div class="bar" id="stepsBar"></div>
+        <div class="step" data-i="0"><div class="ic">✅</div><small data-t="s1">مقبول</small></div>
+        <div class="step" data-i="1"><div class="ic">👨</div><small data-t="s2">تحضير</small></div>
+        <div class="step" data-i="2"><div class="ic">📦</div><small data-t="s3">جاهز</small></div>
+        <div class="step" data-i="3"><div class="ic">🛵</div><small data-t="s4">بالطريق</small></div>
+        <div class="step" data-i="4"><div class="ic">🎉</div><small data-t="s5">سُلّم</small></div>
+      </div>
+    </div>
+
+    <!-- السائق -->
+    <div class="card" id="driverCard" style="display:none">
+      <div class="driver">
+        <div class="av">🚗</div>
+        <div>
+          <b id="driverName">...</b>
+          <small data-t="driverLbl">سائق مكرونجي</small>
+        </div>
+        <button class="call-btn" id="callBtn" title="اتصال">📞</button>
+      </div>
+    </div>
+
+    <!-- تفاصيل الطلب -->
+    <div class="card">
+      <div class="items" id="itemsBox"></div>
+      <div class="tot"><span data-t="total">الإجمالي (شامل الضريبة)</span><span id="totalTxt">—</span></div>
+    </div>
+
+    <!-- واتس -->
+    <div id="waBox">
+      <button class="wa-btn" id="waBtn" data-t="waBtn">📲 أكد طلبك عبر واتساب</button>
+      <div class="wa-note" data-t="waNote">الرسالة تحتوي ملخص طلبك واسمك ورقمك فقط — بدون العنوان</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════
+   إعدادات الربط
+   ═══════════════════════════════════════════ */
+const API_BASE = 'https://makaronjy-api.makaronjy.workers.dev';
+const REFRESH_MS = 5000; // كل 5 ثوانٍ (وضع polling المجاني)
+
+const T = {
+  ar: {
+    title: 'تتبع طلبك', loading: 'جارٍ تحميل بيانات الطلب...',
+    s1: 'مقبول', s2: 'تحضير', s3: 'جاهز', s4: 'بالطريق', s5: 'سُلّم',
+    driverLbl: 'سائق مكرونجي', total: 'الإجمالي (شامل الضريبة)',
+    waBtn: '📲 أكد طلبك عبر واتساب',
+    waNote: 'الرسالة تحتوي ملخص طلبك واسمك ورقمك فقط — بدون العنوان',
+    live: 'تحديث لحظي', stale: 'انقطع التحديث — آخر تحديث قبل',
+    sec: 'ثانية', notFound: 'الطلب غير موجود — تحقق من الرقم أو تواصل مع المطعم',
+    etaPending: 'بانتظار تأكيد المطعم...',
+    etaPrep: 'يصلك خلال 25-35 دقيقة تقريباً',
+    etaReady: 'السائق في طريقه للاستلام قريباً',
+    etaWay: 'السائق على بعد {km} كم — يصلك خلال {min} دقيقة تقريباً',
+    etaDone: 'تم التسليم — بالعافية! 🍝',
+    etaCancel: 'تم إلغاء هذا الطلب',
+    delivered: 'تم التسليم ✅',
+  },
+  en: {
+    title: 'Track Your Order', loading: 'Loading order...',
+    s1: 'Accepted', s2: 'Preparing', s3: 'Ready', s4: 'On the way', s5: 'Delivered',
+    driverLbl: 'Makaronjy Driver', total: 'Total (tax incl.)',
+    waBtn: '📲 Confirm via WhatsApp',
+    waNote: 'Message includes order summary, name & phone only — no address',
+    live: 'Live update', stale: 'Update lost — last update',
+    sec: 's ago', notFound: 'Order not found — check the number or call the branch',
+    etaPending: 'Waiting for restaurant confirmation...',
+    etaPrep: 'Arrives in ~25-35 minutes',
+    etaReady: 'Driver heading to pickup soon',
+    etaWay: 'Driver is {km} km away — ETA ~{min} min',
+    etaDone: 'Delivered — enjoy! 🍝',
+    etaCancel: 'This order was cancelled',
+    delivered: 'Delivered ✅',
+  }
+};
+let LANG = localStorage.getItem('mk_lang') || 'ar';
+function tt(k) { return (T[LANG] && T[LANG][k]) || T.ar[k] || k; }
+
+/* ─── الحالة ─── */
+const orderNumber = new URLSearchParams(location.search).get('order') || '';
+let DATA = null;
+let map = null, driverMarker = null, restMarker = null, custMarker = null, routeLine = null;
+let refreshTimer = null;
+let lastSuccess = Date.now();
+
+document.getElementById('orderNum').textContent = orderNumber || '—';
+
+/* ─── أيقونات الخريطة ─── */
+function emojiIcon(e) {
+  return L.divIcon({
+    html: '<div style="font-size:2rem;line-height:1;filter:drop-shadow(0 3px 5px rgba(0,0,0,.35))">' + e + '</div>',
+    className: '', iconSize: [36, 36], iconAnchor: [18, 34],
+  });
+}
+
+/* ─── المسافة (Haversine) ─── */
+function distKm(a, b) {
+  const R = 6371, dLa = (b.lat - a.lat) * Math.PI / 180, dLo = (b.lng - a.lng) * Math.PI / 180;
+  const s = Math.sin(dLa/2)**2 + Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLo/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1-s));
+}
+
+/* ─── فهرس المرحلة ─── */
+function stageIndex(status) {
+  return {
+    accepted: 0, preparing: 1,
+    ready: 2, driver_assigned: 2, driver_at_restaurant: 2,
+    out_for_delivery: 3, delivered: 4,
+  }[status] ?? -1;
+}
+
+/* ─── تحميل البيانات ─── */
+async function load(first) {
+  try {
+    const res = await fetch(`${API_BASE}/api/track/${encodeURIComponent(orderNumber)}`);
+    const data = await res.json();
+    if (!res.ok) {
+      document.getElementById('loadBox').innerHTML = '<div style="font-size:3rem">😕</div><p>' + tt('notFound') + '</p>';
+      return;
+    }
+    DATA = data;
+    lastSuccess = Date.now();
+    if (first) {
+      document.getElementById('loadBox').style.display = 'none';
+      document.getElementById('content').style.display = 'block';
+      initMap();
+    }
+    render();
+  } catch (e) {
+    /* سيُعاد المحاولة بالدورة القادمة */
+  }
+}
+
+/* ─── الخريطة ─── */
+function initMap() {
+  const b = DATA.branch;
+  const center = (b.lat && b.lng) ? [b.lat, b.lng] : [24.7136, 46.6753];
+  map = L.map('map', { zoomControl: true }).setView(center, 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap', maxZoom: 19,
+  }).addTo(map);
+
+  if (b.lat && b.lng) {
+    restMarker = L.marker([b.lat, b.lng], { icon: emojiIcon('🏪') })
+      .addTo(map).bindPopup(b.name || '');
+  }
+}
+
+function updateMap() {
+  if (!map || !DATA) return;
+  const d = DATA.driver;
+  const pts = [];
+
+  if (restMarker) pts.push(restMarker.getLatLng());
+
+  if (d && d.lat && d.lng && DATA.order.status !== 'delivered') {
+    if (!driverMarker) {
+      driverMarker = L.marker([d.lat, d.lng], { icon: emojiIcon('🚗') })
+        .addTo(map).bindPopup(d.name || '');
+    } else {
+      driverMarker.setLatLng([d.lat, d.lng]);
+    }
+    pts.push(driverMarker.getLatLng());
+  }
+
+  if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+  if (pts.length === 2) {
+    routeLine = L.polyline(pts, { color: '#e0912f', weight: 3, dashArray: '8,8' }).addTo(map);
+    map.fitBounds(L.latLngBounds(pts).pad(0.35));
+  }
+}
+
+/* ─── العرض ─── */
+function render() {
+  const o = DATA.order, d = DATA.driver, b = DATA.branch;
+
+  // الأيقونة والنص
+  const icons = {
+    pending: '⏳', accepted: '✅', preparing: '👨🍳', ready: '📦',
+    driver_assigned: '🚗', driver_at_restaurant: '🏪',
+    out_for_delivery: '🛵', delivered: '🎉', cancelled: '❌',
+  };
+  document.getElementById('statusIc').textContent = icons[o.status] || '⏳';
+  document.getElementById('statusTxt').textContent = o.status_text;
+
+  // الوقت المتوقع
+  let eta = tt('etaPrep');
+  if (o.status === 'pending') eta = tt('etaPending');
+  else if (['ready','driver_assigned','driver_at_restaurant'].includes(o.status)) eta = tt('etaReady');
+  else if (o.status === 'out_for_delivery' && d && d.lat && DATA.order) {
+    // المسافة بين السائق والعميل إن وجدت إحداثياته، وإلا الفرع
+    eta = tt('etaWay').replace('{km}', '—').replace('{min}', '10-15');
+  }
+  else if (o.status === 'delivered') eta = tt('etaDone');
+  else if (o.status === 'cancelled') eta = tt('etaCancel');
+  document.getElementById('etaTxt').textContent = eta;
+
+  // شريط المراحل
+  const idx = stageIndex(o.status);
+  document.querySelectorAll('#stepsBox .step').forEach((s, i) => {
+    s.classList.toggle('done', i < idx);
+    s.classList.toggle('now', i === idx);
+  });
+  const bar = document.getElementById('stepsBar');
+  bar.style.width = idx <= 0 ? '0%' : (idx / 4 * 82) + '%';
+
+  // السائق
+  const dc = document.getElementById('driverCard');
+  if (d && d.name) {
+    dc.style.display = 'block';
+    document.getElementById('driverName').textContent = d.name;
+    document.getElementById('callBtn').onclick = () => { location.href = 'tel:' + d.phone; };
+  } else dc.style.display = 'none';
+
+  // الأصناف
+  document.getElementById('itemsBox').innerHTML =
+    o.items.map(i => `<div class="row"><span>${i.qty}× ${i.name}${i.size ? ' (' + i.size + ')' : ''}</span><span>${i.qty * i.price} ريال</span></div>`).join('') +
+    `<div class="row"><span>🛵 رسوم التوصيل</span><span>${o.delivery_fee} ريال</span></div>`;
+  document.getElementById('totalTxt').textContent = o.total + ' ريال';
+
+  // إخفاء واتس بعد التسليم
+  document.getElementById('waBox').style.display =
+    (o.status === 'delivered' || o.status === 'cancelled') ? 'none' : 'block';
+
+  updateMap();
+
+  // إيقاف التحديث عند النهاية
+  if ((o.status === 'delivered' || o.status === 'cancelled') && refreshTimer) {
+    clearInterval(refreshTimer); refreshTimer = null;
+  }
+}
+
+/* ─── رسالة واتس (بدون العنوان) ─── */
+document.getElementById('waBtn').addEventListener('click', () => {
+  if (!DATA) return;
+  const o = DATA.order, b = DATA.branch;
+  const lines = o.items.map(i => `▪️ ${i.qty}× ${i.name} = ${i.qty * i.price} ريال`);
+  const msg =
+`🍝 مكرونجي – تأكيد طلب
+🧾 رقم الطلب: ${o.number}
+👤 ${o.customer_name} | 📱 ${'' /* رقم العميل لا يُعرض هنا لأنه مرسل الرسالة */}
+━━━━━━━━━━━━
+${lines.join('\n')}
+━━━━━━━━━━━━
+🛵 رسوم التوصيل: ${o.delivery_fee} ريال
+💵 الإجمالي: ${o.total} ريال (شامل الضريبة)`;
+  const phone = (b.phone || '').replace(/\D/g, '');
+  window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
+});
+
+/* ─── مؤشر آخر تحديث ─── */
+setInterval(() => {
+  const secs = Math.floor((Date.now() - lastSuccess) / 1000);
+  const badge = document.getElementById('liveBadge');
+  const txt = document.getElementById('liveTxt');
+  if (secs > 20) {
+    badge.classList.add('stale');
+    txt.textContent = tt('stale') + ' ' + secs + ' ' + tt('sec');
+  } else {
+    badge.classList.remove('stale');
+    txt.textContent = tt('live');
+  }
+}, 1000);
+
+/* ─── الإقلاع ─── */
+if (!orderNumber) {
+  document.getElementById('loadBox').innerHTML = '<div style="font-size:3rem">😕</div><p>' + tt('notFound') + '</p>';
+} else {
+  load(true);
+  refreshTimer = setInterval(() => load(false), REFRESH_MS);
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) load(false); });
+</script>
+
+</body>
+</html>
