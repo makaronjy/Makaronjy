@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تطبيق السائق | مكرونجي</title>
+<link rel="icon" href="img/logo.png">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --brown:#8e2a4a; --brown2:#a4385c; --dark:#5a1830;
+  --gold:#e0912f; --gold2:#f2b95f; --cream:#faf3ea; --card:#fffdf9;
+  --ink:#2b1a15; --muted:#8a6f63; --line:#eadfd2;
+  --wa:#128c5e; --ok:#1e5b4f; --err:#b91c1c;
+}
+*,::before,::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{
+  font-family:'Cairo',sans-serif;background:#1a1a2e;color:#fff;
+  min-height:100vh;padding-bottom:3rem;
+}
+
+/* ─── الشريط العلوي ─── */
+.topbar{
+  position:sticky;top:0;z-index:50;
+  background:rgba(22,33,62,.97);backdrop-filter:blur(8px);
+  display:flex;align-items:center;gap:.6rem;
+  padding:.7rem 1rem;box-shadow:0 4px 18px rgba(0,0,0,.35);
+}
+.topbar .brand{display:flex;align-items:center;gap:.5rem;min-width:0;}
+.topbar .brand img{width:40px;height:40px;border-radius:50%;border:2px solid var(--gold);object-fit:cover;}
+.topbar .brand b{font-size:.95rem;font-weight:900;display:block;line-height:1.2;}
+.topbar .brand small{color:var(--gold2);font-size:.7rem;font-weight:700;}
+.topbar .spacer{flex:1;}
+.conn{
+  display:flex;align-items:center;gap:.35rem;
+  background:#ffffff14;border:1px solid #ffffff2b;border-radius:50px;
+  padding:.3rem .7rem;font-size:.72rem;font-weight:900;
+}
+.conn .dot{width:8px;height:8px;border-radius:50%;background:#4CAF50;animation:pulse 1.5s infinite;}
+.conn.offline .dot{background:#f44336;animation:none;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.icon-btn{
+  background:#ffffff14;border:1px solid #ffffff2b;border-radius:50px;
+  padding:.35rem .7rem;color:#fff;font-family:inherit;
+  font-weight:900;font-size:.8rem;cursor:pointer;
+}
+
+/* ─── الإحصائيات ─── */
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:.6rem;max-width:640px;margin:1rem auto;padding:0 1rem;}
+.stat{background:#16213e;border-radius:16px;padding:.9rem;text-align:center;}
+.stat b{display:block;font-size:1.4rem;font-weight:900;color:var(--gold2);}
+.stat small{color:#8899aa;font-size:.72rem;font-weight:800;}
+
+/* ─── الحاوية ─── */
+.wrap{max-width:640px;margin:0 auto;padding:0 1rem;}
+.sec-title{display:flex;align-items:center;gap:.5rem;font-size:1rem;font-weight:900;color:var(--gold2);margin:1.2rem 0 .6rem;}
+
+/* ─── بطاقة التوصيل ─── */
+.d-card{
+  background:#16213e;border:2px solid transparent;border-radius:20px;
+  padding:1rem;margin-bottom:.8rem;transition:.3s;
+}
+.d-card.active{border-color:var(--gold);box-shadow:0 0 20px rgba(224,145,47,.25);}
+.d-card.new{border-color:#4CAF50;animation:glow 2s infinite;}
+@keyframes glow{0%,100%{box-shadow:0 0 6px rgba(76,175,80,.4)}50%{box-shadow:0 0 22px rgba(76,175,80,.7)}}
+.dc-head{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:.6rem;}
+.dc-num{background:var(--dark);color:var(--gold2);border-radius:10px;padding:.2rem .7rem;font-weight:900;direction:ltr;}
+.dc-fee{background:var(--gold);color:var(--dark);border-radius:10px;padding:.2rem .7rem;font-weight:900;font-size:.85rem;}
+.dc-line{font-size:.88rem;font-weight:700;color:#dde;margin:.3rem 0;line-height:1.7;}
+.dc-line .lbl{color:#8899aa;}
+.dc-line a{color:var(--gold2);font-weight:900;text-decoration:none;}
+.dc-actions{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.8rem;}
+.btn{
+  border:none;border-radius:12px;padding:.7rem 1.1rem;
+  font-family:inherit;font-weight:900;font-size:.88rem;cursor:pointer;transition:.2s;
+}
+.btn:active{transform:scale(.96);}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+.btn-ok{background:#4CAF50;color:#fff;}
+.btn-err{background:#f44336;color:#fff;}
+.btn-gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--dark);}
+.btn-wa{background:var(--wa);color:#fff;}
+.btn-full{width:100%;}
+
+/* ─── شريط المراحل ─── */
+.steps{display:flex;justify-content:space-between;margin:.8rem 0;position:relative;}
+.steps::before{content:'';position:absolute;top:14px;right:8%;left:8%;height:3px;background:#2a3a5e;}
+.step{display:flex;flex-direction:column;align-items:center;position:relative;z-index:1;}
+.step .ic{
+  width:30px;height:30px;border-radius:50%;background:#2a3a5e;
+  display:flex;align-items:center;justify-content:center;font-size:.85rem;margin-bottom:.25rem;
+}
+.step.done .ic{background:#4CAF50;}
+.step.now .ic{background:var(--gold);box-shadow:0 0 12px rgba(224,145,47,.6);}
+.step small{font-size:.6rem;color:#8899aa;font-weight:800;text-align:center;max-width:56px;}
+
+/* ─── فارغ ─── */
+.empty{text-align:center;color:#8899aa;font-weight:800;padding:1.6rem;border:1.5px dashed #2a3a5e;border-radius:16px;font-size:.9rem;}
+
+/* ─── توست ─── */
+#toast{position:fixed;bottom:1.2rem;inset-inline:0;display:flex;flex-direction:column;align-items:center;gap:.5rem;z-index:4000;pointer-events:none;}
+.toast{background:var(--dark);color:#fff;border-radius:50px;padding:.6rem 1.4rem;font-weight:900;font-size:.85rem;box-shadow:0 10px 30px rgba(0,0,0,.4);animation:pop .3s ease;}
+.toast.err{background:var(--err);} .toast.ok{background:var(--ok);}
+@keyframes pop{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
+</style>
+</head>
+<body>
+
+<!-- ═══ الشريط العلوي ═══ -->
+<div class="topbar">
+  <div class="brand">
+    <img src="img/logo.png" alt="مكرونجي">
+    <div>
+      <b id="drvName">...</b>
+      <small id="drvBranch">...</small>
+    </div>
+  </div>
+  <div class="spacer"></div>
+  <div class="conn" id="connBadge"><span class="dot"></span> متصل</div>
+  <button class="icon-btn" onclick="logout()">خروج 🚪</button>
+</div>
+
+<!-- ═══ الإحصائيات ═══ -->
+<div class="stats">
+  <div class="stat"><b id="stDeliv">0</b><small>توصيلات اليوم</small></div>
+  <div class="stat"><b id="stEarn">0</b><small>أرباح اليوم (ريال)</small></div>
+</div>
+
+<div class="wrap">
+  <!-- ═══ التوصيل الحالي ═══ -->
+  <div class="sec-title">🚗 التوصيل الحالي</div>
+  <div id="activeBox"></div>
+
+  <!-- ═══ سجل اليوم ═══ -->
+  <div class="sec-title">📜 سجل اليوم</div>
+  <div id="historyBox"></div>
+</div>
+
+<!-- إدخال صورة الكاميرا (مخفي) -->
+<input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
+
+<div id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════
+   إعدادات الربط
+   ═══════════════════════════════════════════ */
+const API_BASE = 'https://makaronjy-api.makaronjy.workers.dev';
+const REFRESH_MS = 7000;   // تحديث القائمة كل 7 ثوانٍ
+const GPS_MS = 5000;       // بث الموقع كل 5 ثوانٍ (وضع polling المجاني)
+
+let TOKEN = localStorage.getItem('mk_staff_token');
+let USER = JSON.parse(localStorage.getItem('mk_staff_user') || 'null');
+let ACTIVE = null;          // التوصيل النشط الحالي
+let knownAssigned = new Set();
+let gpsTimer = null;
+let pendingPhotoFor = null;
+
+/* ─── حماية الصفحة ─── */
+(function guard() {
+  if (!TOKEN || !USER || USER.role !== 'driver' || USER.mustChangePassword) {
+    location.href = 'login.html'; return;
+  }
+  document.getElementById('drvName').textContent = USER.name;
+})();
+
+/* ─── غلاف API ─── */
+async function api(path, opts = {}) {
+  const res = await fetch(API_BASE + path, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + TOKEN,
+      ...(opts.headers || {}),
+    },
+  });
+  if (res.status === 401) {
+    localStorage.removeItem('mk_staff_token');
+    localStorage.removeItem('mk_staff_user');
+    location.href = 'login.html';
+    throw new Error('unauthorized');
+  }
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'خطأ');
+  return data;
+}
+
+function toast(msg, kind) {
+  const t = document.createElement('div');
+  t.className = 'toast ' + (kind || '');
+  t.textContent = msg;
+  document.getElementById('toast').appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+
+/* ─── تطبيع الجوال ─── */
+function normalizePhone(p) {
+  const d = (p || '').replace(/\D/g, '');
+  if (d.startsWith('0')) return '966' + d.slice(1);
+  if (d.startsWith('966')) return d;
+  return d;
+}
+
+function trackUrl(number) {
+  return location.origin + '/track.html?order=' + encodeURIComponent(number);
+}
+
+/* ─── رسائل واتس الجاهزة ─── */
+function waOnWay(o) {
+  const msg =
+`أنا ${USER.name}، سائق مكرونجي 🛵
+طلبك رقم ${o.number} في الطريق إليك
+تابع موقعي مباشرة:
+${trackUrl(o.number)}`;
+  window.open('https://wa.me/' + normalizePhone(o.customer_phone) + '?text=' + encodeURIComponent(msg), '_blank');
+}
+
+function waDelivered(o) {
+  const msg =
+`تم تسليم طلبك رقم ${o.number} بنجاح ✅
+بالعافية! 🍝
+مكرونجي`;
+  window.open('https://wa.me/' + normalizePhone(o.customer_phone) + '?text=' + encodeURIComponent(msg), '_blank');
+}
+
+/* ─── الملاحة ─── */
+function navigate(o) {
+  if (o.customer_lat && o.customer_lng) {
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${o.customer_lat},${o.customer_lng}`, '_blank');
+  } else {
+    window.open('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(o.customer_address || ''), '_blank');
+  }
+}
+
+/* ─── تحميل البيانات ─── */
+async function loadAll(first) {
+  try {
+    const data = await api('/api/driver/orders');
+    const orders = data.orders || [];
+
+    // التوصيل النشط = أول طلب غير مسلّم
+    ACTIVE = orders.find(o => o.status !== 'delivered') || null;
+
+    // تنبيه عند إسناد جديد
+    const assigned = orders.filter(o => o.status === 'driver_assigned');
+    if (!first) {
+      assigned.forEach(o => {
+        if (!knownAssigned.has(o.number)) {
+          knownAssigned.add(o.number);
+          try { navigator.vibrate && navigator.vibrate([300, 150, 300]); } catch (e) {}
+          toast('🆕 توصيل جديد: ' + o.number);
+        }
+      });
+    } else {
+      assigned.forEach(o => knownAssigned.add(o.number));
+    }
+
+    // الإحصائيات
+    document.getElementById('stDeliv').textContent = data.stats?.delivered_today || 0;
+    document.getElementById('stEarn').textContent = data.stats?.earnings_today || 0;
+
+    render(orders);
+    setConn(true);
+
+    // تشغيل/إيقاف بث الموقع
+    if (ACTIVE) startGps(); else stopGps();
+
+  } catch (e) {
+    if (e.message !== 'unauthorized') setConn(false);
+  }
+}
+
+function setConn(on) {
+  const b = document.getElementById('connBadge');
+  b.classList.toggle('offline', !on);
+  b.innerHTML = on ? '<span class="dot"></span> متصل' : '<span class="dot"></span> غير متصل';
+}
+
+/* ─── العرض ─── */
+function render(orders) {
+  const box = document.getElementById('activeBox');
+
+  if (!ACTIVE) {
+    box.innerHTML = '<div class="empty">لا يوجد توصيل نشط حالياً 📭<br>سيصلك تنبيه عند إسناد طلب جديد</div>';
+  } else {
+    box.innerHTML = cardActive(ACTIVE);
+  }
+
+  const done = orders.filter(o => o.status === 'delivered').slice(0, 15);
+  document.getElementById('historyBox').innerHTML = done.length
+    ? done.map(o => `
+        <div class="d-card">
+          <div class="dc-head">
+            <span class="dc-num">${o.number}</span>
+            <span class="dc-fee">+${o.delivery_fee} ريال</span>
+          </div>
+          <div class="dc-line"><span class="lbl">👤</span> ${o.customer_name} — ✅ تم التسليم</div>
+        </div>`).join('')
+    : '<div class="empty">لا توجد توصيلات مكتملة اليوم</div>';
+}
+
+/* ─── بطاقة التوصيل النشط + شريط المراحل ─── */
+function cardActive(o) {
+  const steps = [
+    { key: 'driver_assigned', ic: '🚗', lbl: 'مُسند' },
+    { key: 'driver_at_restaurant', ic: '🏪', lbl: 'المطعم' },
+    { key: 'out_for_delivery', ic: '🛵', lbl: 'بالطريق' },
+    { key: 'delivered', ic: '✅', lbl: 'سُلّم' },
+  ];
+  const idx = steps.findIndex(s => s.key === o.status);
+
+  const stepsHtml = steps.map((s, i) => `
+    <div class="step ${i < idx ? 'done' : (i === idx ? 'now' : '')}">
+      <div class="ic">${s.ic}</div><small>${s.lbl}</small>
+    </div>`).join('');
+
+  let actions = '';
+  if (o.status === 'driver_assigned') {
+    actions = `
+      <button class="btn btn-ok btn-full" onclick="setStatus(${o.id},'driver_at_restaurant')">🏪 وصلت المطعم</button>
+      <button class="btn btn-err btn-full" onclick="apologize(${o.id})">❌ اعتذار عن التوصيل</button>`;
+  } else if (o.status === 'driver_at_restaurant') {
+    actions = `
+      <button class="btn btn-gold btn-full" onclick="setStatus(${o.id},'out_for_delivery')">📦 استلمت الطلب وانطلقت</button>`;
+  } else if (o.status === 'out_for_delivery') {
+    actions = `
+      <button class="btn btn-wa btn-full" onclick='waOnWay(${JSON.stringify(o).replace(/'/g, "&#39;")})'>🛵 إشعار العميل: أنا بالطريق</button>
+      <button class="btn btn-ok btn-full" onclick="prepareDeliver(${o.id})">✅ تم التسليم + 📸 صورة</button>`;
+  }
+
+  return `
+  <div class="d-card active ${o.status === 'driver_assigned' ? 'new' : ''}">
+    <div class="dc-head">
+      <span class="dc-num">${o.number}</span>
+      <span class="dc-fee">أجرة ${o.delivery_fee} ريال</span>
+    </div>
+    <div class="steps">${stepsHtml}</div>
+    <div class="dc-line"><span class="lbl">👤 العميل:</span> ${o.customer_name}
+      — <a href="tel:${o.customer_phone}">📞 اتصال</a></div>
+    <div class="dc-line"><span class="lbl">📍 العنوان:</span> ${o.customer_address || '—'}
+      — <a href="javascript:void(0)" onclick="navigate(ACTIVE)">🗺️ الملاحة</a></div>
+    <div class="dc-line"><span class="lbl">💵 استلم عند التسليم:</span> ${o.total} ريال</div>
+    <div class="dc-actions">${actions}</div>
+  </div>`;
+}
+
+/* ─── تغيير حالة ─── */
+async function setStatus(id, status) {
+  try {
+    await api(`/api/orders/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    });
+    toast('تم تحديث الحالة ✅', 'ok');
+    loadAll(false);
+  } catch (e) {
+    toast('⚠️ ' + e.message, 'err');
+  }
+}
+
+async function apologize(id) {
+  if (!confirm('هل أنت متأكد من الاعتذار؟ سيعود الطلب للمشرف لتعيين سائق آخر.')) return;
+  setStatus(id, 'ready');
+}
+
+/* ─── التسليم: صورة ثم حالة ─── */
+function prepareDeliver(id) {
+  pendingPhotoFor = id;
+  document.getElementById('photoInput').click();
+}
+
+document.getElementById('photoInput').addEventListener('change', async function () {
+  const file = this.files && this.files[0];
+  this.value = '';
+  const id = pendingPhotoFor;
+  pendingPhotoFor = null;
+  if (!file || !id) return;
+
+  try {
+    toast('جارٍ رفع الصورة...');
+    const base64 = await new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+
+    await api(`/api/orders/${id}/photo`, {
+      method: 'POST',
+      body: JSON.stringify({ photo_base64: base64 }),
+    });
+
+    await api(`/api/orders/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status: 'delivered' }),
+    });
+
+    toast('✅ تم التسليم — أرسل رسالة التأكيد للعميل', 'ok');
+    const o = ACTIVE;
+    if (o) waDelivered(o);
+    loadAll(false);
+  } catch (e) {
+    toast('⚠️ ' + e.message, 'err');
+  }
+});
+
+/* ─── بث الموقع GPS ─── */
+function startGps() {
+  if (gpsTimer || !navigator.geolocation) return;
+  gpsTimer = setInterval(sendLocation, GPS_MS);
+  sendLocation();
+}
+function stopGps() {
+  if (gpsTimer) { clearInterval(gpsTimer); gpsTimer = null; }
+}
+function sendLocation() {
+  if (!ACTIVE) return;
+  navigator.geolocation.getCurrentPosition(async pos => {
+    try {
+      await api('/api/driver/location', {
+        method: 'POST',
+        body: JSON.stringify({
+          order_id: ACTIVE.id,
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          speed: pos.coords.speed || 0,
+          heading: pos.coords.heading || 0,
+        }),
+      });
+    } catch (e) { /* صامت – سيُعاد المحاولة بالدورة القادمة */ }
+  }, () => {}, { enableHighAccuracy: true, timeout: 8000, maximumAge: 2000 });
+}
+
+/* ─── خروج ─── */
+function logout() {
+  if (!confirm('هل تريد تسجيل الخروج؟')) return;
+  stopGps();
+  localStorage.removeItem('mk_staff_token');
+  localStorage.removeItem('mk_staff_user');
+  location.href = 'login.html';
+}
+
+/* ─── الإقلاع ─── */
+loadAll(true);
+setInterval(() => loadAll(false), REFRESH_MS);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) loadAll(false);
+});
+</script>
+
+</body>
+</html>
