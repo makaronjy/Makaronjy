@@ -136,6 +136,19 @@
   <div class="d-foot">
     <div class="closed-note" id="closedNote">🕐 <span id="closedNoteTxt">مغلق يرجى العودة لاحقاً</span></div>
     <div class="pickup-note" id="pickupNoteRow">🛍️ <span data-i18n="pickupNote">طلبك يكون جاهزاً عند وصولك للفرع</span></div>
+
+    <!-- ===== v16: حقلا الاسم والجوال (إجباريين للتوصيل) ===== -->
+    <div class="customer-info" id="customerInfo" style="margin-bottom:.6rem">
+      <label class="d-lbl" for="cName" style="display:block;margin-bottom:.25rem;font-weight:900;font-size:.82rem;color:#5a1830">
+        👤 <span data-i18n="customerName">الاسم</span> <span style="color:#b91c1c">*</span>
+      </label>
+      <input id="cName" class="d-address" placeholder="الاسم الكامل" autocomplete="name" style="margin-bottom:.5rem">
+      <label class="d-lbl" for="cPhone" style="display:block;margin-bottom:.25rem;font-weight:900;font-size:.82rem;color:#5a1830">
+        📱 <span data-i18n="customerPhone">رقم الجوال</span> <span style="color:#b91c1c">*</span>
+      </label>
+      <input id="cPhone" class="d-address" placeholder="05XXXXXXXX" inputmode="tel" autocomplete="tel" dir="ltr" style="text-align:left">
+    </div>
+
     <div class="delivery-box" id="deliveryBox" hidden>
       <label class="d-lbl" for="dAddress" data-i18n="addressLabel">عنوان التوصيل</label>
       <input id="dAddress" class="d-address" data-i18n-ph="addressPh" placeholder="الحي، الشارع، أقرب معلم...">
@@ -279,5 +292,7 @@
 <script src="menu.js"></script>
 <script src="settings.js"></script>
 <script src="app.js"></script>
+<!-- v16: الطبقة السحابية (تحميل بعد app.js لتجاوز checkout) -->
+<script src="cloud.js"></script>
 </body>
 </html>
