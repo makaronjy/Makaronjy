@@ -1,4 +1,6 @@
-/* ===== admin-core.js — النواة: دخول + GitHub + نوافذ (v3) ===== */
+/* ===== admin-core.js — النواة: دخول + GitHub + نوافذ (v3.1) ===== */
+/* v3.1: try-catch شامل + حماية من البيانات المكسورة */
+
 /* ===== إيقاف التكبير ===== */
 document.addEventListener(`touchstart`,
 function(e){
@@ -474,12 +476,16 @@ body: JSON.stringify(body)
 });
 return path;
 }
+/* v3.1: parseJs محمي من النصوص الفارغة أو المكسورة */
 function parseJs(text){
+if(!text || typeof text !== `string`){
+throw new Error(`الملف فارغ أو غير صالح`);
+}
 var w = { window:{} };
 try{
 new Function(`window`, text)(w.window);
 }catch(e){
-throw new Error(`JS parse error: ` + e.message);
+throw new Error(`خطأ في قراءة الملف: ` + e.message);
 }
 return w.window;
 }
@@ -563,6 +569,28 @@ if(STATE.SETTINGS.social === undefined){
 STATE.SETTINGS.social = [];
 }
 }
+/* v3.1: هجرة أنظمة الدفع (جاهز للمستقبل) */
+function migratePayments(){
+var s = STATE.SETTINGS;
+if(!s.payments){
+s.payments = {
+cod: { enabled: true },
+gateway: {
+enabled: false,
+provider: `moyasar`,
+publishableKey: ``
+}
+};
+}
+if(!s.payments.cod) s.payments.cod = { enabled: true };
+if(!s.payments.gateway){
+s.payments.gateway = {
+enabled: false,
+provider: `moyasar`,
+publishableKey: ``
+};
+}
+}
 /* ===== أدوات الوقت ===== */
 function clamp12(v){
 var n = parseInt(v,10);
@@ -642,20 +670,64 @@ if(!ok) return;
 sessionStorage.removeItem(`mk_admin`);
 location.reload();
 });
-/* ===== تحميل البيانات ===== */
+/* ===== تحميل البيانات (v3.1: try-catch شامل) ===== */
 async function loadAll(){
+var menuText, settingsText;
+
+/* الخطوة 1: جلب الملفات من GitHub */
+try{
 var both = await Promise.all([
 getFile(`menu.js`),
 getFile(`settings.js`)
 ]);
-var mw = parseJs(both[0].text);
-var sw = parseJs(both[1].text);
-STATE = {
+menuText = both[0].text;
+settingsText = both[1].text;
+}catch(e){
+var cls = classifyGhError(e);
+throw new Error(
+L(cls.key) +
+(cls.detail ? ` — ` + cls.detail : ``)
+);
+}
+
+/* الخطوة 2: تحليل JavaScript */
+var mw, sw;
+try{
+mw = parseJs(menuText);
+}catch(e){
+throw new Error(
+`ملف menu.js غير صالح: ` + e.message
+);
+}
+try{
+sw = parseJs(settingsText);
+}catch(e){
+throw new Error(
+`ملف settings.js غير صالح: ` + e.message
+);
+}
+
+/* الخطوة 3: التحقق من البنية الأساسية */
+if(!mw.MENU || !Array.isArray(mw.MENU)){
+throw new Error(
+`ملف menu.js لا يحتوي على مصفوفة MENU`
+);
+}
+if(!sw.APP_SETTINGS || typeof sw.APP_SETTINGS !== `object`){
+throw new Error(
+`ملف settings.js لا يحتوي على APP_SETTINGS`
+);
+}
+
+/* الخطوة 4: بناء الحالة الجديدة (فقط بعد النجاح الكامل) */
+var newState = {
 MENU: mw.MENU,
 SETTINGS: sw.APP_SETTINGS,
 shas: { menu: both[0].sha, settings: both[1].sha }
 };
-var S0 = STATE.SETTINGS;
+var S0 = newState.SETTINGS;
+
+/* ضمان وجود الحقول الأساسية */
 if(!S0.ad) S0.ad = {};
 if(!S0.ad.icon) S0.ad.icon = `🍝`;
 if(!S0.delivery) S0.delivery = [];
@@ -667,10 +739,16 @@ mode:`grid`, showDesc:true, showCal:true
 };
 }
 if(S0.bgs) delete S0.bgs;
+
+/* تطبيق الهجرات */
+STATE = newState;
 migrateBranchNums();
 migrateHours();
 migrateBestSellers();
 migrateSocial();
+migratePayments();
+
+/* الخطوة 5: إظهار التطبيق */
 el(`renewScreen`).classList.add(`hidden`);
 el(`loginScreen`).classList.add(`hidden`);
 el(`app`).classList.remove(`hidden`);
@@ -723,10 +801,12 @@ await loadAll();
 applyAdminLang();
 toast(L(`loggedIn`), `success`, L(`loggedSub`));
 }catch(e){
-var cls = classifyGhError(e);
-showBanner(`loginErr`, L(`errPublish`),
-L(cls.key) +
-(cls.detail ? ` — ` + cls.detail : ``));
+/* v3.1: عرض الخطأ بوضوح للمستخدم */
+var errMsg = (e && e.message) ? e.message : String(e);
+showBanner(`loginErr`,
+L(`errPublish`),
+errMsg
+);
 sessionStorage.removeItem(`mk_admin`);
 CFG = null;
 }
@@ -766,7 +846,7 @@ var cls = classifyGhError(e);
 var bad = (e.http===401||e.http===403);
 showBanner(`renewErr`,
 bad ? L(`errRenewBad`) : L(cls.key),
-cls.detail);
+cls.detail || (e && e.message));
 }
 btn.disabled = false;
 btn.textContent = L(`btnRenew`);
@@ -787,7 +867,11 @@ if(e.http===401||e.http===403){
 toast(L(`errAuth`), `error`);
 showRenew();
 }else{
-toast(L(`refreshFail`) + e.message, `error`);
+toast(
+(L(`refreshFail`) + ` `) +
+(e && e.message ? e.message : ``),
+`error`
+);
 }
 }
 b.disabled = false;
@@ -1143,4 +1227,4 @@ ensureV15Cards();
 renderBannersAdmin();
 return r;
 };
-/* ===== END admin-core.js ===== */
+/* ===== END admin-core.js (v3.1) ===== */
