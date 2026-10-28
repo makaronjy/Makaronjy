@@ -69,11 +69,11 @@ window.APP_SETTINGS = {
         },
         {
           "o": {
-            "h": 11,
+            "h": 7,
             "m": 0
           },
           "c": {
-            "h": 7,
+            "h": 19,
             "m": 0
           },
           "closed": false
@@ -559,5 +559,15 @@ window.APP_SETTINGS = {
     "showDesc": true,
     "showCal": true
   },
-  "deliveryFeeMode": "free"
+  "deliveryFeeMode": "free",
+  "payments": {
+    "cod": {
+      "enabled": true
+    },
+    "gateway": {
+      "enabled": false,
+      "provider": "moyasar",
+      "publishableKey": ""
+    }
+  }
 };
