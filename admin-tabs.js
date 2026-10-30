@@ -1,4 +1,6 @@
-/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v8) ===== */
+/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v9) ===== */
+/* v9: إضافة تبويبات الموظفون / الطلبات / التقارير */
+
 /* اسم حسب لغة الواجهة */
 function nmOf(x){
 return (ALANG===`ar`) ? x.ar : (x.en || x.ar);
@@ -17,6 +19,85 @@ const SQ_STYLE =
 function disSt(on){
 return on ? ` disabled style="opacity:.35;pointer-events:none"` : ``;
 }
+
+/* =====================================================
+   v9: الطبقة السحابية — API للـ Worker
+   ===================================================== */
+const CLOUD_API = 'https://makaronjy-api.makaronjy.workers.dev';
+let CLOUD_JWT = sessionStorage.getItem('mk_cloud_jwt') || '';
+
+async function cloudBridge(){
+  try{
+    var c = JSON.parse(sessionStorage.getItem('mk_admin') || 'null');
+    if(!c || !c.token) throw new Error('سجّل الدخول في لوحة التحكم أولاً');
+    var r = await fetch(CLOUD_API + '/api/auth/admin-bridge', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ github_token: c.token })
+    });
+    var d = await r.json().catch(function(){ return {}; });
+    if(!r.ok) throw new Error(d.error || ('فشل الجسر HTTP ' + r.status));
+    CLOUD_JWT = d.token;
+    sessionStorage.setItem('mk_cloud_jwt', CLOUD_JWT);
+    return CLOUD_JWT;
+  }catch(e){
+    throw e;
+  }
+}
+
+async function capi(path, opts){
+  opts = opts || {};
+  var headers = {'Content-Type':'application/json'};
+  if(CLOUD_JWT) headers['Authorization'] = 'Bearer ' + CLOUD_JWT;
+  var r = await fetch(CLOUD_API + path, Object.assign({}, opts, {headers:headers}));
+  if(r.status === 401){
+    try{
+      await cloudBridge();
+      headers['Authorization'] = 'Bearer ' + CLOUD_JWT;
+      r = await fetch(CLOUD_API + path, Object.assign({}, opts, {headers:headers}));
+    }catch(e){}
+  }
+  var d = await r.json().catch(function(){ return {}; });
+  if(!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+  return d;
+}
+
+/* v9: تنسيقات تبويبات السحابة */
+(function injectCloudStyles(){
+  if(el('v9CloudStyles')) return;
+  var st = document.createElement('style');
+  st.id = 'v9CloudStyles';
+  st.textContent =
+  '.cl-card{background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:1rem;margin:0 0 1rem}' +
+  '.cl-card h3{font-size:1rem;font-weight:900;color:var(--ink);margin:0 0 .7rem}' +
+  '.cl-row{display:flex;gap:.6rem;flex-wrap:wrap;align-items:flex-end}' +
+  '.cl-f{display:flex;flex-direction:column;gap:.25rem;flex:1;min-width:130px}' +
+  '.cl-f label{font-size:.72rem;font-weight:900;color:var(--brown)}' +
+  '.cl-f input,.cl-f select{border:1.5px solid var(--line);border-radius:10px;padding:.55rem .6rem;font-family:inherit;font-weight:800;background:#fff;font-size:.88rem}' +
+  '.cl-btn{border:none;border-radius:10px;padding:.6rem 1.1rem;font-family:inherit;font-weight:900;cursor:pointer;font-size:.85rem}' +
+  '.cl-add{background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--dark)}' +
+  '.cl-plain{background:#f3e7d7;color:var(--brown)}' +
+  '.cl-err{background:#fee2e2;color:#b91c1c}' +
+  '.cl-ok{background:#1e5b4f;color:#fff}' +
+  '.cl-res{margin-top:.8rem;background:#dcf5e8;border:1.5px solid #128c5e44;border-radius:12px;padding:.8rem;font-size:.82rem;font-weight:800;line-height:1.9;display:none}' +
+  '.cl-res.show{display:block}' +
+  '.cl-res .pass{direction:ltr;display:inline-block;background:#5a1830;color:#f2b95f;border-radius:8px;padding:.15rem .7rem;font-weight:900;font-family:monospace}' +
+  '.cl-tbl{width:100%;border-collapse:collapse;font-size:.78rem;margin-top:.8rem}' +
+  '.cl-tbl th,.cl-tbl td{border:1px solid var(--line);padding:.45rem .4rem;text-align:center;font-weight:800}' +
+  '.cl-tbl th{background:#f3e7d7;color:var(--brown)}' +
+  '.cl-tbl tr:hover{background:#faf3ea}' +
+  '.cl-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.6rem;margin-top:.8rem}' +
+  '.cl-stat{background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:.7rem;text-align:center}' +
+  '.cl-stat b{display:block;font-size:1.4rem;color:var(--brown);margin-bottom:.15rem}' +
+  '.cl-stat small{color:var(--muted);font-weight:800;font-size:.68rem}' +
+  '.cl-badge-off{background:#fee2e2;color:#b91c1c;border-radius:50px;padding:.1rem .5rem;font-size:.66rem;font-weight:800}' +
+  '.cl-badge-on{background:#dcf5e8;color:#1e5b4f;border-radius:50px;padding:.1rem .5rem;font-size:.66rem;font-weight:800}' +
+  '.cl-btn-sm{padding:.3rem .6rem;font-size:.72rem;border-radius:8px;border:none;font-weight:900;cursor:pointer;font-family:inherit;margin:0 .1rem}' +
+  '.cl-empty{padding:2rem;text-align:center;color:var(--muted);font-weight:800;border:1.5px dashed var(--line);border-radius:12px;margin-top:.8rem}' +
+  '.cl-actions{display:flex;gap:.3rem;justify-content:center;flex-wrap:wrap}';
+  document.head.appendChild(st);
+})();
+
 /* ===== المنيو ===== */
 function renderMenu(){
 var wrap = el(`menuWrap`);
@@ -1472,6 +1553,334 @@ btn.textContent = label;
 handlePublishError(e, btn, label);
 }
 });
+
+/* =====================================================
+   v9: تبويب الموظفون
+   ===================================================== */
+function buildUsersTab(){
+  var sec = el(`tab-cloud-users`);
+  if(!sec) return;
+  var brs = branches();
+  var brOpts = brs.map(function(b){
+    return `<option value="` + esc(b.id) + `">` + esc(brName(b)) + `</option>`;
+  }).join(``);
+  sec.innerHTML =
+    `<div class="cl-card">` +
+      `<h3>` + L(`usersAddTitle`) + `</h3>` +
+      `<form id="cuForm" class="cl-row">` +
+        `<div class="cl-f"><label>` + L(`usersName`) + `</label><input id="cuName" required></div>` +
+        `<div class="cl-f"><label>` + L(`usersPhone`) + `</label><input id="cuPhone" class="ltr" placeholder="9665xxxxxxxx"></div>` +
+        `<div class="cl-f"><label>` + L(`usersUsername`) + `</label><input id="cuUser" class="ltr" required></div>` +
+        `<div class="cl-f"><label>` + L(`usersRole`) + `</label><select id="cuRole">` +
+          `<option value="supervisor">` + L(`usersRoleSup`) + `</option>` +
+          `<option value="driver">` + L(`usersRoleDrv`) + `</option>` +
+        `</select></div>` +
+        `<div class="cl-f"><label>` + L(`usersBranch`) + `</label><select id="cuBranch">` + brOpts + `</select></div>` +
+        `<div class="cl-f"><label>` + L(`usersTempPass`) + `</label><input id="cuPass" class="ltr" placeholder="` + L(`usersTempGen`) + `"></div>` +
+        `<button type="submit" class="cl-btn cl-add" style="align-self:flex-end">` + L(`usersCreate`) + `</button>` +
+      `</form>` +
+      `<div class="cl-res" id="cuResult"></div>` +
+    `</div>` +
+    `<div class="cl-card">` +
+      `<h3>` + L(`usersListTitle`) + `</h3>` +
+      `<div style="overflow-x:auto"><table class="cl-tbl" id="cuTable"></table></div>` +
+      `<div class="cl-res" id="cuAct"></div>` +
+    `</div>`;
+  var form = el(`cuForm`);
+  if(form){
+    form.addEventListener(`submit`, async function(e){
+      e.preventDefault();
+      var name = mv(`cuName`).trim();
+      var phone = mv(`cuPhone`).trim();
+      var username = mv(`cuUser`).trim().toLowerCase();
+      var role = el(`cuRole`).value;
+      var branch_id = el(`cuBranch`).value;
+      var password = mv(`cuPass`).trim() || undefined;
+      if(!name || !username){
+        toast(L(`usersName`) + ` / ` + L(`usersUsername`), `warn`);
+        return;
+      }
+      var btn = form.querySelector(`button[type="submit"]`);
+      btn.disabled = true;
+      btn.textContent = L(`publishing`);
+      try{
+        var d = await capi(`/api/admin/users`, {
+          method:`POST`,
+          body: JSON.stringify({
+            name:name, phone:phone, username:username,
+            password:password, role:role, branch_id:branch_id
+          })
+        });
+        var box = el(`cuResult`);
+        box.classList.add(`show`);
+        box.innerHTML = `✅ ` + L(`usersCreated`) + ` — ` +
+          L(`usersUsername`) + `: <b dir="ltr">` + esc(d.username) + `</b><br>` +
+          `🔑 ` + L(`usersTempPass`) + `: <span class="pass">` + esc(d.temp_password) + `</span><br>` +
+          `⚠️ ` + L(`usersGivePass`);
+        form.reset();
+        loadUsersTab();
+      }catch(err){
+        toast(`⚠️ ` + err.message, `error`);
+      }
+      btn.disabled = false;
+      btn.textContent = L(`usersCreate`);
+    });
+  }
+  var tbl = el(`cuTable`);
+  if(tbl){
+    tbl.addEventListener(`click`, async function(e){
+      var ut = e.target.closest(`[data-ut]`);
+      var ur = e.target.closest(`[data-ur]`);
+      try{
+        if(ut){
+          var uid = +ut.getAttribute(`data-ut`);
+          var ua = +ut.getAttribute(`data-ua`);
+          await capi(`/api/admin/users/` + uid, {
+            method:`PUT`,
+            body: JSON.stringify({ is_active: ua })
+          });
+          toast(ua ? `✓ ` + L(`usersEnable`) : `⛔ ` + L(`usersDisable`), `success`);
+          loadUsersTab();
+        } else if(ur){
+          var uid2 = +ur.getAttribute(`data-ur`);
+          var d = await capi(`/api/admin/users/` + uid2 + `/reset-password`, { method:`POST` });
+          var box = el(`cuAct`);
+          box.classList.add(`show`);
+          box.innerHTML = `🔑 <b dir="ltr">` + esc(d.username) + `</b> ← <span class="pass">` + esc(d.temp_password) + `</span>`;
+        }
+      }catch(err){
+        toast(`⚠️ ` + err.message, `error`);
+      }
+    });
+  }
+}
+
+async function loadUsersTab(){
+  var tbl = el(`cuTable`);
+  if(!tbl) return;
+  var ROLE_MAP = {
+    super_admin: L(`usersRoleOwner`),
+    supervisor: L(`usersRoleSup`),
+    driver: L(`usersRoleDrv`)
+  };
+  try{
+    if(!CLOUD_JWT) await cloudBridge();
+    var d = await capi(`/api/admin/users`);
+    var rows = (d.users || []).map(function(u){
+      return `<tr>` +
+        `<td>` + esc(u.name) + `</td>` +
+        `<td dir="ltr">` + esc(u.username) + `</td>` +
+        `<td>` + (ROLE_MAP[u.role] || u.role) + `</td>` +
+        `<td>` + esc(u.branch_name || `—`) + `</td>` +
+        `<td>` + (u.is_active ? `<span class="cl-badge-on">` + L(`usersActive`) + `</span>` : `<span class="cl-badge-off">` + L(`usersInactive`) + `</span>`) + `</td>` +
+        `<td class="cl-actions">` +
+          `<button class="cl-btn-sm ` + (u.is_active ? `cl-err` : `cl-ok`) +
+            `" data-ut="` + u.id + `" data-ua="` + (u.is_active ? 0 : 1) + `">` +
+            (u.is_active ? L(`usersDisable`) : L(`usersEnable`)) + `</button>` +
+          `<button class="cl-btn-sm cl-plain" data-ur="` + u.id + `">🔑</button>` +
+        `</td>` +
+      `</tr>`;
+    }).join(``);
+    tbl.innerHTML = `<tr>` +
+      `<th>` + L(`usersName`) + `</th>` +
+      `<th>` + L(`usersUsername`) + `</th>` +
+      `<th>` + L(`usersRole`) + `</th>` +
+      `<th>` + L(`usersBranch`) + `</th>` +
+      `<th>` + L(`ordersStatus`) + `</th>` +
+      `<th>—</th>` +
+    `</tr>` +
+    (rows || `<tr><td colspan="6" class="cl-empty">` + L(`usersEmpty`) + `</td></tr>`);
+  }catch(err){
+    tbl.innerHTML = `<tr><td colspan="6" class="cl-empty">⚠️ ` + esc(err.message) + `</td></tr>`;
+  }
+}
+
+/* =====================================================
+   v9: تبويب الطلبات
+   ===================================================== */
+function buildOrdersTab(){
+  var sec = el(`tab-cloud-orders`);
+  if(!sec) return;
+  var brs = branches();
+  var brOpts = `<option value="">` + L(`ordersAllBranches`) + `</option>` +
+    brs.map(function(b){
+      return `<option value="` + esc(b.id) + `">` + esc(brName(b)) + `</option>`;
+    }).join(``);
+  var statusOpts = `<option value="">` + L(`ordersAllStatuses`) + `</option>` +
+    `<option value="pending">` + L(`statusPending`) + `</option>` +
+    `<option value="accepted">` + L(`statusAccepted`) + `</option>` +
+    `<option value="preparing">` + L(`statusPreparing`) + `</option>` +
+    `<option value="ready">` + L(`statusReady`) + `</option>` +
+    `<option value="driver_assigned">` + L(`statusDrvAssigned`) + `</option>` +
+    `<option value="driver_at_restaurant">` + L(`statusDrvAtRest`) + `</option>` +
+    `<option value="out_for_delivery">` + L(`statusOutForDel`) + `</option>` +
+    `<option value="delivered">` + L(`statusDelivered`) + `</option>` +
+    `<option value="cancelled">` + L(`statusCancelled`) + `</option>` +
+    `<option value="archived">` + L(`statusArchived`) + `</option>`;
+  sec.innerHTML =
+    `<div class="cl-card">` +
+      `<h3>` + L(`ordersTitle`) + `</h3>` +
+      `<div class="cl-row">` +
+        `<div class="cl-f"><label>` + L(`ordersBranch`) + `</label><select id="coBranch">` + brOpts + `</select></div>` +
+        `<div class="cl-f"><label>` + L(`ordersStatus`) + `</label><select id="coStatus">` + statusOpts + `</select></div>` +
+        `<button class="cl-btn cl-add" id="coRefresh" style="align-self:flex-end">` + L(`ordersRefresh`) + `</button>` +
+      `</div>` +
+      `<div style="overflow-x:auto"><table class="cl-tbl" id="coTable"></table></div>` +
+    `</div>`;
+  var refBtn = el(`coRefresh`);
+  if(refBtn) refBtn.addEventListener(`click`, loadOrdersTab);
+}
+
+async function loadOrdersTab(){
+  var tbl = el(`coTable`);
+  if(!tbl) return;
+  var STATUS_MAP = {
+    pending: L(`statusPending`),
+    accepted: L(`statusAccepted`),
+    preparing: L(`statusPreparing`),
+    ready: L(`statusReady`),
+    driver_assigned: L(`statusDrvAssigned`),
+    driver_at_restaurant: L(`statusDrvAtRest`),
+    out_for_delivery: L(`statusOutForDel`),
+    delivered: L(`statusDelivered`),
+    cancelled: L(`statusCancelled`),
+    archived: L(`statusArchived`)
+  };
+  var q = `/api/admin/orders?`;
+  var b = el(`coBranch`) ? el(`coBranch`).value : ``;
+  var st = el(`coStatus`) ? el(`coStatus`).value : ``;
+  if(b) q += `branch_id=` + encodeURIComponent(b) + `&`;
+  if(st) q += `status=` + encodeURIComponent(st);
+  try{
+    if(!CLOUD_JWT) await cloudBridge();
+    var d = await capi(q);
+    var rows = (d.orders || []).map(function(o){
+      return `<tr>` +
+        `<td dir="ltr"><b>` + esc(o.number) + `</b></td>` +
+        `<td>` + esc(o.branch_name) + `</td>` +
+        `<td>` + esc(o.customer_name) + `</td>` +
+        `<td dir="ltr">` + esc(o.customer_phone) + `</td>` +
+        `<td>` + o.total + `</td>` +
+        `<td>` + (STATUS_MAP[o.status] || o.status) + `</td>` +
+        `<td>` + esc(o.driver_name || L(`ordersNoDriver`)) + `</td>` +
+        `<td>` + esc(String(o.created_at).slice(0,16)) + `</td>` +
+      `</tr>`;
+    }).join(``);
+    tbl.innerHTML = `<tr>` +
+      `<th>` + L(`ordersNumber`) + `</th>` +
+      `<th>` + L(`ordersBranch`) + `</th>` +
+      `<th>` + L(`ordersCustomer`) + `</th>` +
+      `<th>` + L(`ordersPhone`) + `</th>` +
+      `<th>` + L(`ordersTotal`) + `</th>` +
+      `<th>` + L(`ordersStatus`) + `</th>` +
+      `<th>` + L(`ordersDriver`) + `</th>` +
+      `<th>` + L(`ordersTime`) + `</th>` +
+    `</tr>` +
+    (rows || `<tr><td colspan="8" class="cl-empty">` + L(`ordersEmpty`) + `</td></tr>`);
+  }catch(err){
+    tbl.innerHTML = `<tr><td colspan="8" class="cl-empty">⚠️ ` + esc(err.message) + `</td></tr>`;
+  }
+}
+
+/* =====================================================
+   v9: تبويب التقارير
+   ===================================================== */
+function buildReportsTab(){
+  var sec = el(`tab-cloud-reports`);
+  if(!sec) return;
+  var brs = branches();
+  var brOpts = `<option value="">` + L(`ordersAllBranches`) + `</option>` +
+    brs.map(function(b){
+      return `<option value="` + esc(b.id) + `">` + esc(brName(b)) + `</option>`;
+    }).join(``);
+  sec.innerHTML =
+    `<div class="cl-card">` +
+      `<h3>` + L(`reportsTitle`) + `</h3>` +
+      `<div class="cl-row">` +
+        `<div class="cl-f"><label>` + L(`reportsPeriod`) + `</label><select id="crPeriod">` +
+          `<option value="today">` + L(`reportsToday`) + `</option>` +
+          `<option value="week">` + L(`reportsWeek`) + `</option>` +
+          `<option value="month">` + L(`reportsMonth`) + `</option>` +
+        `</select></div>` +
+        `<div class="cl-f"><label>` + L(`ordersBranch`) + `</label><select id="crBranch">` + brOpts + `</select></div>` +
+        `<button class="cl-btn cl-add" id="crGo" style="align-self:flex-end">` + L(`reportsShow`) + `</button>` +
+      `</div>` +
+      `<div id="crBox" style="margin-top:.8rem"></div>` +
+    `</div>`;
+  var goBtn = el(`crGo`);
+  if(goBtn) goBtn.addEventListener(`click`, loadReportsTab);
+}
+
+async function loadReportsTab(){
+  var box = el(`crBox`);
+  if(!box) return;
+  var q = `/api/reports/summary?period=` + (el(`crPeriod`) ? el(`crPeriod`).value : `today`);
+  var b = el(`crBranch`) ? el(`crBranch`).value : ``;
+  if(b) q += `&branch_id=` + encodeURIComponent(b);
+  try{
+    if(!CLOUD_JWT) await cloudBridge();
+    var d = await capi(q);
+    var t = d.totals || {};
+    var html = `<div class="cl-stats">` +
+      `<div class="cl-stat"><b>` + (t.total_orders || 0) + `</b><small>` + L(`reportsTotal`) + `</small></div>` +
+      `<div class="cl-stat"><b>` + (t.delivered || 0) + `</b><small>` + L(`reportsDelivered`) + `</small></div>` +
+      `<div class="cl-stat"><b>` + (t.cancelled || 0) + `</b><small>` + L(`reportsCancelled`) + `</small></div>` +
+      `<div class="cl-stat"><b>` + (t.revenue || 0) + `</b><small>` + L(`reportsRevenue`) + `</small></div>` +
+      `<div class="cl-stat"><b>` + (t.avg_order || 0) + `</b><small>` + L(`reportsAvg`) + `</small></div>` +
+    `</div>`;
+    if(d.drivers && d.drivers.length){
+      html += `<h4 style="margin-top:1rem;color:var(--brown);font-weight:900">` + L(`reportsDriverPerf`) + `</h4>` +
+        `<table class="cl-tbl"><tr>` +
+          `<th>` + L(`reportsDriverName`) + `</th>` +
+          `<th>` + L(`reportsDeliveries`) + `</th>` +
+          `<th>` + L(`reportsEarnings`) + `</th>` +
+        `</tr>` +
+        d.drivers.map(function(x){
+          return `<tr>` +
+            `<td>` + esc(x.driver_name) + `</td>` +
+            `<td>` + x.deliveries + `</td>` +
+            `<td>` + x.earnings + `</td>` +
+          `</tr>`;
+        }).join(``) + `</table>`;
+    }
+    box.innerHTML = html;
+  }catch(err){
+    box.innerHTML = `<div class="cl-empty">⚠️ ` + esc(err.message) + `</div>`;
+  }
+}
+
+/* =====================================================
+   v9: ربط التبويبات الجديدة بأحداث الفتح
+   ===================================================== */
+(function setupCloudTabs(){
+  var tries = 0;
+  var iv = setInterval(function(){
+    tries++;
+    var usersTab = document.querySelector(`[data-tab="cloud-users"]`);
+    if(!usersTab && tries < 40) return;
+    clearInterval(iv);
+    var tabs = [
+      {id:`cloud-users`, build:buildUsersTab, load:loadUsersTab},
+      {id:`cloud-orders`, build:buildOrdersTab, load:loadOrdersTab},
+      {id:`cloud-reports`, build:buildReportsTab, load:loadReportsTab}
+    ];
+    tabs.forEach(function(t){
+      var sec = el(`tab-` + t.id);
+      if(!sec) return;
+      t.build();
+      var btn = document.querySelector(`[data-tab="` + t.id + `"]`);
+      if(btn && !btn._cloudBound){
+        btn._cloudBound = true;
+        btn.addEventListener(`click`, async function(){
+          try{
+            await t.load();
+          }catch(e){}
+        });
+      }
+    });
+  }, 500);
+})();
+
 /* ===== التصدير الاحتياطي ===== */
 el(`btnExport`).addEventListener(`click`, function(){
 var data = {
@@ -1521,4 +1930,4 @@ return;
 applyAdminLang();
 })();
 window.__ADMIN_BOOTED = true;
-/* ===== END admin-tabs.js ===== */
+/* ===== END admin-tabs.js (v9) ===== */
