@@ -1,5 +1,6 @@
-/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v9) ===== */
+/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v9.1) ===== */
 /* v9: إضافة تبويبات الموظفون / الطلبات / التقارير */
+/* v9.1: إصلاح شرط STATE في setupCloudTabs */
 
 /* اسم حسب لغة الواجهة */
 function nmOf(x){
@@ -1853,7 +1854,7 @@ async function loadReportsTab(){
 }
 
 /* =====================================================
-   v9: ربط التبويبات الجديدة بأحداث الفتح (نسخة مصححة)
+   v9.1: ربط التبويبات الجديدة بأحداث الفتح (مصحح)
    البناء يتم عند أول ضغطة على التبويب — بعد الدخول فقط
    ===================================================== */
 (function setupCloudTabs(){
@@ -1869,7 +1870,7 @@ async function loadReportsTab(){
       if(!btn || btn._cloudBound) return;
       btn._cloudBound = true;
       btn.addEventListener(`click`, function(){
-        if(!window.STATE) return;
+        if(typeof STATE === `undefined` || !STATE) return;
         if(!built[t.id]){
           t.build();
           built[t.id] = true;
@@ -1934,4 +1935,4 @@ return;
 applyAdminLang();
 })();
 window.__ADMIN_BOOTED = true;
-/* ===== END admin-tabs.js (v9) ===== */
+/* ===== END admin-tabs.js (v9.1) ===== */
