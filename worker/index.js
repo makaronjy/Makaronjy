@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════
 //  مكرونجي - Cloudflare Worker API (كامل)
 //  نظام تتبع الطلبات الحي
-//  الإصدار: 1.0
+//  الإصدار: 1.1
 // ═══════════════════════════════════════════
 
 // ───────────────────────────────────────────
@@ -37,8 +37,8 @@ const STATUS_TRANSITIONS = {
   pending:              ['accepted', 'cancelled'],
   accepted:             ['preparing', 'cancelled'],
   preparing:            ['ready', 'cancelled'],
-  ready:                [],  // التعيين فقط عبر /assign
-  driver_assigned:      ['driver_at_restaurant', 'ready'], // ready = اعتذار السائق
+  ready:                [],
+  driver_assigned:      ['driver_at_restaurant', 'ready'],
   driver_at_restaurant: ['out_for_delivery'],
   out_for_delivery:     ['delivered'],
   delivered:            ['archived'],
@@ -50,7 +50,7 @@ const STATUS_ROLES = {
   accepted:             ['supervisor', 'super_admin'],
   cancelled:            ['supervisor', 'super_admin'],
   preparing:            ['supervisor', 'super_admin'],
-  driver_assigned:      ['driver', 'super_admin'],  // اعتذار السائق
+  driver_assigned:      ['driver', 'super_admin'],
   driver_at_restaurant: ['driver', 'super_admin'],
   out_for_delivery:     ['driver', 'super_admin'],
   delivered:            ['driver', 'super_admin'],
@@ -303,6 +303,7 @@ async function handleLogin(request, env) {
 // ═══════════════════════════════════════════
 //  2) جسر المالك (توكن GitHub → JWT داخلي)
 //  POST /api/auth/admin-bridge
+//  v1.1: إصلاح User-Agent وفحص الصلاحيات
 // ═══════════════════════════════════════════
 async function handleAdminBridge(request, env) {
   const ip = getIP(request);
@@ -312,39 +313,47 @@ async function handleAdminBridge(request, env) {
   const body = await request.json().catch(() => null);
   if (!body || !body.github_token) return error('التوكن مطلوب');
 
+  // الترويسات المطلوبة من GitHub API (User-Agent إجباري من سيرفر)
+  const ghHeaders = {
+    'Authorization': `Bearer ${body.github_token}`,
+    'Accept': 'application/vnd.github+json',
+    'User-Agent': 'makaronjy-cloud-worker',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+
   // التحقق من التوكن لدى GitHub
   let ghUser;
   try {
-    const r = await fetch('https://api.github.com/user', {
-      headers: {
-        'Authorization': `Bearer ${body.github_token}`,
-        'Accept': 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-      },
-    });
-    if (!r.ok) return error('توكن GitHub غير صالح', 401);
+    const r = await fetch('https://api.github.com/user', { headers: ghHeaders });
+    if (!r.ok) {
+      const errData = await r.json().catch(() => ({}));
+      return error('توكن GitHub غير صالح', 401, errData.message || `HTTP ${r.status}`);
+    }
     ghUser = await r.json();
   } catch (e) {
-    return error('تعذر الاتصال بـ GitHub', 502);
+    return error('تعذر الاتصال بـ GitHub', 502, e.message);
   }
 
   // التحقق أن لديه صلاحية push على المستودع
   const owner = env.GH_OWNER || 'makaronjy';
   const repo = env.GH_REPO || 'Makaronjy';
   try {
-    const r2 = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
-      headers: {
-        'Authorization': `Bearer ${body.github_token}`,
-        'Accept': 'application/vnd.github+json',
-      },
-    });
-    if (!r2.ok) return error('لا تملك صلاحية على المستودع', 403);
+    const r2 = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers: ghHeaders });
+    if (!r2.ok) {
+      const errData = await r2.json().catch(() => ({}));
+      if (r2.status === 404) return error('المستودع غير موجود', 404, `${owner}/${repo}`);
+      return error('لا تملك صلاحية على المستودع', 403, errData.message || `HTTP ${r2.status}`);
+    }
     const repoData = await r2.json();
-    if (!repoData.permissions || !repoData.permissions.push) {
-      return error('لا تملك صلاحية الكتابة على المستودع', 403);
+    // قبول: admin / maintain / push
+    const perms = repoData.permissions || {};
+    const hasWrite = perms.admin || perms.maintain || perms.push;
+    if (!hasWrite) {
+      return error('لا تملك صلاحية الكتابة على المستودع', 403,
+        `الصلاحيات الحالية: ${JSON.stringify(perms)}`);
     }
   } catch (e) {
-    return error('تعذر التحقق من المستودع', 502);
+    return error('تعذر التحقق من المستودع', 502, e.message);
   }
 
   // إيجاد حساب المالك في قاعدة البيانات
@@ -363,7 +372,7 @@ async function handleAdminBridge(request, env) {
     via: 'github_bridge',
     gh_login: ghUser.login,
     iat: Math.floor(Date.now() / 1000),
-    exp: Math.floor(Date.now() / 1000) + 43200, // 12 ساعة
+    exp: Math.floor(Date.now() / 1000) + 43200,
   };
   const token = await createJWT(payload, env.JWT_SECRET);
 
@@ -444,7 +453,6 @@ async function handleCreateOrder(request, env) {
     };
   });
 
-  // رسوم التوصيل حسب الوضع
   let deliveryFee = 0;
   const feeMode = body.delivery_fee_mode || 'free';
   if (feeMode === 'fixed') deliveryFee = parseFloat(body.delivery_fee) || 5;
@@ -924,7 +932,7 @@ async function handleAdminUsersCreate(request, env) {
     success: true,
     user_id: result.meta.last_row_id,
     username,
-    temp_password: tempPass,  // يُعرض مرة واحدة فقط
+    temp_password: tempPass,
     note: 'سلّم كلمة المرور للموظف الآن – لن تظهر مرة أخرى',
   }, 201);
 }
@@ -987,7 +995,6 @@ async function handleReportsSummary(request, env) {
   let branchId = url.searchParams.get('branch_id');
   const period = url.searchParams.get('period') || 'today';
 
-  // المشرف يرى فرعه فقط
   if (auth.user.role === 'supervisor') branchId = auth.user.branch_id;
 
   const dateCondition = {
@@ -1010,7 +1017,6 @@ async function handleReportsSummary(request, env) {
     FROM orders o WHERE ${where}
   `).bind(...params).first();
 
-  // أداء الفروع (للمالك فقط)
   let perBranch = [];
   if (auth.user.role === 'super_admin') {
     const pb = await env.DB.prepare(`
@@ -1024,7 +1030,6 @@ async function handleReportsSummary(request, env) {
     perBranch = pb.results;
   }
 
-  // أداء السائقين
   const driversParams = branchId ? [branchId] : [];
   const drivers = await env.DB.prepare(`
     SELECT u.name as driver_name,
@@ -1036,7 +1041,6 @@ async function handleReportsSummary(request, env) {
     GROUP BY o.driver_id ORDER BY deliveries DESC
   `).bind(...driversParams).all();
 
-  // الأكثر مبيعاً
   let topItems = [];
   try {
     const ti = await env.DB.prepare(`
@@ -1078,31 +1082,25 @@ export default {
     const path = url.pathname;
 
     try {
-      // ─── الصحة ───
       if (path === '/api/health' && request.method === 'GET') {
-        return json({ status: 'ok', version: '1.0', live_mode: env.LIVE_MODE || 'polling' });
+        return json({ status: 'ok', version: '1.1', live_mode: env.LIVE_MODE || 'polling' });
       }
 
-      // ─── المصادقة ───
       if (path === '/api/auth/login' && request.method === 'POST') return await handleLogin(request, env);
       if (path === '/api/auth/admin-bridge' && request.method === 'POST') return await handleAdminBridge(request, env);
       if (path === '/api/auth/change-password' && request.method === 'POST') return await handleChangePassword(request, env);
 
-      // ─── العميل (بدون توكن) ───
       if (path === '/api/orders' && request.method === 'POST') return await handleCreateOrder(request, env);
       if (path.startsWith('/api/track/') && request.method === 'GET') {
         return await handleTrackOrder(decodeURIComponent(path.split('/').pop()), env);
       }
 
-      // ─── المشرف ───
       if (path === '/api/supervisor/orders' && request.method === 'GET') return await handleSupervisorOrders(request, env);
       if (path === '/api/supervisor/drivers' && request.method === 'GET') return await handleSupervisorDrivers(request, env);
 
-      // ─── السائق ───
       if (path === '/api/driver/orders' && request.method === 'GET') return await handleDriverOrders(request, env);
       if (path === '/api/driver/location' && request.method === 'POST') return await handleDriverLocation(request, env);
 
-      // ─── الطلبات: حالات/تعيين/صورة ───
       let m = path.match(/^\/api\/orders\/(\d+)\/status$/);
       if (m && request.method === 'PUT') return await handleUpdateStatus(parseInt(m[1]), request, env);
 
@@ -1112,7 +1110,6 @@ export default {
       m = path.match(/^\/api\/orders\/(\d+)\/photo$/);
       if (m && request.method === 'POST') return await handleUploadPhoto(parseInt(m[1]), request, env);
 
-      // ─── المالك ───
       if (path === '/api/admin/orders' && request.method === 'GET') return await handleAdminOrders(request, env);
       if (path === '/api/admin/users' && request.method === 'GET') return await handleAdminUsersList(request, env);
       if (path === '/api/admin/users' && request.method === 'POST') return await handleAdminUsersCreate(request, env);
@@ -1123,7 +1120,6 @@ export default {
       m = path.match(/^\/api\/admin\/users\/(\d+)$/);
       if (m && request.method === 'PUT') return await handleAdminUsersUpdate(parseInt(m[1]), request, env);
 
-      // ─── التقارير ───
       if (path === '/api/reports/summary' && request.method === 'GET') return await handleReportsSummary(request, env);
 
       return error('Not found', 404);
@@ -1134,29 +1130,20 @@ export default {
     }
   },
 
-  // ═════════════════════════════════════════
-  //  المهام المجدولة (Cron)
-  //  "0 3 * * *"  = يومياً 3 فجراً: تنظيف + نسخ احتياطي
-  //  "0 *\/6 * * *" = كل 6 ساعات: تنظيف الجلسات
-  // ═════════════════════════════════════════
   async scheduled(event, env, ctx) {
     try {
-      // تنظيف الأرقام المنتهية (إعادة التدوير الآمنة)
       await env.DB.prepare(
         "DELETE FROM used_order_numbers WHERE expires_at < date('now')"
       ).run();
 
-      // تنظيف الجلسات المنتهية
       await env.DB.prepare(
         "DELETE FROM sessions WHERE expires_at < datetime('now')"
       ).run();
 
-      // تنظيف مواقع السائقين الأقدم من 7 أيام
       await env.DB.prepare(
         "DELETE FROM driver_locations WHERE created_at < datetime('now', '-7 days')"
       ).run();
 
-      // تنظيف سجلات التتبع للطلبات المؤرشفة الأقدم من 90 يوماً
       await env.DB.prepare(`
         DELETE FROM order_tracking WHERE order_id IN (
           SELECT id FROM orders
@@ -1164,7 +1151,6 @@ export default {
         )
       `).run();
 
-      // نسخ احتياطي يومي (3 فجراً فقط)
       if (event.cron === '0 3 * * *') {
         const [orders, users, branches, tracking] = await Promise.all([
           env.DB.prepare('SELECT * FROM orders').all(),
@@ -1186,7 +1172,6 @@ export default {
         const key = `backups/backup-${new Date().toISOString().slice(0, 10)}.json`;
         await env.BACKUPS.put(key, JSON.stringify(backup));
 
-        // الاحتفاظ بآخر 30 نسخة فقط
         const list = await env.BACKUPS.list({ prefix: 'backups/' });
         if (list.objects.length > 30) {
           const sorted = list.objects.sort((a, b) => a.key.localeCompare(b.key));
@@ -1201,5 +1186,5 @@ export default {
 };
 
 // ═══════════════════════════════════════════
-//  نهاية worker/index.js
+//  نهاية worker/index.js (v1.1)
 // ═══════════════════════════════════════════
