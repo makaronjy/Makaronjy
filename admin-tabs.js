@@ -1560,6 +1560,7 @@ handlePublishError(e, btn, label);
 function buildUsersTab(){
   var sec = el(`tab-cloud-users`);
   if(!sec) return;
+  if(!STATE) return;
   var brs = branches();
   var brOpts = brs.map(function(b){
     return `<option value="` + esc(b.id) + `">` + esc(brName(b)) + `</option>`;
@@ -1701,6 +1702,7 @@ async function loadUsersTab(){
 function buildOrdersTab(){
   var sec = el(`tab-cloud-orders`);
   if(!sec) return;
+  if(!STATE) return;
   var brs = branches();
   var brOpts = `<option value="">` + L(`ordersAllBranches`) + `</option>` +
     brs.map(function(b){
@@ -1788,6 +1790,7 @@ async function loadOrdersTab(){
 function buildReportsTab(){
   var sec = el(`tab-cloud-reports`);
   if(!sec) return;
+  if(!STATE) return;
   var brs = branches();
   var brOpts = `<option value="">` + L(`ordersAllBranches`) + `</option>` +
     brs.map(function(b){
@@ -1850,35 +1853,36 @@ async function loadReportsTab(){
 }
 
 /* =====================================================
-   v9: ربط التبويبات الجديدة بأحداث الفتح
+   v9: ربط التبويبات الجديدة بأحداث الفتح (نسخة مصححة)
+   البناء يتم عند أول ضغطة على التبويب — بعد الدخول فقط
    ===================================================== */
 (function setupCloudTabs(){
-  var tries = 0;
-  var iv = setInterval(function(){
-    tries++;
-    var usersTab = document.querySelector(`[data-tab="cloud-users"]`);
-    if(!usersTab && tries < 40) return;
-    clearInterval(iv);
-    var tabs = [
-      {id:`cloud-users`, build:buildUsersTab, load:loadUsersTab},
-      {id:`cloud-orders`, build:buildOrdersTab, load:loadOrdersTab},
-      {id:`cloud-reports`, build:buildReportsTab, load:loadReportsTab}
-    ];
-    tabs.forEach(function(t){
-      var sec = el(`tab-` + t.id);
-      if(!sec) return;
-      t.build();
+  var defs = [
+    {id:`cloud-users`, build:buildUsersTab, load:loadUsersTab},
+    {id:`cloud-orders`, build:buildOrdersTab, load:loadOrdersTab},
+    {id:`cloud-reports`, build:buildReportsTab, load:loadReportsTab}
+  ];
+  var built = {};
+  function bindAll(){
+    defs.forEach(function(t){
       var btn = document.querySelector(`[data-tab="` + t.id + `"]`);
-      if(btn && !btn._cloudBound){
-        btn._cloudBound = true;
-        btn.addEventListener(`click`, async function(){
-          try{
-            await t.load();
-          }catch(e){}
-        });
-      }
+      if(!btn || btn._cloudBound) return;
+      btn._cloudBound = true;
+      btn.addEventListener(`click`, function(){
+        if(!window.STATE) return;
+        if(!built[t.id]){
+          t.build();
+          built[t.id] = true;
+        }
+        t.load();
+      });
     });
-  }, 500);
+  }
+  if(document.readyState === `loading`){
+    document.addEventListener(`DOMContentLoaded`, bindAll);
+  } else {
+    bindAll();
+  }
 })();
 
 /* ===== التصدير الاحتياطي ===== */
