@@ -36,11 +36,11 @@ window.APP_SETTINGS = {
       "hours": [
         {
           "o": {
-            "h": 7,
+            "h": 1,
             "m": 0
           },
           "c": {
-            "h": 14,
+            "h": 7,
             "m": 0
           },
           "closed": false
