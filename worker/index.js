@@ -1,7 +1,14 @@
 // ═══════════════════════════════════════════
 //  مكرونجي - Cloudflare Worker API (كامل)
 //  نظام تتبع الطلبات الحي
-//  الإصدار: 1.1
+//  الإصدار: 1.3
+//  v1.3 = كل محتوى v1.1 + الإضافات التالية:
+//  • أرقام طلبات عشوائية غير مسلسلة (58392K#)
+//  • نوعا الطلب: توصيل 🛵 / استلام من الفرع 🏪
+//  • مسار الاستلام: جاهز ← استلمه العميل (مشرف) بلا سائق
+//  • إلغاء تلقائي للمهجور (pending > ساعتين) برسالة اعتذار
+//  • حذف شهري لغير المسلّم الأقدم من 30 يوماً
+//  • حذف موظف DELETE + حمايات المالك من التعطيل/الحذف
 // ═══════════════════════════════════════════
 
 // ───────────────────────────────────────────
@@ -22,13 +29,18 @@ const STATUS_TEXT = {
   accepted: 'تم قبول الطلب',
   preparing: 'جاري التحضير',
   ready: 'جاهز للتسليم',
+  ready_pickup: 'جاهز للاستلام من الفرع',
   driver_assigned: 'تم تعيين السائق',
   driver_at_restaurant: 'السائق في المطعم',
   out_for_delivery: 'في الطريق إليك',
   delivered: 'تم التسليم',
+  delivered_pickup: 'تم استلام الطلب من الفرع ✅',
   cancelled: 'تم الإلغاء',
   archived: 'مؤرشف',
 };
+
+// رسالة الإلغاء التلقائي للمهجور (معتمدة من المالك)
+const AUTO_CANCEL_NOTE = 'نعتذر، لم يتمكن الفرع من التعامل مع طلبك في الوقت المحدد. تواصل معنا وسنخدمك فوراً 🌹';
 
 // ───────────────────────────────────────────
 //  خريطة انتقالات الحالات (قواعد صارمة)
@@ -38,7 +50,7 @@ const STATUS_TRANSITIONS = {
   accepted:             ['preparing', 'cancelled'],
   preparing:            ['ready', 'cancelled'],
   ready:                [],
-  driver_assigned:      ['driver_at_restaurant', 'ready'],
+  driver_assigned:      ['out_for_delivery', 'ready'],
   driver_at_restaurant: ['out_for_delivery'],
   out_for_delivery:     ['delivered'],
   delivered:            ['archived'],
@@ -57,23 +69,45 @@ const STATUS_ROLES = {
   archived:             ['super_admin'],
 };
 
+// ───────────────────────────────────────────
+//  v1.3: قواعد ديناميكية حسب نوع الطلب
+//  توصيل: جاهز ← تعيين ← بالطريق ← سُلّم (سائق)
+//  استلام: جاهز ← استلمه العميل بالفرع (مشرف)
+// ───────────────────────────────────────────
+function allowedNext(order) {
+  if (order.status === 'ready') {
+    return order.order_type === 'pickup' ? ['delivered'] : [];
+  }
+  return STATUS_TRANSITIONS[order.status] || [];
+}
+function allowedRolesFor(order, newStatus) {
+  if (newStatus === 'delivered' && order.order_type === 'pickup') {
+    return ['supervisor', 'super_admin'];
+  }
+  return STATUS_ROLES[newStatus] || [];
+}
+function statusTextFor(order) {
+  if (order.order_type === 'pickup') {
+    if (order.status === 'ready') return STATUS_TEXT.ready_pickup;
+    if (order.status === 'delivered') return STATUS_TEXT.delivered_pickup;
+  }
+  return STATUS_TEXT[order.status] || order.status;
+}
+
 // ═══════════════════════════════════════════
 //  دوال مساعدة
 // ═══════════════════════════════════════════
-
 function json(data, status = 200) {
   return new Response(JSON.stringify(data, null, 2), {
     status,
     headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
   });
 }
-
 function error(message, status = 400, details = null) {
   const body = { error: message };
   if (details) body.details = details;
   return json(body, status);
 }
-
 function sanitize(str) {
   if (!str || typeof str !== 'string') return '';
   return str
@@ -83,7 +117,6 @@ function sanitize(str) {
     .trim()
     .slice(0, 1000);
 }
-
 function getIP(request) {
   return request.headers.get('CF-Connecting-IP') ||
          request.headers.get('X-Forwarded-For') ||
@@ -105,37 +138,33 @@ async function checkRateLimit(env, key, limit = 100, ttl = 60) {
 }
 
 // ═══════════════════════════════════════════
-//  توليد رقم الطلب (12345A#)
+//  v1.3: توليد رقم طلب عشوائي (58392K#)
+//  • 5 أرقام عشوائية (10000–99999) + حرف عشوائي
+//  • فحص تطابق مزدوج: used_order_numbers + orders
+//  • الحجز سنة كاملة — لا إعادة استخدام أبداً
+//  (جدول order_counters يبقى في القاعدة دون استخدام)
 // ═══════════════════════════════════════════
 async function generateOrderNumber(db) {
   const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  const letter = letters[Math.floor(Math.random() * 26)];
-
-  const counter = await db.prepare(
-    'SELECT current_num FROM order_counters WHERE letter = ?'
-  ).bind(letter).first();
-
-  let nextNum = (counter?.current_num || 0) + 1;
-  if (nextNum > 99999) nextNum = 1;
-
-  const orderNumber = `${String(nextNum).padStart(5, '0')}${letter}#`;
-
-  const exists = await db.prepare(
-    'SELECT 1 FROM used_order_numbers WHERE order_number = ?'
-  ).bind(orderNumber).first();
-
-  if (exists) return generateOrderNumber(db);
-
-  await db.prepare(
-    'UPDATE order_counters SET current_num = ?, last_reset = CURRENT_DATE WHERE letter = ?'
-  ).bind(nextNum, letter).run();
-
-  await db.prepare(`
-    INSERT INTO used_order_numbers (order_number, created_at, expires_at)
-    VALUES (?, CURRENT_DATE, DATE('now', '+1 year'))
-  `).bind(orderNumber).run();
-
-  return orderNumber;
+  for (let attempt = 0; attempt < 25; attempt++) {
+    const num = Math.floor(Math.random() * 90000) + 10000;
+    const letter = letters[Math.floor(Math.random() * 26)];
+    const orderNumber = `${num}${letter}#`;
+    const used = await db.prepare(
+      'SELECT 1 FROM used_order_numbers WHERE order_number = ?'
+    ).bind(orderNumber).first();
+    if (used) continue;
+    const exists = await db.prepare(
+      'SELECT 1 FROM orders WHERE order_number = ?'
+    ).bind(orderNumber).first();
+    if (exists) continue;
+    await db.prepare(`
+      INSERT INTO used_order_numbers (order_number, created_at, expires_at)
+      VALUES (?, CURRENT_DATE, DATE('now', '+1 year'))
+    `).bind(orderNumber).run();
+    return orderNumber;
+  }
+  throw new Error('تعذر توليد رقم طلب فريد');
 }
 
 // ═══════════════════════════════════════════
@@ -146,7 +175,6 @@ function generateSalt() {
   crypto.getRandomValues(array);
   return Array.from(array, b => b.toString(16).padStart(2, '0')).join('');
 }
-
 async function hashPassword(password, salt) {
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
@@ -158,7 +186,6 @@ async function hashPassword(password, salt) {
   );
   return Array.from(new Uint8Array(bits), b => b.toString(16).padStart(2, '0')).join('');
 }
-
 async function verifyPassword(password, storedHash, salt) {
   const hash = await hashPassword(password, salt);
   return hash === storedHash;
@@ -170,33 +197,27 @@ async function verifyPassword(password, storedHash, salt) {
 function base64UrlEncode(str) {
   return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
-
 function base64UrlDecode(str) {
   str = str.replace(/-/g, '+').replace(/_/g, '/');
   while (str.length % 4) str += '=';
   return atob(str);
 }
-
 async function createJWT(payload, secret) {
   const encodedHeader = base64UrlEncode(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
   const encodedPayload = base64UrlEncode(JSON.stringify(payload));
   const data = `${encodedHeader}.${encodedPayload}`;
-
   const key = await crypto.subtle.importKey(
     'raw', new TextEncoder().encode(secret),
     { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
   );
   const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(data));
   const encodedSignature = base64UrlEncode(String.fromCharCode(...new Uint8Array(signature)));
-
   return `${data}.${encodedSignature}`;
 }
-
 async function verifyJWT(token, secret) {
   try {
     const [header, payload, signature] = token.split('.');
     if (!header || !payload || !signature) return null;
-
     const key = await crypto.subtle.importKey(
       'raw', new TextEncoder().encode(secret),
       { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']
@@ -209,7 +230,6 @@ async function verifyJWT(token, secret) {
       new TextEncoder().encode(`${header}.${payload}`)
     );
     if (!valid) return null;
-
     const decoded = JSON.parse(base64UrlDecode(payload));
     if (decoded.exp && decoded.exp < Math.floor(Date.now() / 1000)) return null;
     return decoded;
@@ -217,7 +237,6 @@ async function verifyJWT(token, secret) {
     return null;
   }
 }
-
 function extractToken(request) {
   const auth = request.headers.get('Authorization');
   if (!auth || !auth.startsWith('Bearer ')) return null;
@@ -230,14 +249,11 @@ function extractToken(request) {
 async function requireAuth(request, env, allowedRoles) {
   const token = extractToken(request);
   if (!token) return { error: error('غير مصرح: لا يوجد توكن', 401) };
-
   const payload = await verifyJWT(token, env.JWT_SECRET);
   if (!payload) return { error: error('غير مصرح: التوكن منتهي أو غير صالح', 401) };
-
   const user = await env.DB.prepare(
     'SELECT * FROM users WHERE id = ? AND is_active = 1'
   ).bind(payload.userId).first();
-
   if (!user) return { error: error('الحساب معطل أو غير موجود', 403) };
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     return { error: error('صلاحيات غير كافية', 403) };
@@ -261,7 +277,6 @@ async function handleLogin(request, env) {
   const user = await env.DB.prepare(
     'SELECT * FROM users WHERE username = ? AND is_active = 1'
   ).bind(username).first();
-
   if (!user) return error('بيانات الدخول غير صحيحة', 401);
 
   const valid = await verifyPassword(body.password, user.password_hash, user.password_salt);
@@ -303,7 +318,6 @@ async function handleLogin(request, env) {
 // ═══════════════════════════════════════════
 //  2) جسر المالك (توكن GitHub → JWT داخلي)
 //  POST /api/auth/admin-bridge
-//  v1.1: إصلاح User-Agent وفحص الصلاحيات
 // ═══════════════════════════════════════════
 async function handleAdminBridge(request, env) {
   const ip = getIP(request);
@@ -313,7 +327,6 @@ async function handleAdminBridge(request, env) {
   const body = await request.json().catch(() => null);
   if (!body || !body.github_token) return error('التوكن مطلوب');
 
-  // الترويسات المطلوبة من GitHub API (User-Agent إجباري من سيرفر)
   const ghHeaders = {
     'Authorization': `Bearer ${body.github_token}`,
     'Accept': 'application/vnd.github+json',
@@ -321,7 +334,6 @@ async function handleAdminBridge(request, env) {
     'X-GitHub-Api-Version': '2022-11-28',
   };
 
-  // التحقق من التوكن لدى GitHub
   let ghUser;
   try {
     const r = await fetch('https://api.github.com/user', { headers: ghHeaders });
@@ -334,7 +346,6 @@ async function handleAdminBridge(request, env) {
     return error('تعذر الاتصال بـ GitHub', 502, e.message);
   }
 
-  // التحقق أن لديه صلاحية push على المستودع
   const owner = env.GH_OWNER || 'makaronjy';
   const repo = env.GH_REPO || 'Makaronjy';
   try {
@@ -345,7 +356,6 @@ async function handleAdminBridge(request, env) {
       return error('لا تملك صلاحية على المستودع', 403, errData.message || `HTTP ${r2.status}`);
     }
     const repoData = await r2.json();
-    // قبول: admin / maintain / push
     const perms = repoData.permissions || {};
     const hasWrite = perms.admin || perms.maintain || perms.push;
     if (!hasWrite) {
@@ -356,11 +366,9 @@ async function handleAdminBridge(request, env) {
     return error('تعذر التحقق من المستودع', 502, e.message);
   }
 
-  // إيجاد حساب المالك في قاعدة البيانات
   const ownerUser = await env.DB.prepare(
     "SELECT * FROM users WHERE role = 'super_admin' AND is_active = 1 LIMIT 1"
   ).first();
-
   if (!ownerUser) return error('حساب المالك غير موجود في قاعدة البيانات', 500);
 
   const payload = {
@@ -411,7 +419,7 @@ async function handleChangePassword(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  4) إنشاء طلب جديد
+//  4) إنشاء طلب جديد (توصيل أو استلام)
 //  POST /api/orders
 // ═══════════════════════════════════════════
 async function handleCreateOrder(request, env) {
@@ -427,6 +435,7 @@ async function handleCreateOrder(request, env) {
   const branchId = sanitize(body.branch_id);
   const items = Array.isArray(body.items) ? body.items : [];
   const notes = sanitize(body.notes || '');
+  const orderType = body.order_type === 'pickup' ? 'pickup' : 'delivery';
 
   if (!customerName || customerName.length < 2) return error('الاسم مطلوب (حرفان على الأقل)');
   if (!customerPhone || !/^\d{9,15}$/.test(customerPhone.replace(/[^0-9]/g, ''))) {
@@ -453,41 +462,45 @@ async function handleCreateOrder(request, env) {
     };
   });
 
+  // v1.3: الاستلام من الفرع = بدون رسوم توصيل أبداً
   let deliveryFee = 0;
-  const feeMode = body.delivery_fee_mode || 'free';
-  if (feeMode === 'fixed') deliveryFee = parseFloat(body.delivery_fee) || 5;
-  else if (feeMode === 'per_branch') deliveryFee = branch.delivery_fee || 10;
+  if (orderType === 'delivery') {
+    const feeMode = body.delivery_fee_mode || 'free';
+    if (feeMode === 'fixed') deliveryFee = parseFloat(body.delivery_fee) || 5;
+    else if (feeMode === 'per_branch') deliveryFee = branch.delivery_fee || 10;
+  }
 
   const total = subtotal + deliveryFee;
   const orderNumber = await generateOrderNumber(env.DB);
 
   const customerLat = parseFloat(body.customer_lat) || null;
   const customerLng = parseFloat(body.customer_lng) || null;
-  const customerAddress = sanitize(body.customer_address || '');
+  const customerAddress = orderType === 'delivery' ? sanitize(body.customer_address || '') : '';
 
   const result = await env.DB.prepare(`
     INSERT INTO orders (
       order_number, branch_id, customer_name, customer_phone, customer_address,
       customer_lat, customer_lng, items_json, subtotal,
-      delivery_fee, total, payment_method, status, notes
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'cod', 'pending', ?)
+      delivery_fee, total, payment_method, status, notes, order_type
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'cod', 'pending', ?, ?)
   `).bind(
     orderNumber, branchId, customerName, customerPhone, customerAddress,
     customerLat, customerLng, JSON.stringify(cleanItems),
-    subtotal, deliveryFee, total, notes
+    subtotal, deliveryFee, total, notes, orderType
   ).run();
 
   const orderId = result.meta.last_row_id;
 
   await env.DB.prepare(`
     INSERT INTO order_tracking (order_id, status, notes)
-    VALUES (?, 'pending', 'تم استلام الطلب')
-  `).bind(orderId).run();
+    VALUES (?, 'pending', ?)
+  `).bind(orderId, orderType === 'pickup' ? 'تم استلام الطلب — استلام من الفرع 🏪' : 'تم استلام الطلب 🛵').run();
 
   return json({
     success: true,
     order_number: orderNumber,
     order_id: orderId,
+    order_type: orderType,
     total, delivery_fee: deliveryFee,
     branch_name: branch.name_ar,
     branch_phone: branch.phone,
@@ -497,7 +510,7 @@ async function handleCreateOrder(request, env) {
 
 // ═══════════════════════════════════════════
 //  5) تتبع الطلب (للعميل - بدون توكن)
-//  GET /api/track/:number
+//  GET /api/track/:number  — v1.3: مساران مختلفان
 // ═══════════════════════════════════════════
 async function handleTrackOrder(orderNumber, env) {
   const order = await env.DB.prepare(`
@@ -518,8 +531,9 @@ async function handleTrackOrder(orderNumber, env) {
     WHERE order_id = ? ORDER BY created_at ASC
   `).bind(order.id).all();
 
+  const isPickup = order.order_type === 'pickup';
   let driverLocation = null;
-  if (order.driver_id && order.status !== 'delivered' && order.status !== 'cancelled') {
+  if (!isPickup && order.driver_id && order.status !== 'delivered' && order.status !== 'cancelled') {
     driverLocation = await env.DB.prepare(`
       SELECT lat, lng, created_at FROM driver_locations
       WHERE order_id = ? ORDER BY created_at DESC LIMIT 1
@@ -530,7 +544,8 @@ async function handleTrackOrder(orderNumber, env) {
     order: {
       number: order.order_number,
       status: order.status,
-      status_text: STATUS_TEXT[order.status] || order.status,
+      status_text: statusTextFor(order),
+      order_type: order.order_type || 'delivery',
       customer_name: order.customer_name,
       subtotal: order.subtotal,
       delivery_fee: order.delivery_fee,
@@ -545,7 +560,7 @@ async function handleTrackOrder(orderNumber, env) {
       phone: order.branch_phone,
       lat: order.branch_lat, lng: order.branch_lng,
     },
-    driver: order.driver_id ? {
+    driver: (!isPickup && order.driver_id) ? {
       name: order.driver_name,
       phone: order.driver_phone,
       lat: driverLocation?.lat || order.driver_lat,
@@ -558,7 +573,7 @@ async function handleTrackOrder(orderNumber, env) {
 }
 
 // ═══════════════════════════════════════════
-//  6) طلبات الفرع (المشرف)
+//  6) طلبات الفرع (المشرف) + النوع
 //  GET /api/supervisor/orders?status=
 // ═══════════════════════════════════════════
 async function handleSupervisorOrders(request, env) {
@@ -581,13 +596,14 @@ async function handleSupervisorOrders(request, env) {
 
   const orders = result.results.map(o => ({
     id: o.id, number: o.order_number,
+    order_type: o.order_type || 'delivery',
     customer_name: o.customer_name, customer_phone: o.customer_phone,
     customer_address: o.customer_address,
     customer_lat: o.customer_lat, customer_lng: o.customer_lng,
     items: JSON.parse(o.items_json),
     subtotal: o.subtotal, delivery_fee: o.delivery_fee, total: o.total,
     payment_method: o.payment_method,
-    status: o.status, status_text: STATUS_TEXT[o.status] || o.status,
+    status: o.status, status_text: statusTextFor(o),
     driver_id: o.driver_id, driver_name: o.driver_name, driver_phone: o.driver_phone,
     notes: o.notes, created_at: o.created_at,
   }));
@@ -613,7 +629,7 @@ async function handleSupervisorDrivers(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  8) توصيلات السائق + إحصائياته
+//  8) توصيلات السائق (توصيل فقط — v1.3)
 //  GET /api/driver/orders
 // ═══════════════════════════════════════════
 async function handleDriverOrders(request, env) {
@@ -623,7 +639,7 @@ async function handleDriverOrders(request, env) {
   const result = await env.DB.prepare(`
     SELECT o.*, b.name_ar as branch_name
     FROM orders o JOIN branches b ON o.branch_id = b.id
-    WHERE o.driver_id = ?
+    WHERE o.driver_id = ? AND o.order_type = 'delivery'
       AND o.status IN ('driver_assigned','driver_at_restaurant','out_for_delivery','delivered')
     ORDER BY o.created_at DESC LIMIT 50
   `).bind(auth.user.id).all();
@@ -634,7 +650,7 @@ async function handleDriverOrders(request, env) {
     customer_address: o.customer_address,
     customer_lat: o.customer_lat, customer_lng: o.customer_lng,
     total: o.total, delivery_fee: o.delivery_fee,
-    status: o.status, status_text: STATUS_TEXT[o.status] || o.status,
+    status: o.status, status_text: statusTextFor(o),
     created_at: o.created_at,
   }));
 
@@ -654,7 +670,7 @@ async function handleDriverOrders(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  9) تغيير حالة الطلب
+//  9) تغيير حالة الطلب (قواعد حسب النوع)
 //  PUT /api/orders/:id/status
 // ═══════════════════════════════════════════
 async function handleUpdateStatus(orderId, request, env) {
@@ -669,12 +685,12 @@ async function handleUpdateStatus(orderId, request, env) {
   const order = await env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first();
   if (!order) return error('الطلب غير موجود', 404);
 
-  const allowed = STATUS_TRANSITIONS[order.status] || [];
+  const allowed = allowedNext(order);
   if (!allowed.includes(newStatus)) {
     return error(`لا يمكن الانتقال من ${order.status} إلى ${newStatus}`, 409);
   }
 
-  const rolesAllowed = STATUS_ROLES[newStatus] || [];
+  const rolesAllowed = allowedRolesFor(order, newStatus);
   if (!rolesAllowed.includes(user.role)) return error('ليس لديك صلاحية لهذا الإجراء', 403);
 
   if (user.role === 'supervisor' && user.branch_id !== order.branch_id) {
@@ -706,7 +722,7 @@ async function handleUpdateStatus(orderId, request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  10) تعيين سائق
+//  10) تعيين سائق (توصيل فقط — v1.3)
 //  PUT /api/orders/:id/assign
 // ═══════════════════════════════════════════
 async function handleAssignDriver(orderId, request, env) {
@@ -718,6 +734,7 @@ async function handleAssignDriver(orderId, request, env) {
 
   const order = await env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first();
   if (!order) return error('الطلب غير موجود', 404);
+  if (order.order_type === 'pickup') return error('طلبات الاستلام من الفرع لا تحتاج سائقاً', 409);
 
   if (auth.user.role === 'supervisor' && auth.user.branch_id !== order.branch_id) {
     return error('هذا الطلب ليس من فرعك', 403);
@@ -764,7 +781,7 @@ async function handleDriverLocation(request, env) {
   if (!orderId || !isFinite(lat) || !isFinite(lng)) return error('إحداثيات غير صالحة');
 
   const order = await env.DB.prepare(`
-    SELECT * FROM orders WHERE id = ? AND driver_id = ?
+    SELECT * FROM orders WHERE id = ? AND driver_id = ? AND order_type = 'delivery'
       AND status IN ('driver_assigned','driver_at_restaurant','out_for_delivery')
   `).bind(orderId, auth.user.id).first();
   if (!order) return error('لا يوجد توصيل نشط بهذا الرقم', 404);
@@ -782,7 +799,7 @@ async function handleDriverLocation(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  12) صورة التسليم
+//  12) صورة التسليم (توصيل فقط — v1.3)
 //  POST /api/orders/:id/photo
 // ═══════════════════════════════════════════
 async function handleUploadPhoto(orderId, request, env) {
@@ -791,6 +808,7 @@ async function handleUploadPhoto(orderId, request, env) {
 
   const order = await env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first();
   if (!order) return error('الطلب غير موجود', 404);
+  if (order.order_type === 'pickup') return error('لا توجد صورة إثبات لطلبات الاستلام من الفرع', 409);
   if (auth.user.role === 'driver' && order.driver_id !== auth.user.id) {
     return error('هذا الطلب ليس مسنداً إليك', 403);
   }
@@ -825,7 +843,7 @@ async function handleUploadPhoto(orderId, request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  13) كل الطلبات (المالك) + فلاتر
+//  13) كل الطلبات (المالك) + فلاتر + فلتر النوع
 //  GET /api/admin/orders
 // ═══════════════════════════════════════════
 async function handleAdminOrders(request, env) {
@@ -835,6 +853,7 @@ async function handleAdminOrders(request, env) {
   const url = new URL(request.url);
   const branchId = url.searchParams.get('branch_id');
   const status = url.searchParams.get('status');
+  const type = url.searchParams.get('type');
   const search = url.searchParams.get('search');
   const dateFrom = url.searchParams.get('from');
   const dateTo = url.searchParams.get('to');
@@ -850,6 +869,7 @@ async function handleAdminOrders(request, env) {
 
   if (branchId) { query += ' AND o.branch_id = ?'; params.push(branchId); }
   if (status) { query += ' AND o.status = ?'; params.push(status); }
+  if (type) { query += ' AND o.order_type = ?'; params.push(type); }
   if (search) {
     query += ' AND (o.order_number LIKE ? OR o.customer_phone LIKE ? OR o.customer_name LIKE ?)';
     const s = `%${search}%`;
@@ -864,10 +884,11 @@ async function handleAdminOrders(request, env) {
 
   const orders = result.results.map(o => ({
     id: o.id, number: o.order_number, branch_name: o.branch_name,
+    order_type: o.order_type || 'delivery',
     customer_name: o.customer_name, customer_phone: o.customer_phone,
     total: o.total, delivery_fee: o.delivery_fee,
     payment_method: o.payment_method, payment_status: o.payment_status,
-    status: o.status, status_text: STATUS_TEXT[o.status] || o.status,
+    status: o.status, status_text: statusTextFor(o),
     driver_name: o.driver_name, created_at: o.created_at,
   }));
 
@@ -877,7 +898,8 @@ async function handleAdminOrders(request, env) {
 // ═══════════════════════════════════════════
 //  14) إدارة المستخدمين (المالك)
 //  GET/POST /api/admin/users
-//  PUT /api/admin/users/:id
+//  PUT /api/admin/users/:id      (+حمايات v1.3)
+//  DELETE /api/admin/users/:id   (جديد v1.3)
 //  POST /api/admin/users/:id/reset-password
 // ═══════════════════════════════════════════
 async function handleAdminUsersList(request, env) {
@@ -947,6 +969,14 @@ async function handleAdminUsersUpdate(userId, request, env) {
   const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
   if (!user) return error('المستخدم غير موجود', 404);
 
+  // v1.3: حمايات المالك
+  if (user.role === 'super_admin' && body.is_active === 0) {
+    return error('لا يمكن تعطيل حساب المالك', 403);
+  }
+  if (user.id === auth.user.id && body.is_active === 0) {
+    return error('لا يمكنك تعطيل حسابك الحالي', 403);
+  }
+
   const name = body.name !== undefined ? sanitize(body.name) : user.name;
   const phone = body.phone !== undefined ? sanitize(body.phone) : user.phone;
   const branchId = body.branch_id !== undefined ? sanitize(body.branch_id) : user.branch_id;
@@ -956,6 +986,28 @@ async function handleAdminUsersUpdate(userId, request, env) {
     UPDATE users SET name = ?, phone = ?, branch_id = ?, is_active = ?,
       updated_at = CURRENT_TIMESTAMP WHERE id = ?
   `).bind(name, phone, branchId, isActive, userId).run();
+
+  return json({ success: true });
+}
+
+// v1.3: حذف موظف (مشرف/سائق فقط — بلا طلبات)
+async function handleAdminUsersDelete(userId, request, env) {
+  const auth = await requireAuth(request, env, ['super_admin']);
+  if (auth.error) return auth.error;
+
+  const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
+  if (!user) return error('المستخدم غير موجود', 404);
+  if (user.role === 'super_admin') return error('لا يمكن حذف حساب المالك', 403);
+  if (user.id === auth.user.id) return error('لا يمكنك حذف حسابك الحالي', 403);
+
+  const hasOrders = await env.DB.prepare(
+    'SELECT 1 FROM orders WHERE driver_id = ? LIMIT 1'
+  ).bind(userId).first();
+  if (hasOrders) return error('لا يمكن حذف موظف له طلبات — استخدم التعطيل', 409);
+
+  await env.DB.prepare('DELETE FROM driver_locations WHERE driver_id = ?').bind(userId).run();
+  await env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(userId).run();
+  await env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId).run();
 
   return json({ success: true });
 }
@@ -984,7 +1036,8 @@ async function handleAdminUsersReset(userId, request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  15) التقارير والإحصائيات
+//  15) التقارير والإحصائيات (كامل كما v1.1
+//      + عدّادات التوصيل/الاستلام v1.3)
 //  GET /api/reports/summary?branch_id=&period=today|week|month
 // ═══════════════════════════════════════════
 async function handleReportsSummary(request, env) {
@@ -1012,6 +1065,8 @@ async function handleReportsSummary(request, env) {
       COUNT(*) as total_orders,
       SUM(CASE WHEN o.status = 'delivered' THEN 1 ELSE 0 END) as delivered,
       SUM(CASE WHEN o.status = 'cancelled' THEN 1 ELSE 0 END) as cancelled,
+      SUM(CASE WHEN o.status = 'delivered' AND o.order_type = 'pickup' THEN 1 ELSE 0 END) as pickup_delivered,
+      SUM(CASE WHEN o.status = 'delivered' AND o.order_type = 'delivery' THEN 1 ELSE 0 END) as delivery_delivered,
       SUM(CASE WHEN o.status = 'delivered' THEN o.total ELSE 0 END) as revenue,
       AVG(CASE WHEN o.status = 'delivered' THEN o.total ELSE NULL END) as avg_order
     FROM orders o WHERE ${where}
@@ -1060,6 +1115,8 @@ async function handleReportsSummary(request, env) {
       total_orders: totals?.total_orders || 0,
       delivered: totals?.delivered || 0,
       cancelled: totals?.cancelled || 0,
+      pickup_delivered: totals?.pickup_delivered || 0,
+      delivery_delivered: totals?.delivery_delivered || 0,
       revenue: totals?.revenue || 0,
       avg_order: Math.round(totals?.avg_order || 0),
     },
@@ -1083,7 +1140,7 @@ export default {
 
     try {
       if (path === '/api/health' && request.method === 'GET') {
-        return json({ status: 'ok', version: '1.1', live_mode: env.LIVE_MODE || 'polling' });
+        return json({ status: 'ok', version: '1.3', live_mode: env.LIVE_MODE || 'polling' });
       }
 
       if (path === '/api/auth/login' && request.method === 'POST') return await handleLogin(request, env);
@@ -1118,6 +1175,7 @@ export default {
       if (m && request.method === 'POST') return await handleAdminUsersReset(parseInt(m[1]), request, env);
 
       m = path.match(/^\/api\/admin\/users\/(\d+)$/);
+      if (m && request.method === 'DELETE') return await handleAdminUsersDelete(parseInt(m[1]), request, env);
       if (m && request.method === 'PUT') return await handleAdminUsersUpdate(parseInt(m[1]), request, env);
 
       if (path === '/api/reports/summary' && request.method === 'GET') return await handleReportsSummary(request, env);
@@ -1130,28 +1188,63 @@ export default {
     }
   },
 
+  // ═════════════════════════════════════════
+  //  المهام المجدولة (Cron)
+  //  "0 * * * *" = كل ساعة: إلغاء المهجور
+  //  "0 3 * * *" = 3 فجراً: تنظيف + حذف شهري + نسخ
+  // ═════════════════════════════════════════
   async scheduled(event, env, ctx) {
     try {
-      await env.DB.prepare(
-        "DELETE FROM used_order_numbers WHERE expires_at < date('now')"
-      ).run();
-
-      await env.DB.prepare(
-        "DELETE FROM sessions WHERE expires_at < datetime('now')"
-      ).run();
-
-      await env.DB.prepare(
-        "DELETE FROM driver_locations WHERE created_at < datetime('now', '-7 days')"
-      ).run();
-
-      await env.DB.prepare(`
-        DELETE FROM order_tracking WHERE order_id IN (
+      // v1.3: كل ساعة — إلغاء الطلبات المهجورة (pending > ساعتين)
+      if (event.cron === '0 * * * *') {
+        const stale = await env.DB.prepare(`
           SELECT id FROM orders
-          WHERE status = 'archived' AND updated_at < datetime('now', '-90 days')
-        )
-      `).run();
+          WHERE status = 'pending' AND created_at < datetime('now', '-2 hours')
+        `).all();
+        for (const o of stale.results) {
+          await env.DB.prepare(`
+            UPDATE orders SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `).bind(o.id).run();
+          await env.DB.prepare(`
+            INSERT INTO order_tracking (order_id, status, notes)
+            VALUES (?, 'cancelled', ?)
+          `).bind(o.id, AUTO_CANCEL_NOTE).run();
+        }
+      }
 
+      // 3 فجراً: التنظيف الشامل + الحذف الشهري + النسخ الاحتياطي
       if (event.cron === '0 3 * * *') {
+        await env.DB.prepare(
+          "DELETE FROM used_order_numbers WHERE expires_at < date('now')"
+        ).run();
+        await env.DB.prepare(
+          "DELETE FROM sessions WHERE expires_at < datetime('now')"
+        ).run();
+        await env.DB.prepare(
+          "DELETE FROM driver_locations WHERE created_at < datetime('now', '-7 days')"
+        ).run();
+        await env.DB.prepare(`
+          DELETE FROM order_tracking WHERE order_id IN (
+            SELECT id FROM orders
+            WHERE status = 'archived' AND updated_at < datetime('now', '-90 days')
+          )
+        `).run();
+
+        // v1.3: حذف غير المسلّم الأقدم من 30 يوماً + اليتيمة
+        await env.DB.prepare(`
+          DELETE FROM orders
+          WHERE status NOT IN ('delivered','archived')
+            AND created_at < datetime('now', '-30 days')
+        `).run();
+        await env.DB.prepare(
+          'DELETE FROM order_tracking WHERE order_id NOT IN (SELECT id FROM orders)'
+        ).run();
+        await env.DB.prepare(
+          'DELETE FROM driver_locations WHERE order_id NOT IN (SELECT id FROM orders)'
+        ).run();
+
+        // نسخ احتياطي يومي
         const [orders, users, branches, tracking] = await Promise.all([
           env.DB.prepare('SELECT * FROM orders').all(),
           env.DB.prepare('SELECT id, name, phone, username, role, branch_id, is_active FROM users').all(),
@@ -1186,5 +1279,5 @@ export default {
 };
 
 // ═══════════════════════════════════════════
-//  نهاية worker/index.js (v1.1)
+//  نهاية worker/index.js (v1.3)
 // ═══════════════════════════════════════════
