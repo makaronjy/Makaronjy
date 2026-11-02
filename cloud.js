@@ -1,11 +1,6 @@
 /* =====================================================
 مكرونجي — الطبقة السحابية (cloud.js)
-v17.3: نسخة مبسطة وأمينة
-• تقرأ نوع الطلب (استلام/توصيل) من نظام التطبيق نفسه
-  (الافتراضي = استلام، والتنبيهات موجودة أصلاً بالتطبيق)
-• ترسل order_type للـ Worker
-• رسوم التوصيل = 0 للاستلام
-• شاشة نجاح بنصوص مختلفة + Fallback واتساب كامل
+v17.4: رسالة واتساب برقم السحابة (57437A) + نوع مختصر
 ===================================================== */
 
 const CLOUD_API = 'https://makaronjy-api.makaronjy.workers.dev';
@@ -27,7 +22,7 @@ function saveCustomerInfo(name, phone){
   try{ localStorage.setItem('mk_customer', JSON.stringify({name:name, phone:phone})); }catch(e){}
 }
 
-/* ===== موقع التوصيل فقط (لحظة التأكيد) ===== */
+/* ===== موقع التوصيل فقط ===== */
 function captureDeliveryLocation(){
   return new Promise(function(resolve){
     let m = 'delivery';
@@ -125,7 +120,7 @@ function showOrderSuccess(res, waMsg, br, orderType){
   el('osClose').onclick = function(){ box.style.display = 'none'; };
 }
 
-/* ===== تعبئة بيانات العميل + تحسين زر الإتمام (مرة واحدة) ===== */
+/* ===== تعبئة بيانات العميل + نص الزر (مرة واحدة) ===== */
 (function patchOnce(){
   if(window._mkCloudPatched) return;
   window._mkCloudPatched = true;
@@ -141,7 +136,6 @@ function showOrderSuccess(res, waMsg, br, orderType){
       }catch(e){}
     };
   }
-  /* تعديل نص زر الإتمام ليعكس النظام السحابي */
   setTimeout(function(){
     try{
       document.querySelectorAll('button').forEach(function(b){
@@ -154,7 +148,7 @@ function showOrderSuccess(res, waMsg, br, orderType){
 })();
 
 /* =====================================================
-   checkout() السحابي v17.3
+   checkout() السحابي v17.4
    ===================================================== */
 async function checkout(){
   try{
@@ -164,7 +158,6 @@ async function checkout(){
     if(!br){ openGate('switch'); return; }
     if(!cart.size){ toast(TT.emptyMsg); return; }
 
-    /* العميل: اسم + جوال إجباري */
     const nameEl = el('cName'), phoneEl = el('cPhone');
     let cname = '', cphone = '';
     if(nameEl && phoneEl){
@@ -189,11 +182,9 @@ async function checkout(){
       cphone = saved.phone || '';
     }
 
-    /* النوع من نظام التطبيق نفسه (افتراضي = pickup) */
     const m = getOrderMode();
     const isPickup = (m !== 'delivery');
 
-    /* موقع/عنوان للتوصيل فقط */
     let loc = null, addrText = '';
     if(!isPickup){
       loc = await captureDeliveryLocation();
@@ -207,7 +198,6 @@ async function checkout(){
       }
     }
 
-    /* الرسوم: استلام = 0 دائماً */
     const fee = isPickup ? 0 : deliveryFee();
 
     const invoiceID = generateInvoiceID(branchCode(br));
@@ -233,21 +223,28 @@ async function checkout(){
     });
 
     const notes = sanitize(el('cnotes') ? el('cnotes').value.trim() : '');
-    const typeLine = isPickup
-      ? '🏪 ' + tt('orderPickup','استلام من الفرع','Branch pickup') + ' — 💵 ' + tt('cashierPay','الدفع عند الكاشير','Pay at cashier')
-      : '🛵 ' + tt('restaurantDelivery','توصيل المطعم','Restaurant delivery') + ' — 💵 ' + tt('driverPay','الدفع للسائق','Pay to driver');
+
+    /* v17.4: نوع مختصر + سطر دفع منفصل + مكان محجوز للرقم */
+    const typeShort = isPickup
+      ? tt('typePickupShort','استلام','Pickup')
+      : tt('typeDeliveryShort','توصيل','Delivery');
+    const payLine = isPickup
+      ? ('💵 ' + tt('payCashier','الدفع: عند الكاشير','Payment: at cashier'))
+      : ('💵 ' + tt('payDriver','الدفع: للسائق عند التسليم','Payment: to driver on delivery'));
     const feeLine = isPickup ? '' : ('🛵 ' + tt('deliveryFee','رسوم التوصيل','Delivery fee') + ': ' + feeLabel(fee) + '\n');
     const grand = total + fee;
     const pickupNote = isPickup ? ('⏳ ' + tt('pickupNote','طلبك يكون جاهزاً عند وصولك للفرع','Your order will be ready upon arrival') + '\n') : '';
 
+    /* الرقم يُستبدل لاحقاً: رقم السحابة إن نجح، وإلا رقم الفاتورة */
     const msg =
       brandize(TT.waGreeting) + '\n' +
-      '🧾 ' + TT.waOrderTitle + ' | *' + invoiceID + '*\n' +
+      '🧾 ' + TT.waOrderTitle + ' | *@@NUM@@*\n' +
       '📅 ' + dateStr + ' • ⏰ ' + timeStr + '\n' +
-      '📦 ' + tt('waOrderType','نوع الطلب','Order type') + ': *' + typeLine + '*\n' +
+      '📦 ' + tt('waOrderType','نوع الطلب','Order type') + ': *' + typeShort + '* ' + (isPickup ? '🏪' : '🛵') + '\n' +
       (cname ? ('👤 ' + tt('waCustomerName','الاسم','Name') + ': ' + cname + '\n') : '') +
       (cphone ? ('📱 ' + tt('waCustomerPhone','الجوال','Phone') + ': ' + cphone + '\n') : '') +
       pickupNote +
+      payLine + '\n' +
       '🍝 ' + tt('waBranch','الفرع','Branch') + ': ' + branchName(br) + '\n' +
       '━━━━━━━━━━━━\n' +
       lines.join('\n') + '\n' +
@@ -258,7 +255,6 @@ async function checkout(){
       '━━━━━━━━━━━━\n' +
       brandize(TT.waThanks);
 
-    /* السحابة أولاً */
     const cloud = await createCloudOrder({
       customer_name: cname,
       customer_phone: cphone,
@@ -274,15 +270,19 @@ async function checkout(){
       order_type: isPickup ? 'pickup' : 'delivery'
     });
 
+    /* v17.4: الرقم النهائي في الرسالة = رقم السحابة بدون # */
+    const finalNum = cloud ? cloud.order_number : invoiceID;
+    const finalMsg = msg.split('@@NUM@@').join(finalNum);
+
     cart.clear();
     if(el('cnotes')) el('cnotes').value = '';
     updateCart();
     closeCart();
 
     if(cloud){
-      showOrderSuccess(cloud, msg, br, isPickup ? 'pickup' : 'delivery');
+      showOrderSuccess(cloud, finalMsg, br, isPickup ? 'pickup' : 'delivery');
     } else {
-      const waUrl = 'https://wa.me/' + br.wa + '?text=' + encodeURIComponent(msg);
+      const waUrl = 'https://wa.me/' + br.wa + '?text=' + encodeURIComponent(finalMsg);
       const w = window.open(waUrl, '_blank');
       if(!w){ location.href = waUrl; }
       toast(TT.orderSent);
@@ -292,4 +292,4 @@ async function checkout(){
     toast('⚠️ ' + (e && e.message ? e.message : 'حدث خطأ — حاول مرة أخرى'));
   }
 }
-/* ===== END cloud.js (v17.3) ===== */
+/* ===== END cloud.js (v17.4) ===== */
