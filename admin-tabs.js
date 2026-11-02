@@ -1,18 +1,14 @@
-/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v9.1) ===== */
-/* v9: إضافة تبويبات الموظفون / الطلبات / التقارير */
-/* v9.1: إصلاح شرط STATE في setupCloudTabs */
+/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v9.2) ===== */
+/* v9.2: حماية المالك + حذف موظفين + عمود النوع + فلتر النوع */
 
-/* اسم حسب لغة الواجهة */
 function nmOf(x){
 return (ALANG===`ar`) ? x.ar : (x.en || x.ar);
 }
-/* تنبيه القسم الفارغ (محلي حسب اللغة) */
 function emptySecNote(){
 return (ALANG===`ar`)
 ? `هذا القسم فارغ أو كل أصنافه مخفية — لن يظهر للزبائن حتى تضيف صنفاً ظاهراً واحداً على الأقل ثم تضغط «حفظ ونشر المنيو».`
 : `This section is empty or all its items are hidden — customers will not see it until you add at least one visible item and publish the menu.`;
 }
-/* نمط مربع الأزرار 2×2 */
 const SQ_STYLE =
 ` style="display:inline-grid;` +
 `grid-template-columns:repeat(2,auto);` +
@@ -41,9 +37,7 @@ async function cloudBridge(){
     CLOUD_JWT = d.token;
     sessionStorage.setItem('mk_cloud_jwt', CLOUD_JWT);
     return CLOUD_JWT;
-  }catch(e){
-    throw e;
-  }
+  }catch(e){ throw e; }
 }
 
 async function capi(path, opts){
@@ -93,6 +87,9 @@ async function capi(path, opts){
   '.cl-stat small{color:var(--muted);font-weight:800;font-size:.68rem}' +
   '.cl-badge-off{background:#fee2e2;color:#b91c1c;border-radius:50px;padding:.1rem .5rem;font-size:.66rem;font-weight:800}' +
   '.cl-badge-on{background:#dcf5e8;color:#1e5b4f;border-radius:50px;padding:.1rem .5rem;font-size:.66rem;font-weight:800}' +
+  '.cl-badge-pickup{background:#fff6e6;color:#b45309;border-radius:50px;padding:.1rem .5rem;font-size:.66rem;font-weight:800}' +
+  '.cl-badge-delivery{background:#dbeafe;color:#1e40af;border-radius:50px;padding:.1rem .5rem;font-size:.66rem;font-weight:800}' +
+  '.cl-locked{display:inline-flex;align-items:center;justify-content:center;font-size:1rem}' +
   '.cl-btn-sm{padding:.3rem .6rem;font-size:.72rem;border-radius:8px;border:none;font-weight:900;cursor:pointer;font-family:inherit;margin:0 .1rem}' +
   '.cl-empty{padding:2rem;text-align:center;color:var(--muted);font-weight:800;border:1.5px dashed var(--line);border-radius:12px;margin-top:.8rem}' +
   '.cl-actions{display:flex;gap:.3rem;justify-content:center;flex-wrap:wrap}';
@@ -402,7 +399,6 @@ var cutSel = ((it && it.imgMode===`cut`) || !it)
 ? ` selected` : ``;
 var fullSel = (it && it.imgMode===`full`)
 ? ` selected` : ``;
-/* حالة محرر الإضافات */
 var modsRefsArr = [];
 if(it && it.mods){
 if(Array.isArray(it.mods)){
@@ -423,7 +419,6 @@ if(it && it.mods && !Array.isArray(it.mods)){
 modsTitleArVal = it.mods.tAr || ``;
 modsTitleEnVal = it.mods.tEn || ``;
 }
-/* كل الأقسام بما فيها قسم الصنف نفسه */
 var modsSecOptions = STATE.MENU.map(function(sec, sIdx){
 var snm = (ALANG===`ar`) ? sec.t : sec.tEn;
 return `<option value="` + sIdx + `">` +
@@ -552,13 +547,10 @@ so = checkedVals(`it_sold_br`);
 }
 var id = it ? it.id : (`it-` + Date.now());
 var data = {
-id: id,
-ar: ar,
-en: en || ar,
+id: id, ar: ar, en: en || ar,
 desc: mv(`it_descAr`).trim(),
 descEn: mv(`it_descEn`).trim(),
-prices: prices,
-cal: cal,
+prices: prices, cal: cal,
 imgv: it ? (it.imgv || 0) : 0,
 imgMode: mv(`it_imgMode`) || `cut`,
 hidden: el(`it_hidden`).checked
@@ -579,7 +571,6 @@ targetSec.items.push(data);
 renderMenu();
 toast(L(`savedItem`), `success`, L(`dontForget`));
 });
-/* wiring محرر الإضافات */
 var itemsBox = el(`modsItemsBox`);
 var chipsBox = el(`modsChips`);
 function miThumb(x){
@@ -709,7 +700,6 @@ renderModsChips();
 renderModsItems();
 });
 renderModsChips();
-/* معاينة صورة الصنف */
 var imgBox = el(`it_imgBox`);
 var imgFile = el(`it_imgFile`);
 var stImg = ` style="width:100%;height:100%;` +
@@ -1556,7 +1546,7 @@ handlePublishError(e, btn, label);
 });
 
 /* =====================================================
-   v9: تبويب الموظفون
+   v9.2: تبويب الموظفون
    ===================================================== */
 function buildUsersTab(){
   var sec = el(`tab-cloud-users`);
@@ -1633,6 +1623,7 @@ function buildUsersTab(){
     tbl.addEventListener(`click`, async function(e){
       var ut = e.target.closest(`[data-ut]`);
       var ur = e.target.closest(`[data-ur]`);
+      var ud = e.target.closest(`[data-ud]`);
       try{
         if(ut){
           var uid = +ut.getAttribute(`data-ut`);
@@ -1649,6 +1640,18 @@ function buildUsersTab(){
           var box = el(`cuAct`);
           box.classList.add(`show`);
           box.innerHTML = `🔑 <b dir="ltr">` + esc(d.username) + `</b> ← <span class="pass">` + esc(d.temp_password) + `</span>`;
+        } else if(ud){
+          var uid3 = +ud.getAttribute(`data-ud`);
+          var uname = ud.getAttribute(`data-name`) || ``;
+          var ok = await askConfirm(
+            (ALANG===`ar`) ?
+              `سيُحذف الموظف «${uname}» نهائياً. اكتب delete للتأكيد.` :
+              `Delete ${uname} permanently. Type delete to confirm.`,
+            L(`btnDelFinal`), `🗑`, L(`btnDelFinal`), true);
+          if(!ok) return;
+          await capi(`/api/admin/users/` + uid3, { method:`DELETE` });
+          toast((ALANG===`ar`)?`تم الحذف`:`Deleted`, `success`);
+          loadUsersTab();
         }
       }catch(err){
         toast(`⚠️ ` + err.message, `error`);
@@ -1669,18 +1672,32 @@ async function loadUsersTab(){
     if(!CLOUD_JWT) await cloudBridge();
     var d = await capi(`/api/admin/users`);
     var rows = (d.users || []).map(function(u){
+      var isOwner = u.role === `super_admin`;
+      var actions;
+      if(isOwner){
+        actions = `<span class="cl-locked" title="` +
+          ((ALANG===`ar`)?`حساب المالك محمي`:`Owner protected`) +
+          `">🔒</span>` +
+          `<button class="cl-btn-sm cl-plain" data-ur="` + u.id + `" title="` +
+          ((ALANG===`ar`)?`إعادة تعيين كلمة المرور`:`Reset password`) + `">🔑</button>`;
+      } else {
+        actions =
+          `<button class="cl-btn-sm ` + (u.is_active ? `cl-err` : `cl-ok`) +
+            `" data-ut="` + u.id + `" data-ua="` + (u.is_active ? 0 : 1) + `">` +
+            (u.is_active ? L(`usersDisable`) : L(`usersEnable`)) + `</button>` +
+          `<button class="cl-btn-sm cl-plain" data-ur="` + u.id + `" title="` +
+          ((ALANG===`ar`)?`إعادة تعيين كلمة المرور`:`Reset password`) + `">🔑</button>` +
+          `<button class="cl-btn-sm cl-err" data-ud="` + u.id + `" data-name="` +
+          esc(u.name) + `" title="` +
+          ((ALANG===`ar`)?`حذف نهائي`:`Delete permanently`) + `">🗑</button>`;
+      }
       return `<tr>` +
         `<td>` + esc(u.name) + `</td>` +
         `<td dir="ltr">` + esc(u.username) + `</td>` +
         `<td>` + (ROLE_MAP[u.role] || u.role) + `</td>` +
         `<td>` + esc(u.branch_name || `—`) + `</td>` +
         `<td>` + (u.is_active ? `<span class="cl-badge-on">` + L(`usersActive`) + `</span>` : `<span class="cl-badge-off">` + L(`usersInactive`) + `</span>`) + `</td>` +
-        `<td class="cl-actions">` +
-          `<button class="cl-btn-sm ` + (u.is_active ? `cl-err` : `cl-ok`) +
-            `" data-ut="` + u.id + `" data-ua="` + (u.is_active ? 0 : 1) + `">` +
-            (u.is_active ? L(`usersDisable`) : L(`usersEnable`)) + `</button>` +
-          `<button class="cl-btn-sm cl-plain" data-ur="` + u.id + `">🔑</button>` +
-        `</td>` +
+        `<td class="cl-actions">` + actions + `</td>` +
       `</tr>`;
     }).join(``);
     tbl.innerHTML = `<tr>` +
@@ -1698,7 +1715,7 @@ async function loadUsersTab(){
 }
 
 /* =====================================================
-   v9: تبويب الطلبات
+   v9.2: تبويب الطلبات (مع عمود النوع + فلتر)
    ===================================================== */
 function buildOrdersTab(){
   var sec = el(`tab-cloud-orders`);
@@ -1715,23 +1732,30 @@ function buildOrdersTab(){
     `<option value="preparing">` + L(`statusPreparing`) + `</option>` +
     `<option value="ready">` + L(`statusReady`) + `</option>` +
     `<option value="driver_assigned">` + L(`statusDrvAssigned`) + `</option>` +
-    `<option value="driver_at_restaurant">` + L(`statusDrvAtRest`) + `</option>` +
     `<option value="out_for_delivery">` + L(`statusOutForDel`) + `</option>` +
     `<option value="delivered">` + L(`statusDelivered`) + `</option>` +
-    `<option value="cancelled">` + L(`statusCancelled`) + `</option>` +
-    `<option value="archived">` + L(`statusArchived`) + `</option>`;
+    `<option value="cancelled">` + L(`statusCancelled`) + `</option>`;
+  var typeOpts =
+    `<option value="">` + ((ALANG===`ar`)?`كل الأنواع`:`All types`) + `</option>` +
+    `<option value="pickup">🏪 ` + ((ALANG===`ar`)?`استلام`:`Pickup`) + `</option>` +
+    `<option value="delivery">🛵 ` + ((ALANG===`ar`)?`توصيل`:`Delivery`) + `</option>`;
   sec.innerHTML =
     `<div class="cl-card">` +
       `<h3>` + L(`ordersTitle`) + `</h3>` +
       `<div class="cl-row">` +
         `<div class="cl-f"><label>` + L(`ordersBranch`) + `</label><select id="coBranch">` + brOpts + `</select></div>` +
         `<div class="cl-f"><label>` + L(`ordersStatus`) + `</label><select id="coStatus">` + statusOpts + `</select></div>` +
+        `<div class="cl-f"><label>` + ((ALANG===`ar`)?`النوع`:`Type`) + `</label><select id="coType">` + typeOpts + `</select></div>` +
         `<button class="cl-btn cl-add" id="coRefresh" style="align-self:flex-end">` + L(`ordersRefresh`) + `</button>` +
       `</div>` +
       `<div style="overflow-x:auto"><table class="cl-tbl" id="coTable"></table></div>` +
     `</div>`;
   var refBtn = el(`coRefresh`);
   if(refBtn) refBtn.addEventListener(`click`, loadOrdersTab);
+  var brSel = el(`coBranch`), stSel = el(`coStatus`), tySel = el(`coType`);
+  [brSel, stSel, tySel].forEach(function(s){
+    if(s) s.addEventListener(`change`, loadOrdersTab);
+  });
 }
 
 async function loadOrdersTab(){
@@ -1743,7 +1767,6 @@ async function loadOrdersTab(){
     preparing: L(`statusPreparing`),
     ready: L(`statusReady`),
     driver_assigned: L(`statusDrvAssigned`),
-    driver_at_restaurant: L(`statusDrvAtRest`),
     out_for_delivery: L(`statusOutForDel`),
     delivered: L(`statusDelivered`),
     cancelled: L(`statusCancelled`),
@@ -1752,25 +1775,38 @@ async function loadOrdersTab(){
   var q = `/api/admin/orders?`;
   var b = el(`coBranch`) ? el(`coBranch`).value : ``;
   var st = el(`coStatus`) ? el(`coStatus`).value : ``;
+  var ty = el(`coType`) ? el(`coType`).value : ``;
   if(b) q += `branch_id=` + encodeURIComponent(b) + `&`;
-  if(st) q += `status=` + encodeURIComponent(st);
+  if(st) q += `status=` + encodeURIComponent(st) + `&`;
+  if(ty) q += `type=` + encodeURIComponent(ty) + `&`;
   try{
     if(!CLOUD_JWT) await cloudBridge();
     var d = await capi(q);
     var rows = (d.orders || []).map(function(o){
+      var ot = o.order_type || `delivery`;
+      var typeBadge = ot === `pickup`
+        ? `<span class="cl-badge-pickup">🏪 ` + ((ALANG===`ar`)?`استلام`:`Pickup`) + `</span>` +
+          `<small style="display:block;font-size:.6rem;color:var(--amber);margin-top:.15rem">💵 ` +
+          ((ALANG===`ar`)?`كاشير`:`Cashier`) + `</small>`
+        : `<span class="cl-badge-delivery">🛵 ` + ((ALANG===`ar`)?`توصيل`:`Delivery`) + `</span>`;
+      var statusText = STATUS_MAP[o.status] || o.status;
+      if(ot === `pickup` && o.status === `ready`) statusText = (ALANG===`ar`)?`جاهز للاستلام`:`Ready for pickup`;
+      if(ot === `pickup` && o.status === `delivered`) statusText = (ALANG===`ar`)?`تم الاستلام من الفرع ✅`:`Picked up ✅`;
       return `<tr>` +
         `<td dir="ltr"><b>` + esc(o.number) + `</b></td>` +
+        `<td>` + typeBadge + `</td>` +
         `<td>` + esc(o.branch_name) + `</td>` +
         `<td>` + esc(o.customer_name) + `</td>` +
         `<td dir="ltr">` + esc(o.customer_phone) + `</td>` +
-        `<td>` + o.total + `</td>` +
-        `<td>` + (STATUS_MAP[o.status] || o.status) + `</td>` +
+        `<td>` + (o.total || 0) + `</td>` +
+        `<td>` + statusText + `</td>` +
         `<td>` + esc(o.driver_name || L(`ordersNoDriver`)) + `</td>` +
         `<td>` + esc(String(o.created_at).slice(0,16)) + `</td>` +
       `</tr>`;
     }).join(``);
     tbl.innerHTML = `<tr>` +
       `<th>` + L(`ordersNumber`) + `</th>` +
+      `<th>` + ((ALANG===`ar`)?`النوع`:`Type`) + `</th>` +
       `<th>` + L(`ordersBranch`) + `</th>` +
       `<th>` + L(`ordersCustomer`) + `</th>` +
       `<th>` + L(`ordersPhone`) + `</th>` +
@@ -1779,14 +1815,14 @@ async function loadOrdersTab(){
       `<th>` + L(`ordersDriver`) + `</th>` +
       `<th>` + L(`ordersTime`) + `</th>` +
     `</tr>` +
-    (rows || `<tr><td colspan="8" class="cl-empty">` + L(`ordersEmpty`) + `</td></tr>`);
+    (rows || `<tr><td colspan="9" class="cl-empty">` + L(`ordersEmpty`) + `</td></tr>`);
   }catch(err){
-    tbl.innerHTML = `<tr><td colspan="8" class="cl-empty">⚠️ ` + esc(err.message) + `</td></tr>`;
+    tbl.innerHTML = `<tr><td colspan="9" class="cl-empty">⚠️ ` + esc(err.message) + `</td></tr>`;
   }
 }
 
 /* =====================================================
-   v9: تبويب التقارير
+   v9.2: تبويب التقارير
    ===================================================== */
 function buildReportsTab(){
   var sec = el(`tab-cloud-reports`);
@@ -1828,6 +1864,8 @@ async function loadReportsTab(){
     var html = `<div class="cl-stats">` +
       `<div class="cl-stat"><b>` + (t.total_orders || 0) + `</b><small>` + L(`reportsTotal`) + `</small></div>` +
       `<div class="cl-stat"><b>` + (t.delivered || 0) + `</b><small>` + L(`reportsDelivered`) + `</small></div>` +
+      `<div class="cl-stat"><b>` + (t.pickup_delivered || 0) + `</b><small>🏪 ` + ((ALANG===`ar`)?`استلام مسلّم`:`Pickup`) + `</small></div>` +
+      `<div class="cl-stat"><b>` + (t.delivery_delivered || 0) + `</b><small>🛵 ` + ((ALANG===`ar`)?`توصيل مسلّم`:`Delivery`) + `</small></div>` +
       `<div class="cl-stat"><b>` + (t.cancelled || 0) + `</b><small>` + L(`reportsCancelled`) + `</small></div>` +
       `<div class="cl-stat"><b>` + (t.revenue || 0) + `</b><small>` + L(`reportsRevenue`) + `</small></div>` +
       `<div class="cl-stat"><b>` + (t.avg_order || 0) + `</b><small>` + L(`reportsAvg`) + `</small></div>` +
@@ -1854,8 +1892,7 @@ async function loadReportsTab(){
 }
 
 /* =====================================================
-   v9.1: ربط التبويبات الجديدة بأحداث الفتح (مصحح)
-   البناء يتم عند أول ضغطة على التبويب — بعد الدخول فقط
+   v9.2: ربط التبويبات بأحداث الفتح
    ===================================================== */
 (function setupCloudTabs(){
   var defs = [
@@ -1912,7 +1949,7 @@ renderDeliveryAdmin();
 renderSettings();
 renderAd();
 }
-/* ===== الإقلاع واستعادة الجلسة ===== */
+/* ===== الإقلاع ===== */
 (function init(){
 applyAdminLang();
 var saved = sessionStorage.getItem(`mk_admin`);
@@ -1935,4 +1972,4 @@ return;
 applyAdminLang();
 })();
 window.__ADMIN_BOOTED = true;
-/* ===== END admin-tabs.js (v9.1) ===== */
+/* ===== END admin-tabs.js (v9.2) ===== */
