@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -9,11 +10,11 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0b1220;--card:#111a2e;--card2:#0f172a;--line:#1e293b;--gold:#f2b95f;--gold2:#e0912f;--maroon:#7f1d3a;--ink:#e2e8f0;--muted:#94a3b8;--ok:#22c55e;--okbg:#14532d;--err:#ef4444;--errbg:#7f1d1d;--blue:#38bdf8;}
+:root{--bg:#0b1220;--card:#111a2e;--card2:#0f172a;--line:#1e293b;--gold:#f2b95f;--gold2:#e0912f;--maroon:#7f1d3a;--ink:#e2e8f0;--muted:#94a3b8;--ok:#22c55e;--okbg:#14532d;--err:#ef4444;--errbg:#7f1d1d;--wa:#128c5e;}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;padding-bottom:2rem}
 .hidden{display:none !important}
-/* شاشة الدخول */
+/* الدخول */
 .login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1.2rem}
 .login .card{background:var(--card);border:1.5px solid var(--line);border-radius:22px;padding:1.8rem 1.4rem;width:min(400px,94vw);text-align:center}
 .login h1{font-size:1.3rem;font-weight:900;color:var(--gold);margin-bottom:.3rem}
@@ -35,7 +36,7 @@ header button{border:1.5px solid var(--line);background:var(--card);color:var(--
 .stat{background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:.9rem;text-align:center}
 .stat b{display:block;font-size:1.5rem;font-weight:900;color:var(--gold)}
 .stat small{color:var(--muted);font-weight:800;font-size:.72rem}
-/* بطاقة التوصيل الحالي */
+/* الأقسام */
 h3.sec{font-size:.95rem;font-weight:900;color:var(--gold);margin:.4rem 0 .6rem}
 .active{background:var(--card);border:2px solid var(--ok);border-radius:20px;padding:1rem;box-shadow:0 0 24px rgba(34,197,94,.25);margin-bottom:1rem}
 .active .top{display:flex;gap:.5rem;justify-content:flex-end;flex-wrap:wrap;margin-bottom:.8rem}
@@ -52,15 +53,21 @@ h3.sec{font-size:.95rem;font-weight:900;color:var(--gold);margin:.4rem 0 .6rem}
 .st3.done small,.st3.now small{color:var(--ink)}
 .bar3{flex:1;height:3px;background:var(--line);border-radius:3px;margin:0 2px 22px}
 .bar3.done{background:var(--ok)}
-/* معلومات الطلب */
+/* معلومات */
 .info{display:flex;align-items:center;gap:.5rem;font-size:.85rem;font-weight:800;padding:.35rem 0;flex-wrap:wrap}
 .info .lb{color:var(--muted)}
 .info a{color:var(--gold);font-weight:900;text-decoration:none}
 .btn{display:block;width:100%;border:none;border-radius:14px;padding:.95rem;font-family:inherit;font-weight:900;font-size:.95rem;cursor:pointer;margin-top:.6rem}
 .btn.go{background:var(--ok);color:#052e16}
 .btn.done{background:linear-gradient(135deg,var(--gold2),var(--gold));color:#3b1d0a}
+.btn.wa{background:var(--wa);color:#fff}
 .btn.sorry{background:var(--err);color:#fff}
 .btn.ghost{background:transparent;border:1.5px solid var(--line);color:var(--muted);font-size:.75rem;padding:.6rem}
+/* بطاقة آخر تسليم */
+.done-card{background:var(--card);border:2px solid var(--gold2);border-radius:16px;padding:.8rem .9rem;margin-bottom:.7rem;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+.done-card .n{background:var(--maroon);color:var(--gold);border-radius:10px;padding:.25rem .7rem;font-weight:900;direction:ltr}
+.done-card b{flex:1;font-size:.85rem;font-weight:900}
+.done-card button{border:none;border-radius:10px;background:var(--wa);color:#fff;padding:.55rem .9rem;font-family:inherit;font-weight:900;font-size:.78rem;cursor:pointer}
 /* السجل */
 .hist{background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:.8rem;margin-top:.6rem}
 .hist .row{display:flex;justify-content:space-between;gap:.5rem;font-size:.78rem;font-weight:800;padding:.45rem 0;border-bottom:1px dashed var(--line)}
@@ -117,6 +124,7 @@ let ME = null;
 try { ME = JSON.parse(localStorage.getItem('mk_driver_me') || 'null'); } catch(e){}
 let ORDERS = [];
 let photoForOrder = null;
+let LAST_DELIVERED = null; /* v2.1: لزر واتساب الشكر بعد التسليم */
 
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function toast(m, ok){
@@ -126,6 +134,41 @@ function toast(m, ok){
   document.getElementById('toast').appendChild(d);
   setTimeout(()=> d.remove(), 3200);
 }
+function normalizePhone(p){
+  const d = (p || '').replace(/\D/g, '');
+  if (d.startsWith('0')) return '966' + d.slice(1);
+  if (d.startsWith('966')) return d;
+  return d;
+}
+function trackUrl(number){
+  return location.origin + '/track.html?order=' + encodeURIComponent(number);
+}
+function waOpen(phone, msg){
+  const url = 'https://wa.me/' + normalizePhone(phone) + '?text=' + encodeURIComponent(msg);
+  const w = window.open(url, '_blank');
+  if(!w) location.href = url;
+}
+
+/* ===== v2.1: رسائل واتساب الجاهزة ===== */
+function waOnWay(o){
+  const msg =
+`أهلاً ${o.customer_name} 🍝
+أنا سائق طلبك رقم ${o.number} ✅
+انطلقت الآن للوصول إليك 🛵
+ جهّز مبلغ ${o.total} ريال
+🗺️ تتبّع موقعي مباشرة:
+${trackUrl(o.number)}`;
+  waOpen(o.customer_phone, msg);
+}
+function waThanks(o){
+  const msg =
+`${o.customer_name} العزيز 🍝
+تم تسليم طلبك رقم ${o.number} بنجاح 🎉
+شكراً لثقتك بمكرونجي 🙏
+نتمنى لك وجبة شهية 😋`;
+  waOpen(o.customer_phone, msg);
+}
+
 async function api(path, opts){
   opts = opts || {};
   const h = {'Content-Type':'application/json'};
@@ -154,14 +197,6 @@ document.getElementById('btnLogin').addEventListener('click', async function(){
   try{
     const d = await api('/api/auth/login', { method:'POST', body: JSON.stringify({username:u, password:p}) });
     if(d.user.role !== 'driver'){ errBox.textContent = 'هذا الحساب ليس حساب سائق'; errBox.style.display = 'block'; return; }
-    if(d.user.mustChangePassword){
-      const np = prompt('أدخل كلمة مرور جديدة (8 أحرف، حرف كبير وصغير ورقم):');
-      if(np){
-        try{
-          await api('/api/auth/change-password', { method:'POST', body: JSON.stringify({new_password: np}), headersExtra:1 });
-        }catch(e){}
-      }
-    }
     JWT = d.token; ME = d.user;
     localStorage.setItem('mk_driver_jwt', JWT);
     localStorage.setItem('mk_driver_me', JSON.stringify(ME));
@@ -196,11 +231,14 @@ function activeOrder(){
   return ORDERS.find(o => ['driver_assigned','driver_at_restaurant','out_for_delivery'].includes(o.status)) || null;
 }
 
-/* ===== بطاقة التوصيل الحالي (3 خطوات) ===== */
+/* ===== بطاقة التوصيل الحالي ===== */
 function renderActive(){
   const box = document.getElementById('activeBox');
   const o = activeOrder();
-  if(!o){ box.innerHTML = '<div class="empty">لا يوجد توصيل نشط حالياً — بانتظار إسناد طلب جديد 🕐</div>'; return; }
+  if(!o){
+    box.innerHTML = '<div class="empty">لا يوجد توصيل نشط حالياً — بانتظار إسناد طلب جديد 🕐</div>';
+    return;
+  }
   const idx = (o.status === 'driver_assigned' || o.status === 'driver_at_restaurant') ? 0 : (o.status === 'out_for_delivery' ? 1 : 2);
   const steps = [
     {ic:'🚗', t:'مُسند'},
@@ -225,6 +263,7 @@ function renderActive(){
       '<button class="btn sorry" data-act="sorry">❌ اعتذار عن التوصيل</button>';
   } else if(idx === 1){
     btns =
+      '<button class="btn wa" data-act="wa-way">📱 واتساب: أنا بالطريق (مع رابط التتبع)</button>' +
       '<button class="btn done" data-act="delivered">🎉 تم التسليم (مع صورة إثبات)</button>' +
       '<button class="btn ghost" data-act="delivered-nophoto">تعذر التصوير؟ تأكيد التسليم فقط</button>';
   }
@@ -239,53 +278,80 @@ function renderActive(){
     '</div>';
 }
 
-/* ===== السجل ===== */
+/* ===== السجل + بطاقة آخر تسليم ===== */
 function renderHist(){
   const box = document.getElementById('histBox');
+  let extra = '';
+  if(LAST_DELIVERED){
+    extra =
+      '<div class="done-card">' +
+        '<span class="n">' + esc(LAST_DELIVERED.number) + '</span>' +
+        '<b>🎉 تم التسليم — ' + esc(LAST_DELIVERED.customer_name) + '</b>' +
+        '<button data-act="wa-thanks">📱 واتساب شكر</button>' +
+      '</div>';
+  }
   const done = ORDERS.filter(o => o.status === 'delivered').slice(0, 15);
-  if(!done.length){ box.innerHTML = '<div class="empty">لا توجد توصيلات مكتملة بعد</div>'; return; }
-  box.innerHTML = '<div class="hist">' + done.map(function(o){
-    return '<div class="row"><span class="n">' + esc(o.number) + '</span><span>' + esc(o.branch_name || '') + '</span><span class="m">' + o.total + ' ريال</span></div>';
-  }).join('') + '</div>';
+  box.innerHTML = extra + (done.length
+    ? '<div class="hist">' + done.map(function(o){
+        return '<div class="row"><span class="n">' + esc(o.number) + '</span><span>' + esc(o.branch_name || '') + '</span><span class="m">' + o.total + ' ريال</span></div>';
+      }).join('') + '</div>'
+    : (extra ? '' : '<div class="empty">لا توجد توصيلات مكتملة بعد</div>'));
 }
 
 /* ===== إجراءات السائق ===== */
-document.getElementById('activeBox').addEventListener('click', async function(e){
+function onAction(e){
   const b = e.target.closest('[data-act]');
   if(!b) return;
+  const act = b.dataset.act;
+
+  /* واتساب شكر لآخر تسليم */
+  if(act === 'wa-thanks'){
+    if(LAST_DELIVERED) waThanks(LAST_DELIVERED);
+    return;
+  }
+
   const o = activeOrder();
   if(!o) return;
-  const act = b.dataset.act;
-  try{
-    if(act === 'go'){
-      await api('/api/orders/' + o.id + '/status', { method:'PUT', body: JSON.stringify({status:'out_for_delivery'}) });
-      toast('🛵 انطلقت — بالتوفيق!', true);
-      load();
-    }
-    if(act === 'sorry'){
-      if(!confirm('سيُعاد الطلب للمشرف لتعيين سائق آخر. متابعة الاعتذار؟')) return;
-      await api('/api/orders/' + o.id + '/status', { method:'PUT', body: JSON.stringify({status:'ready', notes:'اعتذار السائق'}) });
-      toast('تم الاعتذار وإرجاع الطلب للمشرف');
-      load();
-    }
-    if(act === 'delivered'){
-      photoForOrder = o.id;
-      document.getElementById('photoInput').click();
-    }
-    if(act === 'delivered-nophoto'){
-      if(!confirm('تأكيد التسليم بدون صورة إثبات؟')) return;
-      await api('/api/orders/' + o.id + '/status', { method:'PUT', body: JSON.stringify({status:'delivered'}) });
-      toast('🎉 تم التسليم', true);
-      load();
-    }
-  }catch(err){ toast(err.message); }
-});
+
+  /* واتساب أنا بالطريق */
+  if(act === 'wa-way'){ waOnWay(o); return; }
+
+  (async function(){
+    try{
+      if(act === 'go'){
+        await api('/api/orders/' + o.id + '/status', { method:'PUT', body: JSON.stringify({status:'out_for_delivery'}) });
+        toast('🛵 انطلقت — بالتوفيق!', true);
+        load();
+      }
+      if(act === 'sorry'){
+        if(!confirm('سيُعاد الطلب للمشرف لتعيين سائق آخر. متابعة الاعتذار؟')) return;
+        await api('/api/orders/' + o.id + '/status', { method:'PUT', body: JSON.stringify({status:'ready', notes:'اعتذار السائق'}) });
+        toast('تم الاعتذار وإرجاع الطلب للمشرف');
+        load();
+      }
+      if(act === 'delivered'){
+        photoForOrder = o.id;
+        document.getElementById('photoInput').click();
+      }
+      if(act === 'delivered-nophoto'){
+        if(!confirm('تأكيد التسليم بدون صورة إثبات؟')) return;
+        await api('/api/orders/' + o.id + '/status', { method:'PUT', body: JSON.stringify({status:'delivered'}) });
+        LAST_DELIVERED = o;
+        toast('🎉 تم التسليم', true);
+        load();
+      }
+    }catch(err){ toast(err.message); }
+  })();
+}
+document.getElementById('activeBox').addEventListener('click', onAction);
+document.getElementById('histBox').addEventListener('click', onAction);
 
 /* صورة الإثبات ثم التسليم */
 document.getElementById('photoInput').addEventListener('change', async function(){
   const f = this.files && this.files[0];
   this.value = '';
   if(!f || !photoForOrder) return;
+  const o = ORDERS.find(x => x.id === photoForOrder) || null;
   try{
     const b64 = await new Promise(function(res, rej){
       const rd = new FileReader();
@@ -295,13 +361,14 @@ document.getElementById('photoInput').addEventListener('change', async function(
     });
     await api('/api/orders/' + photoForOrder + '/photo', { method:'POST', body: JSON.stringify({photo_base64: b64}) });
     await api('/api/orders/' + photoForOrder + '/status', { method:'PUT', body: JSON.stringify({status:'delivered'}) });
+    LAST_DELIVERED = o;
     toast('🎉 تم التسليم مع صورة الإثبات', true);
     photoForOrder = null;
     load();
   }catch(err){ toast(err.message); }
 });
 
-/* ===== الموقع الحي كل 30 ثانية أثناء التوصيل ===== */
+/* ===== الموقع الحي كل 30 ثانية ===== */
 setInterval(function(){
   const o = activeOrder();
   if(!o || !JWT) return;
@@ -323,4 +390,4 @@ if(JWT && ME){ enterApp(); } else { logout(); }
 </script>
 </body>
 </html>
-<!-- ===== END driver.html (v2) ===== -->
+<!-- ===== END driver.html (v2.1) ===== -->
