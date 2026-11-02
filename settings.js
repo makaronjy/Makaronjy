@@ -47,11 +47,11 @@ window.APP_SETTINGS = {
         },
         {
           "o": {
-            "h": 13,
+            "h": 11,
             "m": 0
           },
           "c": {
-            "h": 6,
+            "h": 18,
             "m": 0
           },
           "closed": false
