@@ -1,8 +1,7 @@
 /* =====================================================
 مكرونجي — الطبقة السحابية (cloud.js)
-v17: اختيار نوع الطلب + تنبيه الفرع الأقرب + نصوص مختلفة
-يُحمّل بعد app.js — لا يعدّل أي سطر فيه،
-فقط يستبدل دالة checkout() بنسخة سحابية جديدة
+v17.2: إصلاح توقف زر الإتمام بعد الطلب الأول
+يُحمّل بعد app.js — يستبدل دالة checkout() بنسخة سحابية
 مع fallback واتساب كامل عند فشل السحابة
 ===================================================== */
 
@@ -48,7 +47,7 @@ function findNearestOtherBranch(lat, lng, excludeId){
   let best = null, bestDist = Infinity;
   brs.forEach(function(b){
     if(b.id === excludeId) return;
-    if(!b.is_active && b.is_active !== undefined) return;
+    if(b.is_active && b.is_active === false) return;
     if(typeof b.lat !== 'number' || typeof b.lng !== 'number') return;
     const d = calcDistanceKm(lat, lng, b.lat, b.lng);
     if(d < bestDist){ bestDist = d; best = b; }
@@ -68,23 +67,6 @@ function captureClientLocation(){
         clearTimeout(watchdog);
         finish({ lat: pos.coords.latitude, lng: pos.coords.longitude });
       },
-      function(){ clearTimeout(watchdog); finish(null); },
-      { enableHighAccuracy: true, timeout: 7000, maximumAge: 60000 }
-    );
-  });
-}
-
-/* v17: التقاط الموقع للتوصيل فقط (لحفظ العنوان مع الطلب) */
-function captureDeliveryLocation(){
-  return new Promise(function(resolve){
-    const mode = getCurrentOrderType();
-    if(mode !== 'delivery'){ resolve(null); return; }
-    if(!navigator.geolocation){ resolve(null); return; }
-    let done = false;
-    function finish(v){ if(!done){ done = true; resolve(v); } }
-    const watchdog = setTimeout(function(){ finish(null); }, 8000);
-    navigator.geolocation.getCurrentPosition(
-      function(pos){ clearTimeout(watchdog); finish({ lat: pos.coords.latitude, lng: pos.coords.longitude }); },
       function(){ clearTimeout(watchdog); finish(null); },
       { enableHighAccuracy: true, timeout: 7000, maximumAge: 60000 }
     );
@@ -118,16 +100,16 @@ function askAddressText(){
   });
 }
 
-/* ===== v17: قراءة نوع الطلب الحالي ===== */
+/* ===== قراءة نوع الطلب الحالي ===== */
 function getCurrentOrderType(){
   const radios = document.querySelectorAll('input[name="mk_order_type"]');
   for(let i = 0; i < radios.length; i++){
     if(radios[i].checked) return radios[i].value;
   }
-  return 'pickup'; // الافتراضي = استلام
+  return 'pickup';
 }
 
-/* ===== v17: تنبيه الفرع الأقرب ===== */
+/* ===== تنبيه الفرع الأقرب ===== */
 async function checkAndAlertNearestBranch(selectedBranch, clientLoc){
   if(!clientLoc || !selectedBranch) return null;
   if(typeof selectedBranch.lat !== 'number' || typeof selectedBranch.lng !== 'number') return null;
@@ -135,7 +117,7 @@ async function checkAndAlertNearestBranch(selectedBranch, clientLoc){
   const nearest = findNearestOtherBranch(clientLoc.lat, clientLoc.lng, selectedBranch.id);
   if(!nearest) return null;
   const diff = selectedDist - nearest.distance;
-  if(diff < 3) return null; // الفرق أقل من 3 كم = لا تنبيه
+  if(diff < 3) return null;
 
   const isAr = (typeof currentLang !== 'undefined' && currentLang === 'ar');
   const selectedName = selectedBranch.nameAr || selectedBranch.nameEn || '';
@@ -192,110 +174,97 @@ async function checkAndAlertNearestBranch(selectedBranch, clientLoc){
   });
 }
 
-/* ===== v17: إضافة أزرار الاختيار في شاشة السلة ===== */
+/* ===== إضافة أزرار الاختيار في شاشة السلة (محمي من الحقن المتكرر) ===== */
 function injectOrderTypeUI(){
-  const cartEl = el('cart');
-  if(!cartEl) return;
-  if(el('mkOrderTypeBox')) return; // موجود مسبقاً
+  try {
+    const cartEl = el('cart');
+    if(!cartEl) return;
+    if(el('mkOrderTypeBox')) return;
 
-  const isAr = (typeof currentLang !== 'undefined' && currentLang === 'ar');
+    const isAr = (typeof currentLang !== 'undefined' && currentLang === 'ar');
 
-  /* إيجاد موقع الحقول الحالية (الاسم والجوال) */
-  const nameEl = el('cName');
-  const parent = nameEl ? nameEl.closest('.field, .row, label, div') : null;
+    const box = document.createElement('div');
+    box.id = 'mkOrderTypeBox';
+    box.style.cssText = 'background:#faf3ea;border:1.5px solid #eadfd2;border-radius:12px;padding:.7rem;margin:.6rem 0';
+    box.innerHTML =
+      '<div style="font-size:.78rem;font-weight:900;color:#8e2a4a;margin-bottom:.45rem">' +
+        (isAr ? '📦 كيف تستلم طلبك؟' : '📦 How do you want your order?') +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem">' +
+        '<label style="display:flex;align-items:center;gap:.35rem;padding:.55rem;background:#fff;border:1.5px solid #1e5b4f;border-radius:10px;cursor:pointer;transition:.2s">' +
+          '<input type="radio" name="mk_order_type" value="pickup" checked style="margin:0">' +
+          '<span style="font-weight:900;font-size:.82rem;color:#1e5b4f">🏪 ' +
+            (isAr ? 'استلام من الفرع' : 'Pickup') +
+          '</span>' +
+        '</label>' +
+        '<label style="display:flex;align-items:center;gap:.35rem;padding:.55rem;background:#fff;border:1.5px solid #eadfd2;border-radius:10px;cursor:pointer;transition:.2s">' +
+          '<input type="radio" name="mk_order_type" value="delivery" style="margin:0">' +
+          '<span style="font-weight:900;font-size:.82rem;color:#8e2a4a">🛵 ' +
+            (isAr ? 'توصيل للمنزل' : 'Delivery') +
+          '</span>' +
+        '</label>' +
+      '</div>' +
+      '<div id="mkTypeHint" style="margin-top:.4rem;padding:.4rem .5rem;background:#dcf5e8;border-radius:8px;font-size:.72rem;font-weight:800;color:#1e5b4f;line-height:1.7">' +
+        '💵 ' + (isAr ? 'ادفع نقداً عند الكاشير عند الاستلام' : 'Pay cash at the cashier upon pickup') +
+      '</div>';
 
-  const box = document.createElement('div');
-  box.id = 'mkOrderTypeBox';
-  box.style.cssText = 'background:#faf3ea;border:1.5px solid #eadfd2;border-radius:12px;padding:.7rem;margin:.6rem 0';
-  box.innerHTML =
-    '<div style="font-size:.78rem;font-weight:900;color:#8e2a4a;margin-bottom:.45rem">' +
-      (isAr ? '📦 كيف تستلم طلبك؟' : '📦 How do you want your order?') +
-    '</div>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem">' +
-      '<label style="display:flex;align-items:center;gap:.35rem;padding:.55rem;background:#fff;border:1.5px solid #1e5b4f;border-radius:10px;cursor:pointer;transition:.2s">' +
-        '<input type="radio" name="mk_order_type" value="pickup" checked style="margin:0">' +
-        '<span style="font-weight:900;font-size:.82rem;color:#1e5b4f">🏪 ' +
-          (isAr ? 'استلام من الفرع' : 'Pickup') +
-        '</span>' +
-      '</label>' +
-      '<label style="display:flex;align-items:center;gap:.35rem;padding:.55rem;background:#fff;border:1.5px solid #eadfd2;border-radius:10px;cursor:pointer;transition:.2s">' +
-        '<input type="radio" name="mk_order_type" value="delivery" style="margin:0">' +
-        '<span style="font-weight:900;font-size:.82rem;color:#8e2a4a">🛵 ' +
-          (isAr ? 'توصيل للمنزل' : 'Delivery') +
-        '</span>' +
-      '</label>' +
-    '</div>' +
-    '<div id="mkTypeHint" style="margin-top:.4rem;padding:.4rem .5rem;background:#dcf5e8;border-radius:8px;font-size:.72rem;font-weight:800;color:#1e5b4f;line-height:1.7">' +
-      '💵 ' + (isAr ? 'ادفع نقداً عند الكاشير عند الاستلام' : 'Pay cash at the cashier upon pickup') +
-    '</div>';
-
-  /* الإدراج قبل حقل الاسم إن أمكن، وإلا في بداية السلة */
-  if(parent && parent.parentNode){
-    parent.parentNode.insertBefore(box, parent);
-  } else {
     cartEl.insertBefore(box, cartEl.firstChild);
-  }
 
-  /* ربط تغيير النوع بتحديث التلميح وإغلاق العنوان */
-  const hintEl = el('mkTypeHint');
-  const radios = box.querySelectorAll('input[name="mk_order_type"]');
-  radios.forEach(function(r){
-    r.addEventListener('change', function(){
-      const v = r.value;
-      if(v === 'pickup'){
-        hintEl.style.background = '#dcf5e8';
-        hintEl.style.color = '#1e5b4f';
-        hintEl.innerHTML = '💵 ' +
-          (isAr ? 'ادفع نقداً عند الكاشير عند الاستلام' : 'Pay cash at the cashier upon pickup');
-        /* إخفاء حقل العنوان إن وُجد */
-        const addrBox = el('dAddressLine') || el('dAddress');
-        if(addrBox){
-          const wrap = addrBox.closest('.field, .row, label, div');
-          if(wrap) wrap.style.display = 'none';
+    const hintEl = el('mkTypeHint');
+    const radios = box.querySelectorAll('input[name="mk_order_type"]');
+    radios.forEach(function(r){
+      r.addEventListener('change', function(){
+        const v = r.value;
+        if(v === 'pickup'){
+          hintEl.style.background = '#dcf5e8';
+          hintEl.style.color = '#1e5b4f';
+          hintEl.innerHTML = '💵 ' +
+            (isAr ? 'ادفع نقداً عند الكاشير عند الاستلام' : 'Pay cash at the cashier upon pickup');
+          const addrBox = el('dAddressLine') || el('dAddress');
+          if(addrBox){
+            const wrap = addrBox.closest('.field, .row, label, div');
+            if(wrap) wrap.style.display = 'none';
+          }
+          const feeRow = document.querySelector('[data-role="delivery-fee"], .delivery-fee, .fee-row');
+          if(feeRow) feeRow.style.display = 'none';
+        } else {
+          hintEl.style.background = '#fff6e6';
+          hintEl.style.color = '#b45309';
+          hintEl.innerHTML = '💵 ' +
+            (isAr ? 'ادفع نقداً للسائق عند التسليم' : 'Pay cash to the driver upon delivery');
+          const addrBox = el('dAddressLine') || el('dAddress');
+          if(addrBox){
+            const wrap = addrBox.closest('.field, .row, label, div');
+            if(wrap) wrap.style.display = '';
+          }
+          const feeRow = document.querySelector('[data-role="delivery-fee"], .delivery-fee, .fee-row');
+          if(feeRow) feeRow.style.display = '';
         }
-        /* إخفاء رسوم التوصيل من واجهة السلة إن وُجدت */
-        const feeRow = document.querySelector('[data-role="delivery-fee"], .delivery-fee, .fee-row');
-        if(feeRow) feeRow.style.display = 'none';
-      } else {
-        hintEl.style.background = '#fff6e6';
-        hintEl.style.color = '#b45309';
-        hintEl.innerHTML = '💵 ' +
-          (isAr ? 'ادفع نقداً للسائق عند التسليم' : 'Pay cash to the driver upon delivery');
-        /* إظهار حقل العنوان */
-        const addrBox = el('dAddressLine') || el('dAddress');
-        if(addrBox){
-          const wrap = addrBox.closest('.field, .row, label, div');
-          if(wrap) wrap.style.display = '';
-        }
-        const feeRow = document.querySelector('[data-role="delivery-fee"], .delivery-fee, .fee-row');
-        if(feeRow) feeRow.style.display = '';
-      }
+      });
     });
-  });
+  } catch(e){
+    console.error('injectOrderTypeUI error:', e);
+  }
 }
 
-/* ===== مراقبة فتح السلة لحقن الواجهة ===== */
-(function setupCartObserver(){
-  if(window._mkCartObserverSet) return;
-  window._mkCartObserverSet = true;
-
-  const obs = new MutationObserver(function(){
-    const cartEl = el('cart');
-    if(cartEl && (cartEl.offsetParent !== null || cartEl.style.display !== 'none')){
-      setTimeout(injectOrderTypeUI, 50);
-    }
-  });
-  obs.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style','class'] });
-
-  /* override openCart لحقن الواجهة مباشرة عند الفتح */
-  if(typeof window.openCart === 'function' && !window.openCart._mkPatched){
-    const _orig = window.openCart;
-    window.openCart = function(){
-      _orig.apply(this, arguments);
-      setTimeout(injectOrderTypeUI, 100);
-    };
-    window.openCart._mkPatched = true;
-  }
+/* ===== ربط openCart (بدون Observer — مرة واحدة فقط) ===== */
+(function patchOpenCart(){
+  if(window._mkOpenCartPatched) return;
+  window._mkOpenCartPatched = true;
+  if(typeof window.openCart !== 'function') return;
+  const _orig = window.openCart;
+  window.openCart = function(){
+    try { _orig.apply(this, arguments); } catch(e){ console.error('openCart:', e); }
+    try {
+      const info = getCustomerInfo();
+      const n = el('cName'), p = el('cPhone');
+      if(n && !n.value && info.name) n.value = info.name;
+      if(p && !p.value && info.phone) p.value = info.phone;
+    } catch(e){}
+    setTimeout(function(){
+      try { injectOrderTypeUI(); } catch(e){ console.error('injectUI:', e); }
+    }, 150);
+  };
 })();
 
 /* ===== إرسال الطلب للـ Worker ===== */
@@ -312,234 +281,211 @@ async function createCloudOrder(payload){
   }catch(e){ return null; }
 }
 
-/* ===== v17: شاشة النجاح (نصوص مختلفة حسب النوع) ===== */
+/* ===== شاشة النجاح (نصوص مختلفة حسب النوع) ===== */
 function showOrderSuccess(res, waMsg, br, orderType){
-  let box = el('orderSuccess');
-  if(!box){
-    box = document.createElement('div');
-    box.id = 'orderSuccess';
-    box.style.cssText = 'position:fixed;inset:0;z-index:5100;background:rgba(40,12,24,.72);display:flex;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)';
-    document.body.appendChild(box);
+  try {
+    let box = el('orderSuccess');
+    if(!box){
+      box = document.createElement('div');
+      box.id = 'orderSuccess';
+      box.style.cssText = 'position:fixed;inset:0;z-index:5100;background:rgba(40,12,24,.72);display:flex;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)';
+      document.body.appendChild(box);
+    }
+    const waNum = String(br.wa||'').replace(/\D/g,'');
+    const isAr = (typeof currentLang !== 'undefined' && currentLang === 'ar');
+    const isPickup = orderType === 'pickup';
+
+    const title = isAr ? 'تم استلام طلبك بنجاح' : 'Order received successfully';
+    const subtitle = isPickup
+      ? (isAr ? 'سيكون جاهزاً عند وصولك للفرع 🏪' : 'Will be ready upon arrival 🏪')
+      : (isAr ? 'السائق سيأتي إليك قريباً 🛵' : 'Driver will arrive soon 🛵');
+    const hint = isPickup
+      ? (isAr ? '💵 ادفع نقداً عند الكاشير' : '💵 Pay cash at the cashier')
+      : (isAr ? '💵 ادفع نقداً للسائق عند التسليم' : '💵 Pay cash to the driver upon delivery');
+    const trackLabel = isAr ? '🗺️ تتبع طلبك مباشرة' : '🗺️ Track your order';
+    const waLabel = isAr ? '📲 أكد طلبك عبر واتساب' : '📲 Confirm via WhatsApp';
+    const closeLabel = isAr ? 'إغلاق' : 'Close';
+    const saveNote = isAr ? 'احتفظ برقم الطلب لمتابعة حالته في أي وقت' : 'Keep this number to track your order anytime';
+
+    box.innerHTML =
+      '<div style="background:#fffdf9;border:2px solid #e0912f;border-radius:22px;padding:1.6rem 1.3rem;max-width:380px;width:100%;text-align:center;font-family:Cairo,sans-serif">' +
+        '<div style="font-size:3rem">✅</div>' +
+        '<b style="display:block;font-size:1.15rem;color:#8e2a4a;margin:.4rem 0">' + title + '</b>' +
+        '<div style="display:inline-block;background:#5a1830;color:#f2b95f;border-radius:50px;padding:.3rem 1.2rem;font-weight:900;font-size:1.2rem;direction:ltr;margin:.4rem 0">' + res.order_number + '</div>' +
+        '<p style="color:#8a6f63;font-size:.78rem;font-weight:700;margin:.4rem 0">' + saveNote + '</p>' +
+        '<div style="background:' + (isPickup ? '#dcf5e8' : '#fff6e6') + ';border-radius:10px;padding:.55rem;margin:.4rem 0;font-size:.82rem;font-weight:900;color:' + (isPickup ? '#1e5b4f' : '#b45309') + '">' + subtitle + '</div>' +
+        '<div style="background:#f3e7d7;border-radius:10px;padding:.55rem;margin:.4rem 0 1rem;font-size:.78rem;font-weight:800;color:#8e2a4a">' + hint + '</div>' +
+        '<a id="osTrack" href="' + (res.track_url || ('track.html?order=' + encodeURIComponent(res.order_number))) + '" style="display:block;border:none;border-radius:12px;padding:.85rem;background:linear-gradient(135deg,#e0912f,#f2b95f);color:#5a1830;font-family:inherit;font-weight:900;text-decoration:none;margin-bottom:.5rem">' + trackLabel + '</a>' +
+        '<button id="osWa" style="display:block;width:100%;border:none;border-radius:12px;padding:.85rem;background:#128c5e;color:#fff;font-family:inherit;font-weight:900;cursor:pointer;margin-bottom:.5rem">' + waLabel + '</button>' +
+        '<button id="osClose" style="display:block;width:100%;border:none;border-radius:12px;padding:.7rem;background:transparent;color:#8a6f63;font-family:inherit;font-weight:800;cursor:pointer">' + closeLabel + '</button>' +
+      '</div>';
+    box.style.display = 'flex';
+    el('osWa').onclick = function(){
+      const url = 'https://wa.me/' + waNum + '?text=' + encodeURIComponent(waMsg);
+      const w = window.open(url, '_blank');
+      if(!w) location.href = url;
+    };
+    el('osClose').onclick = function(){ box.style.display = 'none'; };
+  } catch(e){
+    console.error('showOrderSuccess error:', e);
   }
-  const waNum = String(br.wa||'').replace(/\D/g,'');
-  const isAr = (typeof currentLang !== 'undefined' && currentLang === 'ar');
-  const isPickup = orderType === 'pickup';
-
-  const title = isPickup
-    ? (isAr ? 'تم استلام طلبك بنجاح' : 'Order received successfully')
-    : (isAr ? 'تم استلام طلبك بنجاح' : 'Order received successfully');
-  const subtitle = isPickup
-    ? (isAr ? 'سيكون جاهزاً عند وصولك للفرع 🏪' : 'Will be ready upon arrival 🏪')
-    : (isAr ? 'السائق سيأتي إليك قريباً 🛵' : 'Driver will arrive soon 🛵');
-  const hint = isPickup
-    ? (isAr ? '💵 ادفع نقداً عند الكاشير' : '💵 Pay cash at the cashier')
-    : (isAr ? '💵 ادفع نقداً للسائق عند التسليم' : '💵 Pay cash to the driver upon delivery');
-  const trackLabel = isAr ? '🗺️ تتبع طلبك مباشرة' : '🗺️ Track your order';
-  const waLabel = isAr ? '📲 أكد طلبك عبر واتساب' : '📲 Confirm via WhatsApp';
-  const closeLabel = isAr ? 'إغلاق' : 'Close';
-  const saveNote = isAr ? 'احتفظ برقم الطلب لمتابعة حالته في أي وقت' : 'Keep this number to track your order anytime';
-
-  box.innerHTML =
-    '<div style="background:#fffdf9;border:2px solid #e0912f;border-radius:22px;padding:1.6rem 1.3rem;max-width:380px;width:100%;text-align:center;font-family:Cairo,sans-serif">' +
-      '<div style="font-size:3rem">✅</div>' +
-      '<b style="display:block;font-size:1.15rem;color:#8e2a4a;margin:.4rem 0">' + title + '</b>' +
-      '<div style="display:inline-block;background:#5a1830;color:#f2b95f;border-radius:50px;padding:.3rem 1.2rem;font-weight:900;font-size:1.2rem;direction:ltr;margin:.4rem 0">' + res.order_number + '</div>' +
-      '<p style="color:#8a6f63;font-size:.78rem;font-weight:700;margin:.4rem 0">' + saveNote + '</p>' +
-      '<div style="background:' + (isPickup ? '#dcf5e8' : '#fff6e6') + ';border-radius:10px;padding:.55rem;margin:.4rem 0;font-size:.82rem;font-weight:900;color:' + (isPickup ? '#1e5b4f' : '#b45309') + '">' + subtitle + '</div>' +
-      '<div style="background:#f3e7d7;border-radius:10px;padding:.55rem;margin:.4rem 0 1rem;font-size:.78rem;font-weight:800;color:#8e2a4a">' + hint + '</div>' +
-      '<a id="osTrack" href="' + (res.track_url || ('track.html?order=' + encodeURIComponent(res.order_number))) + '" style="display:block;border:none;border-radius:12px;padding:.85rem;background:linear-gradient(135deg,#e0912f,#f2b95f);color:#5a1830;font-family:inherit;font-weight:900;text-decoration:none;margin-bottom:.5rem">' + trackLabel + '</a>' +
-      '<button id="osWa" style="display:block;width:100%;border:none;border-radius:12px;padding:.85rem;background:#128c5e;color:#fff;font-family:inherit;font-weight:900;cursor:pointer;margin-bottom:.5rem">' + waLabel + '</button>' +
-      '<button id="osClose" style="display:block;width:100%;border:none;border-radius:12px;padding:.7rem;background:transparent;color:#8a6f63;font-family:inherit;font-weight:800;cursor:pointer">' + closeLabel + '</button>' +
-    '</div>';
-  box.style.display = 'flex';
-  el('osWa').onclick = function(){
-    const url = 'https://wa.me/' + waNum + '?text=' + encodeURIComponent(waMsg);
-    const w = window.open(url, '_blank');
-    if(!w) location.href = url;
-  };
-  el('osClose').onclick = function(){ box.style.display = 'none'; };
-}
-
-/* ===== تعبئة حقول العميل المحفوظة ===== */
-function fillCustomerFields(){
-  const info = getCustomerInfo();
-  const n = el('cName'), p = el('cPhone');
-  if(n && !n.value && info.name) n.value = info.name;
-  if(p && !p.value && info.phone) p.value = info.phone;
-}
-if(typeof window.openCart === 'function' && !window.openCart._mkFillPatched){
-  const _origOpenCart = window.openCart;
-  window.openCart = function(){
-    _origOpenCart.apply(this, arguments);
-    fillCustomerFields();
-    setTimeout(injectOrderTypeUI, 120);
-  };
-  window.openCart._mkFillPatched = true;
 }
 
 /* =====================================================
-   v17: checkout() الكامل — استلام/توصيل + تنبيه الفرع
+   v17.2: checkout() الكامل — محمي بـ try-catch شامل
    ===================================================== */
 async function checkout(){
-  if(orderLocked()) return;
-  const TT = T();
-  const br = currentBranch();
-  if(!br){ openGate('switch'); return; }
-  if(!cart.size){ toast(TT.emptyMsg); return; }
+  try {
+    if(typeof orderLocked === 'function' && orderLocked()) return;
+    const TT = typeof T === 'function' ? T() : {};
+    const br = typeof currentBranch === 'function' ? currentBranch() : null;
+    if(!br){ if(typeof openGate === 'function') openGate('switch'); return; }
+    if(!cart.size){ if(typeof toast === 'function') toast(TT.emptyMsg || 'السلة فارغة'); return; }
 
-  /* بيانات العميل الإجبارية: اسم + جوال */
-  const nameEl = el('cName'), phoneEl = el('cPhone');
-  let cname = '', cphone = '';
-  if(nameEl && phoneEl){
-    cname = sanitize(nameEl.value);
-    cphone = sanitize(phoneEl.value);
-    if(cname.length < 2){
-      toast(tt('nameRequired','⚠️ يرجى كتابة الاسم','⚠️ Please enter your name'));
-      openCart();
-      setTimeout(function(){ nameEl.focus(); }, 250);
-      return;
+    const nameEl = el('cName'), phoneEl = el('cPhone');
+    let cname = '', cphone = '';
+    if(nameEl && phoneEl){
+      cname = sanitize(nameEl.value);
+      cphone = sanitize(phoneEl.value);
+      if(cname.length < 2){
+        if(typeof toast === 'function') toast('⚠️ يرجى كتابة الاسم');
+        if(typeof openCart === 'function') openCart();
+        setTimeout(function(){ nameEl.focus(); }, 250);
+        return;
+      }
+      if(cphone.replace(/\D/g,'').length < 9){
+        if(typeof toast === 'function') toast('⚠️ يرجى كتابة رقم جوال صحيح');
+        if(typeof openCart === 'function') openCart();
+        setTimeout(function(){ phoneEl.focus(); }, 250);
+        return;
+      }
+      saveCustomerInfo(cname, cphone);
+    } else {
+      const saved = getCustomerInfo();
+      cname = saved.name || '';
+      cphone = saved.phone || '';
     }
-    if(cphone.replace(/\D/g,'').length < 9){
-      toast(tt('phoneRequired','⚠️ يرجى كتابة رقم جوال صحيح','⚠️ Please enter a valid phone number'));
-      openCart();
-      setTimeout(function(){ phoneEl.focus(); }, 250);
-      return;
-    }
-    saveCustomerInfo(cname, cphone);
-  } else {
-    const saved = getCustomerInfo();
-    cname = saved.name || '';
-    cphone = saved.phone || '';
-  }
 
-  /* v17: قراءة نوع الطلب من UI الجديد */
-  const orderType = getCurrentOrderType(); // 'pickup' أو 'delivery'
-  const isPickup = orderType === 'pickup';
+    const orderType = getCurrentOrderType();
+    const isPickup = orderType === 'pickup';
 
-  /* v17: التقاط الموقع (للتوصيل = عنوان، للاستلام = تنبيه الفرع) */
-  let loc = null, addrText = '';
-  try { loc = await captureClientLocation(); } catch(e){ loc = null; }
+    let loc = null, addrText = '';
+    try { loc = await captureClientLocation(); } catch(e){ loc = null; }
 
-  if(isPickup){
-    /* v17: فحص الفرع الأقرب */
-    if(loc){
-      const closer = await checkAndAlertNearestBranch(br, loc);
-      if(closer){
-        /* تبديل الفرع فعلياً */
-        if(typeof setBranch === 'function'){ setBranch(closer.id); }
-        else if(typeof STATE !== 'undefined' && STATE.currentBranchId !== undefined){
-          STATE.currentBranchId = closer.id;
+    if(isPickup){
+      if(loc){
+        const closer = await checkAndAlertNearestBranch(br, loc);
+        if(closer){
+          if(typeof setBranch === 'function'){ setBranch(closer.id); }
+          else if(typeof STATE !== 'undefined' && STATE.currentBranchId !== undefined){
+            STATE.currentBranchId = closer.id;
+          }
+          return checkout();
         }
-        /* إعادة البدء بالفرع الجديد */
-        return checkout();
+      }
+    } else {
+      if(!loc){
+        const lineEl = el('dAddressLine') || el('dAddress');
+        if(lineEl && lineEl.value && lineEl.value.trim()){
+          addrText = sanitize(lineEl.value.trim());
+        } else {
+          addrText = await askAddressText();
+        }
       }
     }
-  } else {
-    /* توصيل: التقاط العنوان (موقع أو نص) */
-    if(!loc){
-      const lineEl = el('dAddressLine') || el('dAddress');
-      if(lineEl && lineEl.value && lineEl.value.trim()){
-        addrText = sanitize(lineEl.value.trim());
-      } else {
-        addrText = await askAddressText();
-      }
-    }
-  }
 
-  /* v17: رسوم التوصيل = 0 للاستلام */
-  const fee = isPickup ? 0 : (typeof deliveryFee === 'function' ? deliveryFee() : 0);
+    const fee = isPickup ? 0 : (typeof deliveryFee === 'function' ? deliveryFee() : 0);
 
-  const invoiceID = typeof generateInvoiceID === 'function'
-    ? generateInvoiceID(typeof branchCode === 'function' ? branchCode(br) : '')
-    : ('INV-' + Date.now());
-  const d = new Date();
-  const p2 = function(n){ return String(n).padStart(2,'0'); };
-  const dateStr = p2(d.getDate()) + '/' + p2(d.getMonth()+1) + '/' + d.getFullYear();
-  let hh = d.getHours();
-  const ampm = hh >= 12 ? (currentLang==='ar' ? 'م' : 'PM') : (currentLang==='ar' ? 'ص' : 'AM');
-  hh = hh % 12 || 12;
-  const timeStr = hh + ':' + p2(d.getMinutes()) + ' ' + ampm;
+    const invoiceID = typeof generateInvoiceID === 'function'
+      ? generateInvoiceID(typeof branchCode === 'function' ? branchCode(br) : '')
+      : ('INV-' + Date.now());
+    const d = new Date();
+    const p2 = function(n){ return String(n).padStart(2,'0'); };
+    const dateStr = p2(d.getDate()) + '/' + p2(d.getMonth()+1) + '/' + d.getFullYear();
+    let hh = d.getHours();
+    const ampm = hh >= 12 ? (currentLang==='ar' ? 'م' : 'PM') : (currentLang==='ar' ? 'ص' : 'AM');
+    hh = hh % 12 || 12;
+    const timeStr = hh + ':' + p2(d.getMinutes()) + ' ' + ampm;
 
-  let total = 0;
-  const cloudItems = [];
-  const lines = [];
-  cart.forEach(function(i){
-    const it = findMenuItem(i.id);
-    if(!it) return;
-    const unit = typeof itemPrice === 'function' ? itemPrice(it, i.sizeIdx) : (it.prices[i.sizeIdx] || it.prices[0] || 0);
-    total += i.qty * unit;
-    const size = i.sizeIdx >= 0 ? ' (' + TT.sizes[i.sizeIdx] + ')' : '';
-    cloudItems.push({
-      id: it.id,
-      name: typeof itemName === 'function' ? itemName(it) : (it.ar || it.en || ''),
-      qty: i.qty,
-      price: unit,
-      size: (i.sizeIdx >= 0 ? TT.sizes[i.sizeIdx] : '')
+    let total = 0;
+    const cloudItems = [];
+    const lines = [];
+    cart.forEach(function(i){
+      const it = typeof findMenuItem === 'function' ? findMenuItem(i.id) : null;
+      if(!it) return;
+      const unit = typeof itemPrice === 'function' ? itemPrice(it, i.sizeIdx) : (it.prices[i.sizeIdx] || it.prices[0] || 0);
+      total += i.qty * unit;
+      const size = i.sizeIdx >= 0 ? ' (' + (TT.sizes ? TT.sizes[i.sizeIdx] : '') + ')' : '';
+      cloudItems.push({
+        id: it.id,
+        name: typeof itemName === 'function' ? itemName(it) : (it.ar || it.en || ''),
+        qty: i.qty,
+        price: unit,
+        size: (i.sizeIdx >= 0 && TT.sizes ? TT.sizes[i.sizeIdx] : '')
+      });
+      lines.push('▪️ ' + i.qty + ' × ' + (typeof itemName === 'function' ? itemName(it) : it.ar) + size + ' = ' + (i.qty * unit) + ' ' + (TT.currency || 'ر.س'));
     });
-    lines.push('▪️ ' + i.qty + ' × ' + (typeof itemName === 'function' ? itemName(it) : it.ar) + size + ' = ' + (i.qty * unit) + ' ' + TT.currency);
-  });
 
-  const notes = sanitize(el('cnotes') ? el('cnotes').value.trim() : '');
+    const notes = sanitize(el('cnotes') ? el('cnotes').value.trim() : '');
 
-  /* v17: نصوص نوع الطلب */
-  const typeLine = isPickup
-    ? '🏪 ' + tt('orderPickup','استلام من الفرع','Branch pickup') + ' — ' + tt('cashierPay','💵 ادفع عند الكاشير','💵 Pay at cashier')
-    : '🛵 ' + tt('restaurantDelivery','توصيل المطعم','Restaurant delivery') + ' — ' + tt('driverPay','💵 ادفع للسائق','💵 Pay to driver');
-  const feeLine = isPickup ? '' : ('🛵 ' + tt('deliveryFee','رسوم التوصيل','Delivery fee') + ': ' + feeLabel(fee) + '\n');
-  const grand = total + fee;
+    const typeLine = isPickup
+      ? '🏪 ' + (typeof tt === 'function' ? tt('orderPickup','استلام من الفرع','Branch pickup') : 'استلام من الفرع') + ' — ' + (typeof tt === 'function' ? tt('cashierPay','💵 ادفع عند الكاشير','💵 Pay at cashier') : '💵 ادفع عند الكاشير')
+      : '🛵 ' + (typeof tt === 'function' ? tt('restaurantDelivery','توصيل المطعم','Restaurant delivery') : 'توصيل المطعم') + ' — ' + (typeof tt === 'function' ? tt('driverPay','💵 ادفع للسائق','💵 Pay to driver') : '💵 ادفع للسائق');
+    const feeLine = isPickup ? '' : ('🛵 ' + (typeof tt === 'function' ? tt('deliveryFee','رسوم التوصيل','Delivery fee') : 'رسوم التوصيل') + ': ' + (typeof feeLabel === 'function' ? feeLabel(fee) : fee) + '\n');
+    const grand = total + fee;
 
-  /* v17: رسالة واتساب محسّنة حسب النوع */
-  const pickupNote = isPickup
-    ? ('⏳ ' + tt('pickupReady','سيكون طلبك جاهزاً عند وصولك للفرع','Your order will be ready upon arrival') + '\n')
-    : '';
-  const msg =
-    brandize(TT.waGreeting) + '\n' +
-    '🧾 ' + TT.waOrderTitle + ' | *' + invoiceID + '*\n' +
-    '📅 ' + dateStr + ' • ⏰ ' + timeStr + '\n' +
-    '📦 ' + tt('waOrderType','نوع الطلب','Order type') + ': *' + typeLine + '*\n' +
-    (cname ? ('👤 ' + tt('waCustomerName','الاسم','Name') + ': ' + cname + '\n') : '') +
-    (cphone ? ('📱 ' + tt('waCustomerPhone','الجوال','Phone') + ': ' + cphone + '\n') : '') +
-    pickupNote +
-    '🍝 ' + tt('waBranch','الفرع','Branch') + ': ' + branchName(br) + '\n' +
-    '━━━━━━━━━━━━\n' +
-    lines.join('\n') + '\n' +
-    '━━━━━━━━━━━━\n' +
-    feeLine +
-    '*' + TT.total + ': ' + grand + ' ' + TT.currency + '* ' + TT.taxInc + '\n' +
-    (notes ? ('📝 ' + TT.waNote + ': ' + notes + '\n') : '') +
-    '━━━━━━━━━━━━\n' +
-    brandize(TT.waThanks);
+    const pickupNote = isPickup
+      ? ('⏳ ' + (typeof tt === 'function' ? tt('pickupReady','سيكون طلبك جاهزاً عند وصولك للفرع','Your order will be ready upon arrival') : 'سيكون طلبك جاهزاً عند وصولك للفرع') + '\n')
+      : '';
+    const msg =
+      (typeof brandize === 'function' ? brandize(TT.waGreeting || '') : '') + '\n' +
+      '🧾 ' + (TT.waOrderTitle || 'الطلب') + ' | *' + invoiceID + '*\n' +
+      '📅 ' + dateStr + ' • ⏰ ' + timeStr + '\n' +
+      '📦 ' + (typeof tt === 'function' ? tt('waOrderType','نوع الطلب','Order type') : 'نوع الطلب') + ': *' + typeLine + '*\n' +
+      (cname ? ('👤 ' + (typeof tt === 'function' ? tt('waCustomerName','الاسم','Name') : 'الاسم') + ': ' + cname + '\n') : '') +
+      (cphone ? ('📱 ' + (typeof tt === 'function' ? tt('waCustomerPhone','الجوال','Phone') : 'الجوال') + ': ' + cphone + '\n') : '') +
+      pickupNote +
+      '🍝 ' + (typeof tt === 'function' ? tt('waBranch','الفرع','Branch') : 'الفرع') + ': ' + (typeof branchName === 'function' ? branchName(br) : br.nameAr) + '\n' +
+      '━━━━━━━━━━━━\n' +
+      lines.join('\n') + '\n' +
+      '━━━━━━━━━━━━\n' +
+      feeLine +
+      '*' + (TT.total || 'المجموع') + ': ' + grand + ' ' + (TT.currency || 'ر.س') + '* ' + (TT.taxInc || '') + '\n' +
+      (notes ? ('📝 ' + (TT.waNote || 'ملاحظات') + ': ' + notes + '\n') : '') +
+      '━━━━━━━━━━━━\n' +
+      (typeof brandize === 'function' ? brandize(TT.waThanks || '') : '');
 
-  /* محاولة الحفظ السحابي أولاً */
-  const cloud = await createCloudOrder({
-    customer_name: cname,
-    customer_phone: cphone,
-    branch_id: br.id,
-    items: cloudItems,
-    subtotal: total,
-    delivery_fee: fee,
-    delivery_fee_mode: typeof deliveryFeeMode === 'function' ? deliveryFeeMode() : 'free',
-    customer_lat: loc ? loc.lat : null,
-    customer_lng: loc ? loc.lng : null,
-    customer_address: isPickup ? '' : addrText,
-    notes: notes,
-    order_type: orderType
-  });
+    const cloud = await createCloudOrder({
+      customer_name: cname,
+      customer_phone: cphone,
+      branch_id: br.id,
+      items: cloudItems,
+      subtotal: total,
+      delivery_fee: fee,
+      delivery_fee_mode: typeof deliveryFeeMode === 'function' ? deliveryFeeMode() : 'free',
+      customer_lat: loc ? loc.lat : null,
+      customer_lng: loc ? loc.lng : null,
+      customer_address: isPickup ? '' : addrText,
+      notes: notes,
+      order_type: orderType
+    });
 
-  cart.clear();
-  if(el('cnotes')) el('cnotes').value = '';
-  if(typeof updateCart === 'function') updateCart();
-  if(typeof closeCart === 'function') closeCart();
+    cart.clear();
+    if(el('cnotes')) el('cnotes').value = '';
+    if(typeof updateCart === 'function') updateCart();
+    if(typeof closeCart === 'function') closeCart();
 
-  if(cloud){
-    /* نجح السحابي: شاشة النجاح */
-    showOrderSuccess(cloud, msg, br, orderType);
-  } else {
-    /* فشل السحابي: واتساب مباشرة (Fallback) */
-    const waUrl = 'https://wa.me/' + br.wa + '?text=' + encodeURIComponent(msg);
-    const w = window.open(waUrl, '_blank');
-    if(!w){ location.href = waUrl; }
-    toast(TT.orderSent);
+    if(cloud){
+      showOrderSuccess(cloud, msg, br, orderType);
+    } else {
+      const waUrl = 'https://wa.me/' + br.wa + '?text=' + encodeURIComponent(msg);
+      const w = window.open(waUrl, '_blank');
+      if(!w){ location.href = waUrl; }
+      if(typeof toast === 'function') toast(TT.orderSent || 'تم إرسال الطلب');
+    }
+  } catch(e){
+    console.error('checkout error:', e);
+    if(typeof toast === 'function') toast('⚠️ حدث خطأ — حاول مرة أخرى');
   }
 }
-/* ===== END cloud.js (v17) ===== */
+/* ===== END cloud.js (v17.2) ===== */
