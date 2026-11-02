@@ -1,19 +1,16 @@
 // ═══════════════════════════════════════════
 //  مكرونجي - Cloudflare Worker API (كامل)
-//  نظام تتبع الطلبات الحي
-//  الإصدار: 1.3
-//  v1.3 = كل محتوى v1.1 + الإضافات التالية:
-//  • أرقام طلبات عشوائية غير مسلسلة (58392K#)
-//  • نوعا الطلب: توصيل 🛵 / استلام من الفرع 🏪
-//  • مسار الاستلام: جاهز ← استلمه العميل (مشرف) بلا سائق
-//  • إلغاء تلقائي للمهجور (pending > ساعتين) برسالة اعتذار
-//  • حذف شهري لغير المسلّم الأقدم من 30 يوماً
-//  • حذف موظف DELETE + حمايات المالك من التعطيل/الحذف
+//  الإصدار: 1.4
+//  v1.4: رقم طلب بدون # + صلاحية ready للمشرف
+//        + اعتذار السائق (driver_assigned → ready)
+//  يحتوي كل ميزات v1.3:
+//  • أرقام عشوائية غير مسلسلة (58392K)
+//  • مساران: توصيل 🛵 / استلام من الفرع 🏪
+//  • إلغاء تلقائي للمهجور بعد ساعتين
+//  • حذف شهري لغير المسلّم (30 يوم)
+//  • حذف موظفين + حمايات المالك
 // ═══════════════════════════════════════════
 
-// ───────────────────────────────────────────
-//  CORS Headers
-// ───────────────────────────────────────────
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
@@ -39,7 +36,6 @@ const STATUS_TEXT = {
   archived: 'مؤرشف',
 };
 
-// رسالة الإلغاء التلقائي للمهجور (معتمدة من المالك)
 const AUTO_CANCEL_NOTE = 'نعتذر، لم يتمكن الفرع من التعامل مع طلبك في الوقت المحدد. تواصل معنا وسنخدمك فوراً 🌹';
 
 // ───────────────────────────────────────────
@@ -58,10 +54,12 @@ const STATUS_TRANSITIONS = {
   archived:             [],
 };
 
+// v1.4: أُضيفت صلاحية ready للمشرف (كانت ناقصة = سبب خطأ الصلاحية)
 const STATUS_ROLES = {
   accepted:             ['supervisor', 'super_admin'],
   cancelled:            ['supervisor', 'super_admin'],
   preparing:            ['supervisor', 'super_admin'],
+  ready:                ['supervisor', 'super_admin'],
   driver_assigned:      ['driver', 'super_admin'],
   driver_at_restaurant: ['driver', 'super_admin'],
   out_for_delivery:     ['driver', 'super_admin'],
@@ -70,9 +68,7 @@ const STATUS_ROLES = {
 };
 
 // ───────────────────────────────────────────
-//  v1.3: قواعد ديناميكية حسب نوع الطلب
-//  توصيل: جاهز ← تعيين ← بالطريق ← سُلّم (سائق)
-//  استلام: جاهز ← استلمه العميل بالفرع (مشرف)
+//  قواعد ديناميكية حسب نوع الطلب
 // ───────────────────────────────────────────
 function allowedNext(order) {
   if (order.status === 'ready') {
@@ -83,6 +79,10 @@ function allowedNext(order) {
 function allowedRolesFor(order, newStatus) {
   if (newStatus === 'delivered' && order.order_type === 'pickup') {
     return ['supervisor', 'super_admin'];
+  }
+  // v1.4: اعتذار السائق — إرجاع الطلب من driver_assigned إلى ready
+  if (newStatus === 'ready' && order.status === 'driver_assigned') {
+    return ['driver', 'supervisor', 'super_admin'];
   }
   return STATUS_ROLES[newStatus] || [];
 }
@@ -122,10 +122,6 @@ function getIP(request) {
          request.headers.get('X-Forwarded-For') ||
          'unknown';
 }
-
-// ───────────────────────────────────────────
-//  Rate Limiting
-// ───────────────────────────────────────────
 async function checkRateLimit(env, key, limit = 100, ttl = 60) {
   try {
     const current = parseInt(await env.KV.get(key) || '0');
@@ -138,18 +134,15 @@ async function checkRateLimit(env, key, limit = 100, ttl = 60) {
 }
 
 // ═══════════════════════════════════════════
-//  v1.3: توليد رقم طلب عشوائي (58392K#)
-//  • 5 أرقام عشوائية (10000–99999) + حرف عشوائي
-//  • فحص تطابق مزدوج: used_order_numbers + orders
-//  • الحجز سنة كاملة — لا إعادة استخدام أبداً
-//  (جدول order_counters يبقى في القاعدة دون استخدام)
+//  توليد رقم طلب عشوائي (58392K) — بدون #
+//  فحص تطابق مزدوج + حجز سنة كاملة
 // ═══════════════════════════════════════════
 async function generateOrderNumber(db) {
   const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   for (let attempt = 0; attempt < 25; attempt++) {
     const num = Math.floor(Math.random() * 90000) + 10000;
     const letter = letters[Math.floor(Math.random() * 26)];
-    const orderNumber = `${num}${letter}#`;
+    const orderNumber = `${num}${letter}`;
     const used = await db.prepare(
       'SELECT 1 FROM used_order_numbers WHERE order_number = ?'
     ).bind(orderNumber).first();
@@ -233,19 +226,13 @@ async function verifyJWT(token, secret) {
     const decoded = JSON.parse(base64UrlDecode(payload));
     if (decoded.exp && decoded.exp < Math.floor(Date.now() / 1000)) return null;
     return decoded;
-  } catch (e) {
-    return null;
-  }
+  } catch (e) { return null; }
 }
 function extractToken(request) {
   const auth = request.headers.get('Authorization');
   if (!auth || !auth.startsWith('Bearer ')) return null;
   return auth.substring(7);
 }
-
-// ═══════════════════════════════════════════
-//  التحقق من التوكن والصلاحيات
-// ═══════════════════════════════════════════
 async function requireAuth(request, env, allowedRoles) {
   const token = extractToken(request);
   if (!token) return { error: error('غير مصرح: لا يوجد توكن', 401) };
@@ -263,7 +250,6 @@ async function requireAuth(request, env, allowedRoles) {
 
 // ═══════════════════════════════════════════
 //  1) تسجيل الدخول
-//  POST /api/auth/login
 // ═══════════════════════════════════════════
 async function handleLogin(request, env) {
   const ip = getIP(request);
@@ -316,8 +302,7 @@ async function handleLogin(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  2) جسر المالك (توكن GitHub → JWT داخلي)
-//  POST /api/auth/admin-bridge
+//  2) جسر المالك (توكن GitHub → JWT)
 // ═══════════════════════════════════════════
 async function handleAdminBridge(request, env) {
   const ip = getIP(request);
@@ -392,7 +377,6 @@ async function handleAdminBridge(request, env) {
 
 // ═══════════════════════════════════════════
 //  3) تغيير كلمة المرور
-//  POST /api/auth/change-password
 // ═══════════════════════════════════════════
 async function handleChangePassword(request, env) {
   const auth = await requireAuth(request, env, null);
@@ -419,8 +403,7 @@ async function handleChangePassword(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  4) إنشاء طلب جديد (توصيل أو استلام)
-//  POST /api/orders
+//  4) إنشاء طلب (توصيل أو استلام)
 // ═══════════════════════════════════════════
 async function handleCreateOrder(request, env) {
   const ip = getIP(request);
@@ -462,7 +445,6 @@ async function handleCreateOrder(request, env) {
     };
   });
 
-  // v1.3: الاستلام من الفرع = بدون رسوم توصيل أبداً
   let deliveryFee = 0;
   if (orderType === 'delivery') {
     const feeMode = body.delivery_fee_mode || 'free';
@@ -509,8 +491,7 @@ async function handleCreateOrder(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  5) تتبع الطلب (للعميل - بدون توكن)
-//  GET /api/track/:number  — v1.3: مساران مختلفان
+//  5) تتبع الطلب (مساران مختلفان)
 // ═══════════════════════════════════════════
 async function handleTrackOrder(orderNumber, env) {
   const order = await env.DB.prepare(`
@@ -573,8 +554,7 @@ async function handleTrackOrder(orderNumber, env) {
 }
 
 // ═══════════════════════════════════════════
-//  6) طلبات الفرع (المشرف) + النوع
-//  GET /api/supervisor/orders?status=
+//  6) طلبات الفرع (المشرف)
 // ═══════════════════════════════════════════
 async function handleSupervisorOrders(request, env) {
   const auth = await requireAuth(request, env, ['supervisor', 'super_admin']);
@@ -612,8 +592,7 @@ async function handleSupervisorOrders(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  7) سائقو الفرع (لقائمة التعيين)
-//  GET /api/supervisor/drivers
+//  7) سائقو الفرع
 // ═══════════════════════════════════════════
 async function handleSupervisorDrivers(request, env) {
   const auth = await requireAuth(request, env, ['supervisor', 'super_admin']);
@@ -629,8 +608,7 @@ async function handleSupervisorDrivers(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  8) توصيلات السائق (توصيل فقط — v1.3)
-//  GET /api/driver/orders
+//  8) توصيلات السائق (توصيل فقط)
 // ═══════════════════════════════════════════
 async function handleDriverOrders(request, env) {
   const auth = await requireAuth(request, env, ['driver']);
@@ -671,7 +649,6 @@ async function handleDriverOrders(request, env) {
 
 // ═══════════════════════════════════════════
 //  9) تغيير حالة الطلب (قواعد حسب النوع)
-//  PUT /api/orders/:id/status
 // ═══════════════════════════════════════════
 async function handleUpdateStatus(orderId, request, env) {
   const auth = await requireAuth(request, env, null);
@@ -722,8 +699,7 @@ async function handleUpdateStatus(orderId, request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  10) تعيين سائق (توصيل فقط — v1.3)
-//  PUT /api/orders/:id/assign
+//  10) تعيين سائق (توصيل فقط)
 // ═══════════════════════════════════════════
 async function handleAssignDriver(orderId, request, env) {
   const auth = await requireAuth(request, env, ['supervisor', 'super_admin']);
@@ -763,7 +739,6 @@ async function handleAssignDriver(orderId, request, env) {
 
 // ═══════════════════════════════════════════
 //  11) موقع السائق
-//  POST /api/driver/location
 // ═══════════════════════════════════════════
 async function handleDriverLocation(request, env) {
   const auth = await requireAuth(request, env, ['driver']);
@@ -799,8 +774,7 @@ async function handleDriverLocation(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  12) صورة التسليم (توصيل فقط — v1.3)
-//  POST /api/orders/:id/photo
+//  12) صورة التسليم (توصيل فقط)
 // ═══════════════════════════════════════════
 async function handleUploadPhoto(orderId, request, env) {
   const auth = await requireAuth(request, env, ['driver', 'super_admin']);
@@ -843,8 +817,7 @@ async function handleUploadPhoto(orderId, request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  13) كل الطلبات (المالك) + فلاتر + فلتر النوع
-//  GET /api/admin/orders
+//  13) كل الطلبات (المالك) + فلاتر
 // ═══════════════════════════════════════════
 async function handleAdminOrders(request, env) {
   const auth = await requireAuth(request, env, ['super_admin']);
@@ -896,11 +869,7 @@ async function handleAdminOrders(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  14) إدارة المستخدمين (المالك)
-//  GET/POST /api/admin/users
-//  PUT /api/admin/users/:id      (+حمايات v1.3)
-//  DELETE /api/admin/users/:id   (جديد v1.3)
-//  POST /api/admin/users/:id/reset-password
+//  14) إدارة المستخدمين + حذف + حمايات
 // ═══════════════════════════════════════════
 async function handleAdminUsersList(request, env) {
   const auth = await requireAuth(request, env, ['super_admin']);
@@ -969,7 +938,6 @@ async function handleAdminUsersUpdate(userId, request, env) {
   const user = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
   if (!user) return error('المستخدم غير موجود', 404);
 
-  // v1.3: حمايات المالك
   if (user.role === 'super_admin' && body.is_active === 0) {
     return error('لا يمكن تعطيل حساب المالك', 403);
   }
@@ -990,7 +958,6 @@ async function handleAdminUsersUpdate(userId, request, env) {
   return json({ success: true });
 }
 
-// v1.3: حذف موظف (مشرف/سائق فقط — بلا طلبات)
 async function handleAdminUsersDelete(userId, request, env) {
   const auth = await requireAuth(request, env, ['super_admin']);
   if (auth.error) return auth.error;
@@ -1036,9 +1003,7 @@ async function handleAdminUsersReset(userId, request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  15) التقارير والإحصائيات (كامل كما v1.1
-//      + عدّادات التوصيل/الاستلام v1.3)
-//  GET /api/reports/summary?branch_id=&period=today|week|month
+//  15) التقارير والإحصائيات
 // ═══════════════════════════════════════════
 async function handleReportsSummary(request, env) {
   const auth = await requireAuth(request, env, ['super_admin', 'supervisor']);
@@ -1140,7 +1105,7 @@ export default {
 
     try {
       if (path === '/api/health' && request.method === 'GET') {
-        return json({ status: 'ok', version: '1.3', live_mode: env.LIVE_MODE || 'polling' });
+        return json({ status: 'ok', version: '1.4', live_mode: env.LIVE_MODE || 'polling' });
       }
 
       if (path === '/api/auth/login' && request.method === 'POST') return await handleLogin(request, env);
@@ -1190,12 +1155,10 @@ export default {
 
   // ═════════════════════════════════════════
   //  المهام المجدولة (Cron)
-  //  "0 * * * *" = كل ساعة: إلغاء المهجور
-  //  "0 3 * * *" = 3 فجراً: تنظيف + حذف شهري + نسخ
   // ═════════════════════════════════════════
   async scheduled(event, env, ctx) {
     try {
-      // v1.3: كل ساعة — إلغاء الطلبات المهجورة (pending > ساعتين)
+      // كل ساعة: إلغاء الطلبات المهجورة (pending > ساعتين)
       if (event.cron === '0 * * * *') {
         const stale = await env.DB.prepare(`
           SELECT id FROM orders
@@ -1213,7 +1176,7 @@ export default {
         }
       }
 
-      // 3 فجراً: التنظيف الشامل + الحذف الشهري + النسخ الاحتياطي
+      // 3 فجراً: تنظيف + حذف شهري + نسخ احتياطي
       if (event.cron === '0 3 * * *') {
         await env.DB.prepare(
           "DELETE FROM used_order_numbers WHERE expires_at < date('now')"
@@ -1231,7 +1194,7 @@ export default {
           )
         `).run();
 
-        // v1.3: حذف غير المسلّم الأقدم من 30 يوماً + اليتيمة
+        // حذف غير المسلّم الأقدم من 30 يوماً + اليتيمة
         await env.DB.prepare(`
           DELETE FROM orders
           WHERE status NOT IN ('delivered','archived')
@@ -1279,5 +1242,5 @@ export default {
 };
 
 // ═══════════════════════════════════════════
-//  نهاية worker/index.js (v1.3)
+//  نهاية worker/index.js (v1.4)
 // ═══════════════════════════════════════════
