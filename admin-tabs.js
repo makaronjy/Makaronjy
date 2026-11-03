@@ -1,5 +1,5 @@
-/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v9.2) ===== */
-/* v9.2: حماية المالك + حذف موظفين + عمود النوع + فلتر النوع */
+/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v9.3) ===== */
+/* v9.3: بطاقة "توفر خدمة التوصيل" داخل الإعدادات (بدون ملف جديد) */
 
 function nmOf(x){
 return (ALANG===`ar`) ? x.ar : (x.en || x.ar);
@@ -1351,6 +1351,29 @@ const APP_IMGS = [
 ];
 const imgPending = {};
 let imgRenderStamp = Date.now();
+/* v9.3: نشر إعداد توفر التوصيل */
+async function publishAvail(btn){
+var mode = el(`availMode`).value;
+var ids = Array.prototype.slice
+.call(document.querySelectorAll(`.availBr:checked`))
+.map(function(c){ return c.value; });
+if(mode === `selected` && !ids.length){
+toast(L(`warnAvail`), `warn`);
+return;
+}
+var label = L(`deliveryAvailPublish`);
+btn.disabled = true;
+btn.textContent = L(`publishing`);
+try{
+STATE.SETTINGS.deliveryAvailability = { mode: mode, branchIds: ids };
+await publishSettings(`تحديث توفر التوصيل من لوحة التحكم 🛵`);
+toast(L(`deliveryAvailSaved`), `success`, L(`subLive`));
+btn.disabled = false;
+btn.textContent = label;
+}catch(e){
+handlePublishError(e, btn, label);
+}
+}
 function renderSettings(){
 var s = STATE.SETTINGS;
 var stImg = ` style="width:100%;height:100%;` +
@@ -1377,6 +1400,20 @@ pendBtns +
 `<input type="file" accept="image/png,image/jpeg,image/webp" hidden data-ifile="` + im.key + `">` +
 `</div>`;
 }).join(``);
+/* v9.3: بطاقة توفر التوصيل */
+var da = s.deliveryAvailability || { mode:`all`, branchIds: [] };
+if(da.mode!==`all` && da.mode!==`none` && da.mode!==`selected`) da.mode = `all`;
+if(!Array.isArray(da.branchIds)) da.branchIds = [];
+var availBoxes = branches().map(function(b){
+var ck = da.branchIds.includes(b.id) ? ` checked` : ``;
+return `<label style="display:flex;align-items:center;gap:.4rem;` +
+`font-size:.78rem;font-weight:800;color:var(--ink);` +
+`margin-bottom:.35rem;cursor:pointer">` +
+`<input type="checkbox" class="availBr" value="` + b.id + `"` + ck +
+` style="width:auto;margin:0"> ` + esc(brName(b)) + `</label>`;
+}).join(``);
+var availHint = (da.mode===`none`) ? L(`deliveryAvailHintNone`)
+: (da.mode===`selected`) ? L(`deliveryAvailHintSelected`) : ``;
 el(`settingsForm`).innerHTML =
 `<div class="form-grid">` +
 `<label>` + L(`lblBrandAr`) +
@@ -1393,6 +1430,28 @@ el(`settingsForm`).innerHTML =
 `<div class="note">` + L(`imagesNote`) + `</div>` +
 `<div class="imgs-grid">` + imgs + `</div>` +
 `</fieldset>` +
+`<fieldset style="margin-top:1rem">` +
+`<legend>` + L(`deliveryAvailTitle`) + `</legend>` +
+`<select id="availMode" style="width:100%;border:1px solid var(--line);` +
+`border-radius:10px;padding:.6rem .7rem;font-family:inherit;` +
+`font-weight:800;font-size:.88rem;background:var(--panel);` +
+`color:var(--ink);outline:none">` +
+`<option value="all"` + (da.mode===`all`?` selected`:``) + `>` + L(`deliveryAvailAll`) + `</option>` +
+`<option value="none"` + (da.mode===`none`?` selected`:``) + `>` + L(`deliveryAvailNone`) + `</option>` +
+`<option value="selected"` + (da.mode===`selected`?` selected`:``) + `>` + L(`deliveryAvailSelected`) + `</option>` +
+`</select>` +
+`<div id="availBranchWrap" style="display:` +
+(da.mode===`selected`?`block`:`none`) + `;margin-top:.6rem">` +
+`<small style="display:block;font-size:.72rem;font-weight:900;` +
+`color:var(--rust);margin-bottom:.3rem">` +
+L(`deliveryAvailSelectBranches`) + `</small>` +
+availBoxes +
+`</div>` +
+`<div id="availHint" class="note" style="margin:.6rem 0 0;` +
+(availHint?``:`display:none;`) + `">` + availHint + `</div>` +
+`<button type="button" class="primary" data-iact="availPublish" ` +
+`style="margin-top:.8rem">` + L(`deliveryAvailPublish`) + `</button>` +
+`</fieldset>` +
 `<div class="note">` + L(`settingsNote`) + `</div>`;
 }
 el(`settingsForm`).addEventListener(`click`, function(e){
@@ -1400,6 +1459,8 @@ var b = e.target.closest(`button[data-iact]`);
 if(!b) return;
 var key = b.dataset.img;
 var act = b.dataset.iact;
+/* v9.3: نشر توفر التوصيل */
+if(act === `availPublish`){ publishAvail(b); return; }
 var meta = APP_IMGS.find(function(x){
 return x.key===key;
 });
@@ -1441,6 +1502,18 @@ toast(L(`imgUploadFailApp`)+err.message, `error`);
 })(); }
 });
 el(`settingsForm`).addEventListener(`change`, function(e){
+/* v9.3: تبديل وضع توفر التوصيل */
+if(e.target && e.target.id === `availMode`){
+var m = e.target.value;
+el(`availBranchWrap`).style.display =
+(m === `selected`) ? `block` : `none`;
+var h = (m === `none`) ? L(`deliveryAvailHintNone`)
+: (m === `selected`) ? L(`deliveryAvailHintSelected`) : ``;
+var hint = el(`availHint`);
+hint.textContent = h;
+hint.style.display = h ? `block` : `none`;
+return;
+}
 var inp = e.target.closest(`input[data-ifile]`);
 if(!inp) return;
 var key = inp.dataset.ifile;
@@ -1512,7 +1585,7 @@ el(`adForm`).innerHTML =
 `<label>` + L(`lblAdBtnEn`) +
 `<input id="a_btnEn" class="ltr" value="` + esc(a.btnEn || `Got it 🍝`) + `"></label>` +
 `<label>` + L(`lblAdTitleEn`) +
-`<input id="a_titleEn" class="ltr" value="` + esc(a.titleEn) + `"></label>` +
+`<input id="a_titleEn" class="ltr" value="` + esc(a.titleEn) + `</label>` +
 `</div>` +
 `<div class="full"><label>` + L(`lblAdTextAr`) +
 `<textarea id="a_textAr" rows="2">` + esc(a.textAr) + `</textarea></label></div>` +
@@ -1972,4 +2045,4 @@ return;
 applyAdminLang();
 })();
 window.__ADMIN_BOOTED = true;
-/* ===== END admin-tabs.js (v9.2) ===== */
+/* ===== END admin-tabs.js (v9.3) ===== */
