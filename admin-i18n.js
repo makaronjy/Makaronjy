@@ -1,4 +1,4 @@
-/* ===== admin-i18n.js — قاموس نصوص اللوحة (v7) ===== */
+/* ===== admin-i18n.js — قاموس نصوص اللوحة (v8) ===== */
 const ASTR = {
 ar: {
 loginTitle:`لوحة تحكم مكرونجي`,
@@ -200,6 +200,17 @@ return `سيُحذف «${n}» من قائمة التطبيقات. متابعة؟
 },
 deletedDelivery:`تم حذف التطبيق`,
 savedDelivery:`تم حفظ التطبيق`,
+/* ===== v8: توفر خدمة التوصيل ===== */
+deliveryAvailTitle:`🛵 توفر خدمة التوصيل`,
+deliveryAvailAll:`🛵 التوصيل متاح في كل الفروع`,
+deliveryAvailNone:`🚫 لا يوجد توصيل في أي فرع`,
+deliveryAvailSelected:`🎯 فروع محددة فقط`,
+deliveryAvailSelectBranches:`اختر الفروع التي توفّر التوصيل:`,
+deliveryAvailPublish:`🚀 نشر إعداد التوصيل`,
+deliveryAvailSaved:`تم نشر إعداد التوصيل ✅`,
+deliveryAvailHintNone:`العملاء سيرون خيار الاستلام فقط في كل الفروع`,
+deliveryAvailHintSelected:`باقي الفروع ستكون استلام من الفرع فقط (بدون توصيل)`,
+/* ===== نهاية v8 ===== */
 legendSocial:`حسابات التواصل الاجتماعي`,
 btnAddSocial:`➕ إضافة حساب تواصل`,
 editSocialTitle:`تعديل حساب تواصل`,
@@ -522,6 +533,17 @@ return `Remove ${n}?`;
 },
 deletedDelivery:`Deleted`,
 savedDelivery:`Saved`,
+/* ===== v8: Delivery Availability ===== */
+deliveryAvailTitle:`🛵 Delivery Availability`,
+deliveryAvailAll:`🛵 Available in all branches`,
+deliveryAvailNone:`🚫 No delivery in any branch`,
+deliveryAvailSelected:`🎯 Selected branches only`,
+deliveryAvailSelectBranches:`Select branches with delivery:`,
+deliveryAvailPublish:`🚀 Publish delivery setting`,
+deliveryAvailSaved:`Delivery setting published ✅`,
+deliveryAvailHintNone:`Customers will see pickup only in all branches`,
+deliveryAvailHintSelected:`Other branches will be branch pickup only (no delivery)`,
+/* ===== End v8 ===== */
 legendSocial:`Social accounts`,
 btnAddSocial:`➕ Add social`,
 editSocialTitle:`Edit social`,
@@ -646,4 +668,4 @@ reportsEarnings:`Earnings`,
 reportsNoData:`No data for selected period`
 }
 };
-/* ===== END admin-i18n.js (v7) ===== */
+/* ===== END admin-i18n.js (v8) ===== */
