@@ -62,14 +62,14 @@ window.APP_SETTINGS = {
             "m": 0
           },
           "c": {
-            "h": 19,
+            "h": 7,
             "m": 0
           },
           "closed": false
         },
         {
           "o": {
-            "h": 1,
+            "h": 0,
             "m": 0
           },
           "c": {
