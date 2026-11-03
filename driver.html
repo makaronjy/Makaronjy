@@ -1,16 +1,15 @@
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="robots" content="noindex, nofollow">
-<title>بوابة السائق | مكرونجي</title>
+<title data-t="driver.pageTitle">بوابة السائق | مكرونجي</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0b1220;--card:#111a2e;--card2:#0f172a;--line:#1e293b;--gold:#f2b95f;--gold2:#e0912f;--maroon:#7f1d3a;--ink:#e2e8f0;--muted:#94a3b8;--ok:#22c55e;--okbg:#14532d;--err:#ef4444;--errbg:#7f1d1d;--wa:#128c5e;}
+:root{--bg:#0b1220;--card:#111a2e;--card2:#0f172a;--line:#1e293b;--gold:#f2b95f;--gold2:#e0912f;--maroon:#7f1d3a;--ink:#e2e8f0;--muted:#94a3b8;--ok:#22c55e;--okbg:#14532d;--err:#ef4444;--errbg:#7f1d1d;--wa:#128c5e;--blue:#38bdf8;}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;padding-bottom:2rem}
 .hidden{display:none !important}
@@ -38,6 +37,8 @@ header button{border:1.5px solid var(--line);background:var(--card);color:var(--
 .stat small{color:var(--muted);font-weight:800;font-size:.72rem}
 /* الأقسام */
 h3.sec{font-size:.95rem;font-weight:900;color:var(--gold);margin:.4rem 0 .6rem}
+h3.sec .cnt{background:var(--maroon);color:var(--gold);border-radius:50px;padding:.1rem .6rem;font-size:.72rem;font-weight:900;margin-inline-start:.4rem}
+/* بطاقة التوصيل الحالي */
 .active{background:var(--card);border:2px solid var(--ok);border-radius:20px;padding:1rem;box-shadow:0 0 24px rgba(34,197,94,.25);margin-bottom:1rem}
 .active .top{display:flex;gap:.5rem;justify-content:flex-end;flex-wrap:wrap;margin-bottom:.8rem}
 .badge-num{background:var(--maroon);color:var(--gold);border-radius:12px;padding:.35rem .9rem;font-weight:900;font-size:1rem;direction:ltr}
@@ -63,6 +64,20 @@ h3.sec{font-size:.95rem;font-weight:900;color:var(--gold);margin:.4rem 0 .6rem}
 .btn.wa{background:var(--wa);color:#fff}
 .btn.sorry{background:var(--err);color:#fff}
 .btn.ghost{background:transparent;border:1.5px solid var(--line);color:var(--muted);font-size:.75rem;padding:.6rem}
+/* v2.2: بطاقات الحوض */
+.pool-card{background:var(--card);border:2px solid var(--blue);border-radius:18px;padding:.9rem;margin-bottom:.8rem;box-shadow:0 0 18px rgba(56,189,248,.18)}
+.pool-card.nogps{border-color:var(--gold2);box-shadow:0 0 18px rgba(224,145,47,.18)}
+.pc-head{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.5rem}
+.pc-dist{background:var(--card2);border:1.5px solid var(--line);color:var(--blue);border-radius:50px;padding:.2rem .8rem;font-size:.75rem;font-weight:900}
+.pc-line{font-size:.82rem;font-weight:800;padding:.2rem 0;color:var(--ink);line-height:1.7}
+.pc-line .lb{color:var(--muted)}
+.pc-warn{background:var(--errbg);color:#fecaca;border-radius:10px;padding:.45rem .7rem;font-size:.75rem;font-weight:900;margin:.4rem 0}
+.pc-actions{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.6rem}
+.pc-actions a,.pc-actions button{flex:1;min-width:90px;text-align:center;border:none;border-radius:10px;padding:.6rem .4rem;font-family:inherit;font-weight:900;font-size:.78rem;cursor:pointer;text-decoration:none}
+.pca-nav{background:var(--blue);color:#082f49}
+.pca-call{background:var(--okbg);color:#bbf7d0;border:1.5px solid var(--ok) !important}
+.pca-wa{background:var(--wa);color:#fff}
+.pca-claim{background:linear-gradient(135deg,var(--gold2),var(--gold));color:#3b1d0a;flex-basis:100%}
 /* بطاقة آخر تسليم */
 .done-card{background:var(--card);border:2px solid var(--gold2);border-radius:16px;padding:.8rem .9rem;margin-bottom:.7rem;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
 .done-card .n{background:var(--maroon);color:var(--gold);border-radius:10px;padding:.25rem .7rem;font-weight:900;direction:ltr}
@@ -86,11 +101,11 @@ h3.sec{font-size:.95rem;font-weight:900;color:var(--gold);margin:.4rem 0 .6rem}
 <!-- الدخول -->
 <div id="loginScr" class="login">
   <div class="card">
-    <h1>🚗 بوابة السائق</h1>
-    <small>مكرونجي — سجّل دخولك لبدء التوصيل</small>
-    <input id="inUser" placeholder="اسم المستخدم" autocomplete="username">
-    <input id="inPass" type="password" placeholder="كلمة المرور" autocomplete="current-password">
-    <button id="btnLogin">دخول</button>
+    <h1 data-t="driver.login.title">🚗 بوابة السائق</h1>
+    <small data-t="driver.login.subtitle">مكرونجي — سجّل دخولك لبدء التوصيل</small>
+    <input id="inUser" data-t-placeholder="driver.login.placeholderUser" placeholder="اسم المستخدم" autocomplete="username">
+    <input id="inPass" type="password" data-t-placeholder="driver.login.placeholderPass" placeholder="كلمة المرور" autocomplete="current-password">
+    <button id="btnLogin" data-t="driver.login.loginBtn">دخول</button>
     <div id="loginErr" class="err"></div>
   </div>
 </div>
@@ -99,17 +114,24 @@ h3.sec{font-size:.95rem;font-weight:900;color:var(--gold);margin:.4rem 0 .6rem}
 <div id="app" class="hidden">
   <header>
     <div class="av">🚗</div>
-    <div class="nm"><b id="hName">—</b><small>● متصل</small></div>
-    <button id="btnLogout">🚪 خروج</button>
+    <div class="nm"><b id="hName">—</b><small data-t="common.connected">● متصل</small></div>
+    <button id="btnLogout" data-t="driver.logoutBtn">🚪 خروج</button>
   </header>
   <div class="wrap">
     <div class="stats">
-      <div class="stat"><b id="stCount">0</b><small>توصيلات اليوم</small></div>
-      <div class="stat"><b id="stEarn">0</b><small>أرباح اليوم (ريال)</small></div>
+      <div class="stat"><b id="stCount">0</b><small data-t="driver.stats.todayDeliveries">توصيلات اليوم</small></div>
+      <div class="stat"><b id="stEarn">0</b><small data-t="driver.stats.todayEarnings">أرباح اليوم (ريال)</small></div>
     </div>
-    <h3 class="sec">🚗 التوصيل الحالي</h3>
+
+    <h3 class="sec" data-t="driver.sections.currentDelivery">🚗 التوصيل الحالي</h3>
     <div id="activeBox"></div>
-    <h3 class="sec">📜 سجل التوصيلات</h3>
+
+    <div id="poolSec">
+      <h3 class="sec"><span data-t="driver.sections.availablePool">📦 طلبات متاحة في الفرع</span><span class="cnt" id="poolCnt">0</span></h3>
+      <div id="poolBox"></div>
+    </div>
+
+    <h3 class="sec" data-t="driver.sections.history">📜 سجل التوصيلات</h3>
     <div id="histBox"></div>
   </div>
 </div>
@@ -117,14 +139,19 @@ h3.sec{font-size:.95rem;font-weight:900;color:var(--gold);margin:.4rem 0 .6rem}
 <input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
 <div id="toast"></div>
 
+<!-- نظام الترجمة المركزي -->
+<script src="i18n-staff.js"></script>
+
 <script>
 const API = 'https://makaronjy-api.makaronjy.workers.dev';
 let JWT = localStorage.getItem('mk_driver_jwt') || '';
 let ME = null;
 try { ME = JSON.parse(localStorage.getItem('mk_driver_me') || 'null'); } catch(e){}
 let ORDERS = [];
+let POOL = [];
+let MY_LOC = null;
 let photoForOrder = null;
-let LAST_DELIVERED = null; /* v2.1: لزر واتساب الشكر بعد التسليم */
+let LAST_DELIVERED = null;
 
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function toast(m, ok){
@@ -148,25 +175,35 @@ function waOpen(phone, msg){
   const w = window.open(url, '_blank');
   if(!w) location.href = url;
 }
+/* المسافة بالكم (Haversine) */
+function distKm(la1, lo1, la2, lo2){
+  const R = 6371, r = x => x * Math.PI / 180;
+  const dLa = r(la2 - la1), dLo = r(lo2 - lo1);
+  const a = Math.sin(dLa/2)**2 + Math.cos(r(la1))*Math.cos(r(la2))*Math.sin(dLo/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
 
-/* ===== v2.1: رسائل واتساب الجاهزة ===== */
+/* ===== رسائل السائق المعتمدة (عربية دائماً) ===== */
 function waOnWay(o){
-  const msg =
-`أهلاً ${o.customer_name} 🍝
-أنا سائق طلبك رقم ${o.number} ✅
-انطلقت الآن للوصول إليك 🛵
- جهّز مبلغ ${o.total} ريال
-🗺️ تتبّع موقعي مباشرة:
-${trackUrl(o.number)}`;
-  waOpen(o.customer_phone, msg);
+  waOpen(o.customer_phone, tt('messages.drvOnWay', {
+    customer_name: o.customer_name,
+    driver_name: (ME && ME.name) || '—',
+    order_number: o.number,
+    total: o.total,
+    track_url: trackUrl(o.number)
+  }));
 }
 function waThanks(o){
-  const msg =
-`${o.customer_name} العزيز 🍝
-تم تسليم طلبك رقم ${o.number} بنجاح 🎉
-شكراً لثقتك بمكرونجي 🙏
-نتمنى لك وجبة شهية 😋`;
-  waOpen(o.customer_phone, msg);
+  waOpen(o.customer_phone, tt('messages.drvThanks', {
+    customer_name: o.customer_name,
+    order_number: o.number
+  }));
+}
+function waNoGps(o){
+  waOpen(o.customer_phone, tt('messages.drvNoGps', {
+    customer_name: o.customer_name,
+    order_number: o.number
+  }));
 }
 
 async function api(path, opts){
@@ -175,7 +212,7 @@ async function api(path, opts){
   if(JWT) h['Authorization'] = 'Bearer ' + JWT;
   const r = await fetch(API + path, Object.assign({}, opts, {headers:h}));
   const d = await r.json().catch(()=> ({}));
-  if(r.status === 401){ logout(); throw new Error('انتهت الجلسة — سجّل الدخول مجدداً'); }
+  if(r.status === 401){ logout(); throw new Error(tt('errors.unauthorized')); }
   if(!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
   return d;
 }
@@ -193,20 +230,22 @@ document.getElementById('btnLogin').addEventListener('click', async function(){
   const p = document.getElementById('inPass').value;
   const errBox = document.getElementById('loginErr');
   errBox.style.display = 'none';
-  if(!u || !p){ errBox.textContent = 'أكمل البيانات'; errBox.style.display = 'block'; return; }
+  if(!u || !p){ errBox.textContent = tt('driver.login.errEmpty'); errBox.style.display = 'block'; return; }
   try{
     const d = await api('/api/auth/login', { method:'POST', body: JSON.stringify({username:u, password:p}) });
-    if(d.user.role !== 'driver'){ errBox.textContent = 'هذا الحساب ليس حساب سائق'; errBox.style.display = 'block'; return; }
+    if(d.user.role !== 'driver'){ errBox.textContent = tt('driver.login.errNotDriver'); errBox.style.display = 'block'; return; }
     JWT = d.token; ME = d.user;
     localStorage.setItem('mk_driver_jwt', JWT);
     localStorage.setItem('mk_driver_me', JSON.stringify(ME));
     enterApp();
   }catch(e){
-    errBox.textContent = e.message || 'فشل الدخول';
+    errBox.textContent = e.message || tt('driver.login.errFailed');
     errBox.style.display = 'block';
   }
 });
-document.getElementById('btnLogout').addEventListener('click', logout);
+document.getElementById('btnLogout').addEventListener('click', function(){
+  if(confirm(tt('driver.confirmLogout'))) logout();
+});
 
 function enterApp(){
   document.getElementById('loginScr').classList.add('hidden');
@@ -215,16 +254,25 @@ function enterApp(){
   load();
 }
 
-/* ===== التحميل ===== */
+/* ===== التحميل (طلباتي + الحوض) ===== */
 async function load(){
   try{
-    const d = await api('/api/driver/orders');
+    const [d, p] = await Promise.all([
+      api('/api/driver/orders'),
+      api('/api/branch/pool')
+    ]);
     ORDERS = d.orders || [];
+    POOL = p.orders || [];
+    if(p.driver_location) MY_LOC = MY_LOC || { lat:p.driver_location.lat, lng:p.driver_location.lng };
     document.getElementById('stCount').textContent = (d.stats && d.stats.delivered_today) || 0;
     document.getElementById('stEarn').textContent = (d.stats && d.stats.earnings_today) || 0;
-    renderActive();
-    renderHist();
+    renderAll();
   }catch(e){ toast(e.message); }
+}
+function renderAll(){
+  renderActive();
+  renderPool();
+  renderHist();
 }
 
 function activeOrder(){
@@ -236,14 +284,14 @@ function renderActive(){
   const box = document.getElementById('activeBox');
   const o = activeOrder();
   if(!o){
-    box.innerHTML = '<div class="empty">لا يوجد توصيل نشط حالياً — بانتظار إسناد طلب جديد 🕐</div>';
+    box.innerHTML = '<div class="empty">' + tt('driver.empty.noActive') + '</div>';
     return;
   }
   const idx = (o.status === 'driver_assigned' || o.status === 'driver_at_restaurant') ? 0 : (o.status === 'out_for_delivery' ? 1 : 2);
   const steps = [
-    {ic:'🚗', t:'مُسند'},
-    {ic:'🛵', t:'بالطريق'},
-    {ic:'🎉', t:'سلّم'}
+    {ic:'🚗', t: tt('driver.steps.assigned')},
+    {ic:'🛵', t: tt('driver.steps.onTheWay')},
+    {ic:'🎉', t: tt('driver.steps.delivered')}
   ];
   let stepsHtml = '<div class="steps3">';
   steps.forEach(function(s, i){
@@ -254,28 +302,77 @@ function renderActive(){
   stepsHtml += '</div>';
 
   const navLink = (o.customer_lat && o.customer_lng)
-    ? '<a href="https://maps.google.com/?q=' + o.customer_lat + ',' + o.customer_lng + '" target="_blank" rel="noopener">🗺️ الملاحة</a>'
+    ? '<a href="https://maps.google.com/?q=' + o.customer_lat + ',' + o.customer_lng + '" target="_blank" rel="noopener">🗺️ ' + tt('driver.actions.navigation').replace('🗺️ ','') + '</a>'
     : '';
   let btns = '';
   if(idx === 0){
     btns =
-      '<button class="btn go" data-act="go">🛵 انطلقت بالتوصيل</button>' +
-      '<button class="btn sorry" data-act="sorry">❌ اعتذار عن التوصيل</button>';
+      '<button class="btn go" data-act="go">' + tt('driver.actions.startDelivery') + '</button>' +
+      '<button class="btn sorry" data-act="sorry">' + tt('driver.actions.sorry') + '</button>';
   } else if(idx === 1){
     btns =
-      '<button class="btn wa" data-act="wa-way">📱 واتساب: أنا بالطريق (مع رابط التتبع)</button>' +
-      '<button class="btn done" data-act="delivered">🎉 تم التسليم (مع صورة إثبات)</button>' +
-      '<button class="btn ghost" data-act="delivered-nophoto">تعذر التصوير؟ تأكيد التسليم فقط</button>';
+      '<button class="btn wa" data-act="wa-way">' + tt('driver.actions.onTheWayWaFull') + '</button>' +
+      '<button class="btn done" data-act="delivered">' + tt('driver.actions.deliverWithPhoto') + '</button>' +
+      '<button class="btn ghost" data-act="delivered-nophoto">' + tt('driver.actions.deliverNoPhoto') + '</button>';
   }
   box.innerHTML =
     '<div class="active">' +
-      '<div class="top"><span class="badge-fee">أجرة ' + (o.delivery_fee || 0) + ' ريال</span><span class="badge-num">' + esc(o.number) + '</span></div>' +
+      '<div class="top"><span class="badge-fee">' + tt('driver.info.deliveryFee') + ' ' + (o.delivery_fee || 0) + '</span><span class="badge-num">' + esc(o.number) + '</span></div>' +
       stepsHtml +
-      '<div class="info">👤 <span class="lb">العميل:</span> ' + esc(o.customer_name) + ' — <a href="tel:' + esc(o.customer_phone) + '">📞 اتصال</a></div>' +
-      '<div class="info">📍 <span class="lb">العنوان:</span> ' + (esc(o.customer_address) || '—') + ' — ' + navLink + '</div>' +
-      '<div class="info">💵 <span class="lb">استلم عند التسليم:</span> ' + o.total + ' ريال</div>' +
+      '<div class="info">👤 <span class="lb">' + tt('driver.info.customer') + ':</span> ' + esc(o.customer_name) + ' — <a href="tel:' + esc(o.customer_phone) + '">📞 ' + tt('driver.actions.call').replace('📞 ','') + '</a></div>' +
+      '<div class="info">📍 <span class="lb">' + tt('driver.info.address') + ':</span> ' + (esc(o.customer_address) || '—') + ' — ' + navLink + '</div>' +
+      '<div class="info">💵 <span class="lb">' + tt('driver.info.amountToCollect') + ':</span> ' + o.total + ' ' + tt('common.riyal') + '</div>' +
       btns +
     '</div>';
+}
+
+/* ===== v2.2: حوض الطلبات (الأقرب أولاً) ===== */
+function sortPool(){
+  const ref = MY_LOC;
+  POOL.forEach(function(o, i){
+    o._hasGps = !!(o.customer_lat && o.customer_lng);
+    o._dist = (ref && o._hasGps) ? distKm(ref.lat, ref.lng, o.customer_lat, o.customer_lng) : (o._hasGps ? 50000 + i : Infinity);
+  });
+  POOL.sort(function(a, b){
+    if(a._dist !== b._dist) return a._dist - b._dist;
+    return String(a.created_at) < String(b.created_at) ? -1 : 1;
+  });
+}
+function renderPool(){
+  const sec = document.getElementById('poolSec');
+  const box = document.getElementById('poolBox');
+  /* الحوض مخفي أثناء انشغالك بتوصيل نشط */
+  if(activeOrder()){ sec.classList.add('hidden'); return; }
+  sec.classList.remove('hidden');
+  sortPool();
+  document.getElementById('poolCnt').textContent = POOL.length;
+  if(!POOL.length){
+    box.innerHTML = '<div class="empty">' + tt('driver.empty.noPool') + '</div>';
+    return;
+  }
+  box.innerHTML = POOL.map(function(o){
+    const distBadge = (MY_LOC && o._hasGps)
+      ? '<span class="pc-dist">📍 ' + o._dist.toFixed(1) + ' ' + tt('track.map.routeInfo.km') + '</span>'
+      : '';
+    const navBtn = o._hasGps
+      ? '<a class="pca-nav" href="https://maps.google.com/?q=' + o.customer_lat + ',' + o.customer_lng + '" target="_blank" rel="noopener">' + tt('driver.actions.navigation') + '</a>'
+      : '';
+    const waBtn = o._hasGps
+      ? ''
+      : '<button class="pca-wa" data-act="wa-nogps" data-id="' + o.id + '">' + tt('driver.actions.wa') + '</button>';
+    return '<div class="pool-card' + (o._hasGps ? '' : ' nogps') + '">' +
+      '<div class="pc-head"><span class="badge-num">' + esc(o.number) + '</span><span class="badge-fee">💵 ' + o.total + ' ' + tt('common.riyal') + '</span>' + distBadge + '</div>' +
+      '<div class="pc-line">👤 <span class="lb">' + tt('driver.info.customer') + ':</span> ' + esc(o.customer_name) + '</div>' +
+      '<div class="pc-line">📍 <span class="lb">' + tt('driver.info.address') + ':</span> ' + (esc(o.customer_address) || '—') + '</div>' +
+      (o._hasGps ? '' : '<div class="pc-warn">' + tt('driver.info.noGpsWarning') + '</div>') +
+      '<div class="pc-actions">' +
+        navBtn +
+        '<a class="pca-call" href="tel:' + esc(o.customer_phone) + '">' + tt('driver.actions.call') + '</a>' +
+        waBtn +
+        '<button class="pca-claim" data-act="claim" data-id="' + o.id + '">' + tt('driver.actions.claim') + '</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
 }
 
 /* ===== السجل + بطاقة آخر تسليم ===== */
@@ -286,47 +383,56 @@ function renderHist(){
     extra =
       '<div class="done-card">' +
         '<span class="n">' + esc(LAST_DELIVERED.number) + '</span>' +
-        '<b>🎉 تم التسليم — ' + esc(LAST_DELIVERED.customer_name) + '</b>' +
-        '<button data-act="wa-thanks">📱 واتساب شكر</button>' +
+        '<b>🎉 ' + tt('driver.lastDelivery.title') + ' — ' + esc(LAST_DELIVERED.customer_name) + '</b>' +
+        '<button data-act="wa-thanks">' + tt('driver.lastDelivery.thanks') + '</button>' +
       '</div>';
   }
   const done = ORDERS.filter(o => o.status === 'delivered').slice(0, 15);
   box.innerHTML = extra + (done.length
     ? '<div class="hist">' + done.map(function(o){
-        return '<div class="row"><span class="n">' + esc(o.number) + '</span><span>' + esc(o.branch_name || '') + '</span><span class="m">' + o.total + ' ريال</span></div>';
+        return '<div class="row"><span class="n">' + esc(o.number) + '</span><span>' + esc(o.branch_name || '') + '</span><span class="m">' + o.total + ' ' + tt('common.riyal') + '</span></div>';
       }).join('') + '</div>'
-    : (extra ? '' : '<div class="empty">لا توجد توصيلات مكتملة بعد</div>'));
+    : (extra ? '' : '<div class="empty">' + tt('driver.empty.noHistory') + '</div>'));
 }
 
-/* ===== إجراءات السائق ===== */
+/* ===== الإجراءات ===== */
 function onAction(e){
   const b = e.target.closest('[data-act]');
   if(!b) return;
   const act = b.dataset.act;
+  const id = b.dataset.id ? +b.dataset.id : null;
 
-  /* واتساب شكر لآخر تسليم */
-  if(act === 'wa-thanks'){
-    if(LAST_DELIVERED) waThanks(LAST_DELIVERED);
+  if(act === 'wa-thanks'){ if(LAST_DELIVERED) waThanks(LAST_DELIVERED); return; }
+  if(act === 'wa-nogps'){
+    const o = POOL.find(x => x.id === id);
+    if(o) waNoGps(o);
     return;
   }
+  if(act === 'claim'){
+    (async function(){
+      try{
+        const r = await api('/api/orders/' + id + '/claim', { method:'POST' });
+        toast('🤲 ' + r.order_number + ' — ' + tt('driver.steps.assigned'), true);
+        load();
+      }catch(err){ toast('⚠️ ' + err.message); load(); }
+    })();
+    return;
+  }
+  if(act === 'wa-way'){ const o = activeOrder(); if(o) waOnWay(o); return; }
 
   const o = activeOrder();
   if(!o) return;
-
-  /* واتساب أنا بالطريق */
-  if(act === 'wa-way'){ waOnWay(o); return; }
-
   (async function(){
     try{
       if(act === 'go'){
         await api('/api/orders/' + o.id + '/status', { method:'PUT', body: JSON.stringify({status:'out_for_delivery'}) });
-        toast('🛵 انطلقت — بالتوفيق!', true);
+        toast(tt('driver.actions.started'), true);
         load();
       }
       if(act === 'sorry'){
-        if(!confirm('سيُعاد الطلب للمشرف لتعيين سائق آخر. متابعة الاعتذار؟')) return;
+        if(!confirm(tt('driver.actions.confirmSorry'))) return;
         await api('/api/orders/' + o.id + '/status', { method:'PUT', body: JSON.stringify({status:'ready', notes:'اعتذار السائق'}) });
-        toast('تم الاعتذار وإرجاع الطلب للمشرف');
+        toast(tt('driver.actions.sorryDone'));
         load();
       }
       if(act === 'delivered'){
@@ -334,17 +440,18 @@ function onAction(e){
         document.getElementById('photoInput').click();
       }
       if(act === 'delivered-nophoto'){
-        if(!confirm('تأكيد التسليم بدون صورة إثبات؟')) return;
+        if(!confirm(tt('driver.actions.confirmNoPhoto'))) return;
         await api('/api/orders/' + o.id + '/status', { method:'PUT', body: JSON.stringify({status:'delivered'}) });
         LAST_DELIVERED = o;
-        toast('🎉 تم التسليم', true);
+        toast(tt('driver.actions.deliveredDone'), true);
         load();
       }
-    }catch(err){ toast(err.message); }
+    }catch(err){ toast('⚠️ ' + err.message); }
   })();
 }
 document.getElementById('activeBox').addEventListener('click', onAction);
 document.getElementById('histBox').addEventListener('click', onAction);
+document.getElementById('poolBox').addEventListener('click', onAction);
 
 /* صورة الإثبات ثم التسليم */
 document.getElementById('photoInput').addEventListener('change', async function(){
@@ -362,32 +469,40 @@ document.getElementById('photoInput').addEventListener('change', async function(
     await api('/api/orders/' + photoForOrder + '/photo', { method:'POST', body: JSON.stringify({photo_base64: b64}) });
     await api('/api/orders/' + photoForOrder + '/status', { method:'PUT', body: JSON.stringify({status:'delivered'}) });
     LAST_DELIVERED = o;
-    toast('🎉 تم التسليم مع صورة الإثبات', true);
+    toast(tt('driver.actions.deliveredWithPhoto'), true);
     photoForOrder = null;
     load();
-  }catch(err){ toast(err.message); }
+  }catch(err){ toast('⚠️ ' + err.message); }
 });
 
-/* ===== الموقع الحي كل 30 ثانية ===== */
-setInterval(function(){
-  const o = activeOrder();
-  if(!o || !JWT) return;
-  if(!navigator.geolocation) return;
+/* ===== v2.2: موقع مستمر كل 30 ثانية (طوال الجلسة) ===== */
+function sendLocation(){
+  if(!JWT || !navigator.geolocation) return;
   navigator.geolocation.getCurrentPosition(function(pos){
+    MY_LOC = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    const o = activeOrder();
     fetch(API + '/api/driver/location', {
       method:'POST',
       headers:{'Content-Type':'application/json', 'Authorization':'Bearer ' + JWT},
-      body: JSON.stringify({ order_id: o.id, lat: pos.coords.latitude, lng: pos.coords.longitude })
-    }).catch(function(){});
+      body: JSON.stringify({
+        order_id: o ? o.id : null,
+        lat: MY_LOC.lat, lng: MY_LOC.lng
+      })
+    }).then(function(){ renderPool(); }).catch(function(){});
   }, function(){}, {enableHighAccuracy:true, timeout:8000, maximumAge:15000});
-}, 30000);
+}
+setInterval(sendLocation, 30000);
 
 /* تحديث تلقائي كل 20 ثانية */
 setInterval(function(){ if(JWT) load(); }, 20000);
 
+/* مزامنة اللغة */
+window.addEventListener('staff-lang-changed', function(){ renderAll(); });
+
 /* الإقلاع */
+initStaffI18n();
 if(JWT && ME){ enterApp(); } else { logout(); }
 </script>
 </body>
 </html>
-<!-- ===== END driver.html (v2.1) ===== -->
+<!-- ===== END driver.html (v2.2) ===== -->
