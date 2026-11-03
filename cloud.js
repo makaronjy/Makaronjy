@@ -1,6 +1,7 @@
 /* =====================================================
 مكرونجي — الطبقة السحابية (cloud.js)
-v17.4: رسالة واتساب برقم السحابة (57437A) + نوع مختصر
+v17.5: قواعد توفر التوصيل + موقع إجباري للتوصيل
+       + شاشة إرشاد ذكية حسب الجهاز + زر إتمام نظيف
 ===================================================== */
 
 const CLOUD_API = 'https://makaronjy-api.makaronjy.workers.dev';
@@ -21,13 +22,123 @@ function getCustomerInfo(){
 function saveCustomerInfo(name, phone){
   try{ localStorage.setItem('mk_customer', JSON.stringify({name:name, phone:phone})); }catch(e){}
 }
+function isAr(){ return (typeof currentLang !== 'undefined' && currentLang === 'ar'); }
 
-/* ===== موقع التوصيل فقط ===== */
-function captureDeliveryLocation(){
+/* ===== v17.5: توفر خدمة التوصيل من settings.js ===== */
+function deliveryAvailability(){
+  try{
+    const da = (typeof S === 'function' && S() && S().deliveryAvailability) ? S().deliveryAvailability : null;
+    if(!da || typeof da !== 'object') return { mode:'all', branchIds: [] };
+    if(da.mode !== 'all' && da.mode !== 'none' && da.mode !== 'selected') da.mode = 'all';
+    if(!Array.isArray(da.branchIds)) da.branchIds = [];
+    return da;
+  }catch(e){ return { mode:'all', branchIds: [] }; }
+}
+function branchHasDelivery(br){
+  if(!br) return true;
+  const da = deliveryAvailability();
+  if(da.mode === 'none') return false;
+  if(da.mode === 'selected') return da.branchIds.includes(br.id);
+  return true;
+}
+
+/* ===== v17.5: فرض القاعدة على واجهة نوع الطلب ===== */
+function enforceDeliveryUI(){
+  try{
+    const br = (typeof currentBranch === 'function') ? currentBranch() : null;
+    const ok = branchHasDelivery(br);
+    const md = el('modeDelivery');
+    if(md){
+      md.disabled = !ok;
+      md.style.opacity = ok ? '' : '.4';
+      md.style.pointerEvents = ok ? '' : 'none';
+    }
+    /* ملاحظة صغيرة تحت أزرار النوع */
+    let note = el('mkDelivNote');
+    if(!note && md && md.parentElement){
+      note = document.createElement('div');
+      note.id = 'mkDelivNote';
+      note.style.cssText = 'margin-top:.5rem;padding:.45rem .7rem;background:#fff6e6;border:1px dashed #e0912f;border-radius:10px;font-size:.72rem;font-weight:800;color:#a06b1c;display:none';
+      md.parentElement.appendChild(note);
+    }
+    if(note){
+      note.textContent = isAr()
+        ? '🏪 هذا الفرع للاستلام فقط — لا تتوفر خدمة توصيل هنا'
+        : '🏪 This branch is pickup only — no delivery here';
+      note.style.display = ok ? 'none' : 'block';
+    }
+    /* تحويل الوضع الحالي لو صار ممنوعاً */
+    if(!ok && typeof getOrderMode === 'function' && getOrderMode() === 'delivery' && typeof setOrderMode === 'function'){
+      setOrderMode('pickup');
+    }
+  }catch(e){}
+}
+
+/* ===== v17.5: زر إتمام نظيف (بدون أيقونة واتساب) ===== */
+function cleanCheckoutBtn(){
+  try{
+    document.querySelectorAll('button').forEach(function(b){
+      const t = b.textContent || '';
+      if(/إتمام الطلب|Complete Order|Checkout/i.test(t) && b.querySelector('svg')){
+        b.innerHTML = isAr() ? '✅ إتمام الطلب' : '✅ Complete Order';
+      }
+    });
+  }catch(e){}
+}
+
+/* ===== ربطات واحدة (patches) ===== */
+(function patchOnce(){
+  if(window._mkCloudPatched) return;
+  window._mkCloudPatched = true;
+
+  /* تعبئة بيانات العميل عند فتح السلة */
+  if(typeof window.openCart === 'function' && !window.openCart._mkFill){
+    const _orig = window.openCart;
+    window.openCart = function(){
+      _orig.apply(this, arguments);
+      try{
+        const info = getCustomerInfo();
+        const n = el('cName'), p = el('cPhone');
+        if(n && !n.value && info.name) n.value = info.name;
+        if(p && !p.value && info.phone) p.value = info.phone;
+      }catch(e){}
+    };
+    window.openCart._mkFill = true;
+  }
+  /* فرض قاعدة التوصيل عند فتح صفحة النوع وتغيير الفرع والوضع */
+  ['openOrderType','applyBranchSelect','setOrderMode','confirmOrderType'].forEach(function(fn){
+    if(typeof window[fn] === 'function' && !window[fn]._mkAvail){
+      const _f = window[fn];
+      window[fn] = function(){
+        const r = _f.apply(this, arguments);
+        setTimeout(enforceDeliveryUI, 60);
+        return r;
+      };
+      window[fn]._mkAvail = true;
+    }
+  });
+  /* إبقاء الزر نظيفاً بعد تبديل اللغة */
+  if(typeof window.applyLang === 'function' && !window.applyLang._mkClean){
+    const _a = window.applyLang;
+    window.applyLang = function(){
+      const r = _a.apply(this, arguments);
+      setTimeout(cleanCheckoutBtn, 80);
+      return r;
+    };
+    window.applyLang._mkClean = true;
+  }
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', function(){
+      cleanCheckoutBtn(); enforceDeliveryUI();
+    });
+  } else {
+    setTimeout(function(){ cleanCheckoutBtn(); enforceDeliveryUI(); }, 300);
+  }
+})();
+
+/* ===== موقع التوصيل (خام) ===== */
+function captureGeoRaw(){
   return new Promise(function(resolve){
-    let m = 'delivery';
-    try{ m = (typeof getOrderMode === 'function') ? getOrderMode() : 'delivery'; }catch(e){}
-    if(m !== 'delivery'){ resolve(null); return; }
     if(!navigator.geolocation){ resolve(null); return; }
     let done = false;
     function finish(v){ if(!done){ done = true; resolve(v); } }
@@ -39,32 +150,139 @@ function captureDeliveryLocation(){
     );
   });
 }
+async function getPermState(){
+  try{
+    if(navigator.permissions && navigator.permissions.query){
+      const st = await navigator.permissions.query({ name: 'geolocation' });
+      return st.state; /* granted | denied | prompt */
+    }
+  }catch(e){}
+  return 'unknown';
+}
 
-/* ===== عنوان نصي احتياطي ===== */
-function askAddressText(){
+/* ===== v17.5: شاشة الإرشاد الذكية حسب الجهاز ===== */
+function deviceKind(){
+  const ua = navigator.userAgent || '';
+  if(/iphone|ipad|ipod/i.test(ua)) return 'ios';
+  if(/android/i.test(ua)) return 'android';
+  return 'desktop';
+}
+function guideContent(){
+  const ar = isAr();
+  const kind = deviceKind();
+  if(kind === 'ios'){
+    return {
+      icon: '📱',
+      name: ar ? 'آيفون / آيباد (Safari)' : 'iPhone / iPad (Safari)',
+      steps: ar ? [
+        'من الصفحة: اضغط زر «aA» أعلى الشاشة ← «إعدادات الموقع» ← الموقع ← سماح',
+        'أو: إعدادات الجهاز ← Safari ← الموقع ← اسأل أو سماح',
+        'عد لهذه الصفحة واضغط «حاول مرة أخرى»'
+      ] : [
+        'On this page: tap the "aA" button ← Website Settings ← Location ← Allow',
+        'Or: Settings app ← Safari ← Location ← Ask or Allow',
+        'Return here and tap "Try again"'
+      ]
+    };
+  }
+  if(kind === 'android'){
+    return {
+      icon: '🤖',
+      name: ar ? 'أندرويد (Chrome)' : 'Android (Chrome)',
+      steps: ar ? [
+        'من الصفحة: اضغط ⋮ أعلى المتصفح ← «إعدادات الموقع» ← الموقع ← سماح',
+        'أو: إعدادات Chrome ← الخصوصية والأمان ← أذونات الموقع ← الموقع',
+        'عد لهذه الصفحة واضغط «حاول مرة أخرى»'
+      ] : [
+        'On this page: tap ⋮ ← Site settings ← Location ← Allow',
+        'Or: Chrome Settings ← Privacy ← Site settings ← Location',
+        'Return here and tap "Try again"'
+      ]
+    };
+  }
+  return {
+    icon: '💻',
+    name: ar ? 'كمبيوتر (متصفح)' : 'Desktop browser',
+    steps: ar ? [
+      'اضغط أيقونة 🔒 (أو ⚙️) بجانب شريط العنوان أعلى الصفحة',
+      'اختر «الموقع / Location» ← سماح / Allow',
+      'اضغط «حاول مرة أخرى» مباشرة'
+    ] : [
+      'Click the 🔒 (or ⚙️) icon next to the address bar',
+      'Choose "Location" ← Allow',
+      'Then tap "Try again"'
+    ]
+  };
+}
+function showLocationGuide(){
   return new Promise(function(resolve){
-    let box = el('addrModal');
+    let box = el('mkLocGuide');
     if(!box){
       box = document.createElement('div');
-      box.id = 'addrModal';
-      box.style.cssText = 'position:fixed;inset:0;z-index:5000;background:rgba(40,12,24,.6);display:flex;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)';
-      box.innerHTML =
-        '<div style="background:#faf3ea;border:2px solid #e0912f;border-radius:18px;padding:1.2rem;max-width:360px;width:100%;font-family:Cairo,sans-serif">' +
-          '<b style="display:block;margin-bottom:.6rem;color:#8e2a4a;font-size:.95rem">📍 اكتب عنوان التوصيل</b>' +
-          '<textarea id="addrModalTxt" rows="3" style="width:100%;border:1.5px solid #eadfd2;border-radius:10px;padding:.5rem;font-family:inherit;font-size:.9rem" placeholder="الحي، الشارع، أقرب معلم..."></textarea>' +
-          '<div style="display:flex;gap:.5rem;margin-top:.8rem">' +
-            '<button id="addrModalOk" style="flex:1;border:none;border-radius:10px;padding:.7rem;background:#1e5b4f;color:#fff;font-family:inherit;font-weight:900;cursor:pointer">تأكيد</button>' +
-            '<button id="addrModalSkip" style="flex:1;border:none;border-radius:10px;padding:.7rem;background:#f3e7d7;color:#8e2a4a;font-family:inherit;font-weight:900;cursor:pointer">تخطي</button>' +
-          '</div>' +
-        '</div>';
+      box.id = 'mkLocGuide';
+      box.style.cssText = 'position:fixed;inset:0;z-index:5200;background:rgba(40,12,24,.72);display:flex;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)';
       document.body.appendChild(box);
     }
+    const c = guideContent();
+    const ar = isAr();
+    box.innerHTML =
+      '<div style="background:#fffdf9;border:2px solid #e0912f;border-radius:22px;padding:1.4rem 1.2rem;max-width:400px;width:100%;font-family:Cairo,sans-serif;max-height:88vh;overflow-y:auto">' +
+        '<div style="text-align:center;font-size:2.6rem">📍</div>' +
+        '<b style="display:block;text-align:center;color:#8e2a4a;font-size:1.05rem;font-weight:900;margin:.3rem 0">' +
+          (ar ? 'نحتاج موقعك لتوصيل أدق وأسرع' : 'We need your location for accurate delivery') +
+        '</b>' +
+        '<p style="text-align:center;color:#8a6f63;font-size:.72rem;font-weight:700;margin:.2rem 0 .8rem">' +
+          (ar ? 'موقعك يبقى سرياً — يُستخدم لحساب مسار السائق فقط' : 'Your location stays private — used only for the driver route') +
+        '</p>' +
+        '<div style="background:#faf3ea;border:1.5px solid #eadfd2;border-radius:14px;padding:.8rem .9rem">' +
+          '<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">' +
+            '<span style="font-size:1.4rem">' + c.icon + '</span>' +
+            '<b style="color:#8e2a4a;font-size:.85rem;font-weight:900">' + c.name + '</b>' +
+          '</div>' +
+          c.steps.map(function(s, i){
+            return '<div style="display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.45rem">' +
+              '<span style="flex:0 0 22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#e0912f,#f2b95f);color:#5a1830;font-size:.7rem;font-weight:900;display:flex;align-items:center;justify-content:center">' + (i+1) + '</span>' +
+              '<span style="font-size:.78rem;font-weight:700;color:#2b1a15;line-height:1.7">' + s + '</span>' +
+            '</div>';
+          }).join('') +
+        '</div>' +
+        '<div style="display:flex;gap:.5rem;margin-top:1rem">' +
+          '<button id="mkLocRetry" style="flex:1;border:none;border-radius:12px;padding:.8rem;background:linear-gradient(135deg,#e0912f,#f2b95f);color:#5a1830;font-family:inherit;font-weight:900;cursor:pointer">' +
+            (ar ? '🔄 حاول مرة أخرى' : '🔄 Try again') +
+          '</button>' +
+          '<button id="mkLocConvert" style="flex:1;border:none;border-radius:12px;padding:.8rem;background:#1e5b4f;color:#fff;font-family:inherit;font-weight:900;cursor:pointer">' +
+            (ar ? '🏪 تحويل لاستلام من الفرع' : '🏪 Switch to pickup') +
+          '</button>' +
+        '</div>' +
+      '</div>';
     box.style.display = 'flex';
-    const ta = el('addrModalTxt');
-    ta.value = '';
-    el('addrModalOk').onclick = function(){ box.style.display = 'none'; resolve(sanitize(ta.value)); };
-    el('addrModalSkip').onclick = function(){ box.style.display = 'none'; resolve(''); };
+    el('mkLocRetry').onclick = function(){ box.style.display = 'none'; resolve('retry'); };
+    el('mkLocConvert').onclick = function(){ box.style.display = 'none'; resolve('convert'); };
   });
+}
+
+/* ===== v17.5: ضمان موقع التوصيل (حلقة حتى النجاح أو التحويل) ===== */
+async function ensureDeliveryLocation(){
+  for(;;){
+    const st = await getPermState();
+    if(st === 'denied'){
+      const choice = await showLocationGuide();
+      if(choice === 'convert') return { convert: true };
+      continue; /* حاول مرة أخرى */
+    }
+    const loc = await captureGeoRaw();
+    if(loc) return { loc: loc };
+    const st2 = await getPermState();
+    if(st2 === 'denied'){
+      const choice = await showLocationGuide();
+      if(choice === 'convert') return { convert: true };
+      continue;
+    }
+    /* فشل مؤقت أو إلغاء طلب الإذن */
+    const choice = await showLocationGuide();
+    if(choice === 'convert') return { convert: true };
+    /* retry: نكمل الحلقة */
+  }
 }
 
 /* ===== إرسال للـ Worker ===== */
@@ -91,25 +309,25 @@ function showOrderSuccess(res, waMsg, br, orderType){
     document.body.appendChild(box);
   }
   const waNum = String(br.wa||'').replace(/\D/g,'');
-  const isAr = (typeof currentLang !== 'undefined' && currentLang === 'ar');
+  const ar = isAr();
   const isPickup = orderType === 'pickup';
   const subtitle = isPickup
-    ? (isAr ? 'سيكون جاهزاً عند وصولك للفرع 🏪' : 'Will be ready upon arrival 🏪')
-    : (isAr ? 'السائق سيأتي إليك قريباً 🛵' : 'Driver will arrive soon 🛵');
+    ? (ar ? 'سيكون جاهزاً عند وصولك للفرع 🏪' : 'Will be ready upon arrival 🏪')
+    : (ar ? 'السائق سيأتي إليك قريباً 🛵' : 'Driver will arrive soon 🛵');
   const hint = isPickup
-    ? (isAr ? '💵 ادفع نقداً عند الكاشير' : '💵 Pay cash at the cashier')
-    : (isAr ? '💵 ادفع نقداً للسائق عند التسليم' : '💵 Pay cash to the driver upon delivery');
+    ? (ar ? '💵 ادفع نقداً عند الكاشير' : '💵 Pay cash at the cashier')
+    : (ar ? '💵 ادفع نقداً للسائق عند التسليم' : '💵 Pay cash to the driver upon delivery');
   box.innerHTML =
     '<div style="background:#fffdf9;border:2px solid #e0912f;border-radius:22px;padding:1.6rem 1.3rem;max-width:380px;width:100%;text-align:center;font-family:Cairo,sans-serif">' +
       '<div style="font-size:3rem">✅</div>' +
-      '<b style="display:block;font-size:1.15rem;color:#8e2a4a;margin:.4rem 0">' + (isAr ? 'تم استلام طلبك بنجاح' : 'Order received successfully') + '</b>' +
+      '<b style="display:block;font-size:1.15rem;color:#8e2a4a;margin:.4rem 0">' + (ar ? 'تم استلام طلبك بنجاح' : 'Order received successfully') + '</b>' +
       '<div style="display:inline-block;background:#5a1830;color:#f2b95f;border-radius:50px;padding:.3rem 1.2rem;font-weight:900;font-size:1.2rem;direction:ltr;margin:.4rem 0">' + res.order_number + '</div>' +
-      '<p style="color:#8a6f63;font-size:.78rem;font-weight:700;margin:.4rem 0">' + (isAr ? 'احتفظ برقم الطلب لمتابعة حالته في أي وقت' : 'Keep this number to track your order') + '</p>' +
+      '<p style="color:#8a6f63;font-size:.78rem;font-weight:700;margin:.4rem 0">' + (ar ? 'احتفظ برقم الطلب لمتابعة حالته في أي وقت' : 'Keep this number to track your order') + '</p>' +
       '<div style="background:' + (isPickup ? '#dcf5e8' : '#fff6e6') + ';border-radius:10px;padding:.55rem;margin:.4rem 0;font-size:.82rem;font-weight:900;color:' + (isPickup ? '#1e5b4f' : '#b45309') + '">' + subtitle + '</div>' +
       '<div style="background:#f3e7d7;border-radius:10px;padding:.55rem;margin:.4rem 0 1rem;font-size:.78rem;font-weight:800;color:#8e2a4a">' + hint + '</div>' +
-      '<a id="osTrack" href="' + (res.track_url || ('track.html?order=' + encodeURIComponent(res.order_number))) + '" style="display:block;border-radius:12px;padding:.85rem;background:linear-gradient(135deg,#e0912f,#f2b95f);color:#5a1830;font-weight:900;text-decoration:none;margin-bottom:.5rem">' + (isAr ? '🗺️ تتبع طلبك مباشرة' : '🗺️ Track your order') + '</a>' +
-      '<button id="osWa" style="display:block;width:100%;border:none;border-radius:12px;padding:.85rem;background:#128c5e;color:#fff;font-weight:900;cursor:pointer;margin-bottom:.5rem">' + (isAr ? '📲 أكد طلبك عبر واتساب' : '📲 Confirm via WhatsApp') + '</button>' +
-      '<button id="osClose" style="display:block;width:100%;border:none;border-radius:12px;padding:.7rem;background:transparent;color:#8a6f63;font-weight:800;cursor:pointer">' + (isAr ? 'إغلاق' : 'Close') + '</button>' +
+      '<a id="osTrack" href="' + (res.track_url || ('track.html?order=' + encodeURIComponent(res.order_number))) + '" style="display:block;border-radius:12px;padding:.85rem;background:linear-gradient(135deg,#e0912f,#f2b95f);color:#5a1830;font-weight:900;text-decoration:none;margin-bottom:.5rem">' + (ar ? '🗺️ تتبع طلبك مباشرة' : '🗺️ Track your order') + '</a>' +
+      '<button id="osWa" style="display:block;width:100%;border:none;border-radius:12px;padding:.85rem;background:#128c5e;color:#fff;font-weight:900;cursor:pointer;margin-bottom:.5rem">' + (ar ? '📲 أكد طلبك عبر واتساب' : '📲 Confirm via WhatsApp') + '</button>' +
+      '<button id="osClose" style="display:block;width:100%;border:none;border-radius:12px;padding:.7rem;background:transparent;color:#8a6f63;font-weight:800;cursor:pointer">' + (ar ? 'إغلاق' : 'Close') + '</button>' +
     '</div>';
   box.style.display = 'flex';
   el('osWa').onclick = function(){
@@ -120,35 +338,8 @@ function showOrderSuccess(res, waMsg, br, orderType){
   el('osClose').onclick = function(){ box.style.display = 'none'; };
 }
 
-/* ===== تعبئة بيانات العميل + نص الزر (مرة واحدة) ===== */
-(function patchOnce(){
-  if(window._mkCloudPatched) return;
-  window._mkCloudPatched = true;
-  if(typeof window.openCart === 'function'){
-    const _orig = window.openCart;
-    window.openCart = function(){
-      _orig.apply(this, arguments);
-      try{
-        const info = getCustomerInfo();
-        const n = el('cName'), p = el('cPhone');
-        if(n && !n.value && info.name) n.value = info.name;
-        if(p && !p.value && info.phone) p.value = info.phone;
-      }catch(e){}
-    };
-  }
-  setTimeout(function(){
-    try{
-      document.querySelectorAll('button').forEach(function(b){
-        if(/إتمام الطلب عبر واتساب/.test(b.textContent || '')){
-          b.innerHTML = b.innerHTML.replace('إتمام الطلب عبر واتساب', '✅ إتمام الطلب');
-        }
-      });
-    }catch(e){}
-  }, 800);
-})();
-
 /* =====================================================
-   checkout() السحابي v17.4
+   checkout() السحابي v17.5
    ===================================================== */
 async function checkout(){
   try{
@@ -182,18 +373,28 @@ async function checkout(){
       cphone = saved.phone || '';
     }
 
-    const m = getOrderMode();
-    const isPickup = (m !== 'delivery');
+    /* v17.5: فرض قاعدة توفر التوصيل */
+    let m = getOrderMode();
+    if(m === 'delivery' && !branchHasDelivery(br)){
+      if(typeof setOrderMode === 'function') setOrderMode('pickup');
+      m = 'pickup';
+      toast(isAr() ? '🏪 تم التحويل للاستلام — لا يتوفر توصيل لهذا الفرع' : '🏪 Switched to pickup — no delivery for this branch');
+    }
+    let isPickup = (m !== 'delivery');
 
+    /* v17.5: الموقع إجباري للتوصيل */
     let loc = null, addrText = '';
     if(!isPickup){
-      loc = await captureDeliveryLocation();
-      if(!loc){
+      const res = await ensureDeliveryLocation();
+      if(res.convert){
+        if(typeof setOrderMode === 'function') setOrderMode('pickup');
+        isPickup = true;
+        toast(isAr() ? '🏪 حوّلنا طلبك لاستلام من الفرع' : '🏪 Order switched to branch pickup');
+      } else {
+        loc = res.loc;
         const lineEl = el('dAddressLine') || el('dAddress');
         if(lineEl && lineEl.value && lineEl.value.trim()){
           addrText = sanitize(lineEl.value.trim());
-        } else {
-          addrText = await askAddressText();
         }
       }
     }
@@ -205,7 +406,7 @@ async function checkout(){
     const p2 = function(n){ return String(n).padStart(2,'0'); };
     const dateStr = p2(d.getDate()) + '/' + p2(d.getMonth()+1) + '/' + d.getFullYear();
     let hh = d.getHours();
-    const ampm = hh >= 12 ? (currentLang==='ar' ? 'م' : 'PM') : (currentLang==='ar' ? 'ص' : 'AM');
+    const ampm = hh >= 12 ? (isAr() ? 'م' : 'PM') : (isAr() ? 'ص' : 'AM');
     hh = hh % 12 || 12;
     const timeStr = hh + ':' + p2(d.getMinutes()) + ' ' + ampm;
 
@@ -224,7 +425,6 @@ async function checkout(){
 
     const notes = sanitize(el('cnotes') ? el('cnotes').value.trim() : '');
 
-    /* v17.4: نوع مختصر + سطر دفع منفصل + مكان محجوز للرقم */
     const typeShort = isPickup
       ? tt('typePickupShort','استلام','Pickup')
       : tt('typeDeliveryShort','توصيل','Delivery');
@@ -235,7 +435,6 @@ async function checkout(){
     const grand = total + fee;
     const pickupNote = isPickup ? ('⏳ ' + tt('pickupNote','طلبك يكون جاهزاً عند وصولك للفرع','Your order will be ready upon arrival') + '\n') : '';
 
-    /* الرقم يُستبدل لاحقاً: رقم السحابة إن نجح، وإلا رقم الفاتورة */
     const msg =
       brandize(TT.waGreeting) + '\n' +
       '🧾 ' + TT.waOrderTitle + ' | *@@NUM@@*\n' +
@@ -270,7 +469,6 @@ async function checkout(){
       order_type: isPickup ? 'pickup' : 'delivery'
     });
 
-    /* v17.4: الرقم النهائي في الرسالة = رقم السحابة بدون # */
     const finalNum = cloud ? cloud.order_number : invoiceID;
     const finalMsg = msg.split('@@NUM@@').join(finalNum);
 
@@ -292,4 +490,4 @@ async function checkout(){
     toast('⚠️ ' + (e && e.message ? e.message : 'حدث خطأ — حاول مرة أخرى'));
   }
 }
-/* ===== END cloud.js (v17.4) ===== */
+/* ===== END cloud.js (v17.5) ===== */
