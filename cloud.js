@@ -1,6 +1,8 @@
 /* =====================================================
 مكرونجي — الطبقة السحابية (cloud.js)
-v17.5: قواعد توفر التوصيل + موقع إجباري للتوصيل
+v17.6: أسماء الأصناف ثنائية اللغة (name_ar + name_en)
+       لكل ما عدا ذلك مطابق لـ v17.5:
+       قواعد توفر التوصيل + موقع إجباري للتوصيل
        + شاشة إرشاد ذكية حسب الجهاز + زر إتمام نظيف
 ===================================================== */
 
@@ -24,7 +26,7 @@ function saveCustomerInfo(name, phone){
 }
 function isAr(){ return (typeof currentLang !== 'undefined' && currentLang === 'ar'); }
 
-/* ===== v17.5: توفر خدمة التوصيل من settings.js ===== */
+/* ===== توفر خدمة التوصيل من settings.js ===== */
 function deliveryAvailability(){
   try{
     const da = (typeof S === 'function' && S() && S().deliveryAvailability) ? S().deliveryAvailability : null;
@@ -42,7 +44,7 @@ function branchHasDelivery(br){
   return true;
 }
 
-/* ===== v17.5: فرض القاعدة على واجهة نوع الطلب ===== */
+/* ===== فرض القاعدة على واجهة نوع الطلب ===== */
 function enforceDeliveryUI(){
   try{
     const br = (typeof currentBranch === 'function') ? currentBranch() : null;
@@ -53,7 +55,6 @@ function enforceDeliveryUI(){
       md.style.opacity = ok ? '' : '.4';
       md.style.pointerEvents = ok ? '' : 'none';
     }
-    /* ملاحظة صغيرة تحت أزرار النوع */
     let note = el('mkDelivNote');
     if(!note && md && md.parentElement){
       note = document.createElement('div');
@@ -67,14 +68,13 @@ function enforceDeliveryUI(){
         : '🏪 This branch is pickup only — no delivery here';
       note.style.display = ok ? 'none' : 'block';
     }
-    /* تحويل الوضع الحالي لو صار ممنوعاً */
     if(!ok && typeof getOrderMode === 'function' && getOrderMode() === 'delivery' && typeof setOrderMode === 'function'){
       setOrderMode('pickup');
     }
   }catch(e){}
 }
 
-/* ===== v17.5: زر إتمام نظيف (بدون أيقونة واتساب) ===== */
+/* ===== زر إتمام نظيف (بدون أيقونة واتساب) ===== */
 function cleanCheckoutBtn(){
   try{
     document.querySelectorAll('button').forEach(function(b){
@@ -86,12 +86,11 @@ function cleanCheckoutBtn(){
   }catch(e){}
 }
 
-/* ===== ربطات واحدة (patches) ===== */
+/* ===== ربطات واحدة ===== */
 (function patchOnce(){
   if(window._mkCloudPatched) return;
   window._mkCloudPatched = true;
 
-  /* تعبئة بيانات العميل عند فتح السلة */
   if(typeof window.openCart === 'function' && !window.openCart._mkFill){
     const _orig = window.openCart;
     window.openCart = function(){
@@ -105,7 +104,6 @@ function cleanCheckoutBtn(){
     };
     window.openCart._mkFill = true;
   }
-  /* فرض قاعدة التوصيل عند فتح صفحة النوع وتغيير الفرع والوضع */
   ['openOrderType','applyBranchSelect','setOrderMode','confirmOrderType'].forEach(function(fn){
     if(typeof window[fn] === 'function' && !window[fn]._mkAvail){
       const _f = window[fn];
@@ -117,7 +115,6 @@ function cleanCheckoutBtn(){
       window[fn]._mkAvail = true;
     }
   });
-  /* إبقاء الزر نظيفاً بعد تبديل اللغة */
   if(typeof window.applyLang === 'function' && !window.applyLang._mkClean){
     const _a = window.applyLang;
     window.applyLang = function(){
@@ -154,13 +151,13 @@ async function getPermState(){
   try{
     if(navigator.permissions && navigator.permissions.query){
       const st = await navigator.permissions.query({ name: 'geolocation' });
-      return st.state; /* granted | denied | prompt */
+      return st.state;
     }
   }catch(e){}
   return 'unknown';
 }
 
-/* ===== v17.5: شاشة الإرشاد الذكية حسب الجهاز ===== */
+/* ===== شاشة الإرشاد الذكية حسب الجهاز ===== */
 function deviceKind(){
   const ua = navigator.userAgent || '';
   if(/iphone|ipad|ipod/i.test(ua)) return 'ios';
@@ -261,14 +258,14 @@ function showLocationGuide(){
   });
 }
 
-/* ===== v17.5: ضمان موقع التوصيل (حلقة حتى النجاح أو التحويل) ===== */
+/* ===== ضمان موقع التوصيل ===== */
 async function ensureDeliveryLocation(){
   for(;;){
     const st = await getPermState();
     if(st === 'denied'){
       const choice = await showLocationGuide();
       if(choice === 'convert') return { convert: true };
-      continue; /* حاول مرة أخرى */
+      continue;
     }
     const loc = await captureGeoRaw();
     if(loc) return { loc: loc };
@@ -278,10 +275,8 @@ async function ensureDeliveryLocation(){
       if(choice === 'convert') return { convert: true };
       continue;
     }
-    /* فشل مؤقت أو إلغاء طلب الإذن */
     const choice = await showLocationGuide();
     if(choice === 'convert') return { convert: true };
-    /* retry: نكمل الحلقة */
   }
 }
 
@@ -339,7 +334,7 @@ function showOrderSuccess(res, waMsg, br, orderType){
 }
 
 /* =====================================================
-   checkout() السحابي v17.5
+   checkout() السحابي v17.6
    ===================================================== */
 async function checkout(){
   try{
@@ -373,7 +368,7 @@ async function checkout(){
       cphone = saved.phone || '';
     }
 
-    /* v17.5: فرض قاعدة توفر التوصيل */
+    /* فرض قاعدة توفر التوصيل */
     let m = getOrderMode();
     if(m === 'delivery' && !branchHasDelivery(br)){
       if(typeof setOrderMode === 'function') setOrderMode('pickup');
@@ -382,7 +377,7 @@ async function checkout(){
     }
     let isPickup = (m !== 'delivery');
 
-    /* v17.5: الموقع إجباري للتوصيل */
+    /* الموقع إجباري للتوصيل */
     let loc = null, addrText = '';
     if(!isPickup){
       const res = await ensureDeliveryLocation();
@@ -419,7 +414,16 @@ async function checkout(){
       const unit = itemPrice(it, i.sizeIdx);
       total += i.qty * unit;
       const size = i.sizeIdx >= 0 ? ' (' + TT.sizes[i.sizeIdx] + ')' : '';
-      cloudItems.push({ id: it.id, name: itemName(it), qty: i.qty, price: unit, size: (i.sizeIdx >= 0 ? TT.sizes[i.sizeIdx] : '') });
+      /* v17.6: ثلاثة أسماء — للتوافق + الترجمة المستقبلية */
+      cloudItems.push({
+        id: it.id,
+        name: itemName(it),
+        name_ar: it.ar || itemName(it),
+        name_en: it.en || it.ar || itemName(it),
+        qty: i.qty,
+        price: unit,
+        size: (i.sizeIdx >= 0 ? TT.sizes[i.sizeIdx] : '')
+      });
       lines.push('▪️ ' + i.qty + ' × ' + itemName(it) + size + ' = ' + (i.qty * unit) + ' ' + TT.currency);
     });
 
@@ -490,4 +494,4 @@ async function checkout(){
     toast('⚠️ ' + (e && e.message ? e.message : 'حدث خطأ — حاول مرة أخرى'));
   }
 }
-/* ===== END cloud.js (v17.5) ===== */
+/* ===== END cloud.js (v17.6) ===== */
