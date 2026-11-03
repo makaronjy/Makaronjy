@@ -571,7 +571,9 @@ window.APP_SETTINGS = {
     }
   },
   "deliveryAvailability": {
-    "mode": "none",
-    "branchIds": []
+    "mode": "selected",
+    "branchIds": [
+      "b-badiah"
+    ]
   }
 };
