@@ -81,12 +81,12 @@ body{
   box-shadow:0 2px 8px rgba(90,24,48,.06);
 }
 .order-card.new{border-color:var(--gold);box-shadow:0 0 0 3px #e0912f22,0 8px 22px rgba(90,24,48,.12);}
+.order-card.pool{border-color:#38bdf8;box-shadow:0 0 0 2px #38bdf822;}
 .oc-head{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:.6rem;}
 .oc-num{
   background:var(--dark);color:var(--gold2);border-radius:10px;
   padding:.2rem .7rem;font-weight:900;font-size:.95rem;direction:ltr;
 }
-/* v2: شارة نوع الطلب */
 .oc-type{border-radius:50px;padding:.15rem .65rem;font-size:.7rem;font-weight:900;}
 .oc-type.pickup{background:#fff6e6;color:#a06b1c;border:1px dashed var(--gold);}
 .oc-type.delivery{background:#e3f2fd;color:#1565c0;border:1px dashed #90caf9;}
@@ -114,6 +114,7 @@ body{
 .btn-err{background:#fee2e2;color:var(--err);}
 .btn-gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--dark);}
 .btn-wa{background:var(--wa);color:#fff;}
+.btn-blue{background:#38bdf8;color:#0c4a6e;}
 .btn-plain{background:#f3e7d7;color:var(--brown2);}
 .sel{
   border:1.5px solid var(--line);border-radius:10px;padding:.55rem .6rem;
@@ -122,6 +123,30 @@ body{
 .map-link{
   color:var(--brown2);font-weight:900;font-size:.8rem;text-decoration:none;
   border-bottom:1.5px dashed var(--gold);
+}
+
+/* v2.1: بطاقة الحوض */
+.pool-info{
+  background:#e0f2fe;border:1.5px dashed #38bdf8;border-radius:12px;
+  padding:.7rem .9rem;margin:.4rem 0;font-size:.82rem;font-weight:800;
+  color:#075985;line-height:1.8;display:flex;align-items:center;gap:.6rem;
+}
+.pool-info .ico{font-size:1.6rem;}
+.pool-info .txt{flex:1;}
+.pool-info b{display:block;font-size:.9rem;font-weight:900;}
+.pool-toggle{
+  background:transparent;border:none;color:#075985;
+  font-family:inherit;font-weight:900;font-size:.75rem;
+  cursor:pointer;text-decoration:underline;padding:0;
+}
+.pool-assign-wrap{
+  display:none;background:#f0f9ff;border:1px solid #bae6fd;
+  border-radius:10px;padding:.6rem;margin-top:.5rem;
+}
+.pool-assign-wrap.show{display:block;}
+.pool-assign-wrap small{
+  display:block;color:var(--muted);font-size:.72rem;
+  font-weight:700;margin-bottom:.4rem;
 }
 
 /* ─── فارغ ─── */
@@ -141,7 +166,7 @@ body{
 .toast.ok{background:var(--ok);}
 @keyframes pop{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
 
-/* ─── الطباعة (تقرير PDF) ─── */
+/* ─── الطباعة ─── */
 #reportArea{display:none;}
 @media print{
   body *{visibility:hidden;}
@@ -151,6 +176,9 @@ body{
   #reportArea table{width:100%;border-collapse:collapse;font-size:12px;}
   #reportArea th,#reportArea td{border:1px solid #999;padding:6px;text-align:right;}
 }
+
+/* ─── زر اللغة: مساحة في الأعلى ─── */
+.topbar{padding-inline-end:7rem;}
 </style>
 </head>
 <body>
@@ -167,41 +195,44 @@ body{
   <div class="spacer"></div>
   <button class="bell" id="bellBtn">🔔 <span class="cnt" id="bellCnt" hidden>0</span></button>
   <button class="icon-btn" id="soundBtn" onclick="toggleSound()">🔊</button>
-  <button class="icon-btn" onclick="printReport()">📄</button>
-  <button class="icon-btn" onclick="logout()">خروج 🚪</button>
+  <button class="icon-btn" onclick="printReport()" data-t-title="supervisor.report.title">📄</button>
+  <button class="icon-btn" onclick="logout()" data-t="common.logout">خروج 🚪</button>
 </div>
 
 <!-- ═══ الإحصائيات ═══ -->
 <div class="stats">
-  <div class="stat"><b id="stOrders">0</b><small>طلبات اليوم</small></div>
-  <div class="stat"><b id="stRevenue">0</b><small>مبيعات اليوم (ريال)</small></div>
-  <div class="stat"><b id="stDrivers">0</b><small>سائقون متاحون</small></div>
+  <div class="stat"><b id="stOrders">0</b><small data-t="supervisor.stats.todayOrders">طلبات اليوم</small></div>
+  <div class="stat"><b id="stRevenue">0</b><small data-t="supervisor.stats.todayRevenue">مبيعات اليوم (ريال)</small></div>
+  <div class="stat"><b id="stDrivers">0</b><small data-t="supervisor.stats.availableDrivers">سائقون متاحون</small></div>
 </div>
 
 <div class="wrap">
 
   <!-- ═══ طلبات جديدة ═══ -->
-  <div class="sec-title">🔔 طلبات جديدة <span class="pill" id="cntNew">0</span></div>
+  <div class="sec-title">🔔 <span data-t="supervisor.sections.newOrders">طلبات جديدة</span> <span class="pill" id="cntNew">0</span></div>
   <div id="listNew"></div>
 
   <!-- ═══ قيد التنفيذ ═══ -->
-  <div class="sec-title">🍳 قيد التنفيذ <span class="pill" id="cntProg">0</span></div>
+  <div class="sec-title">🍳 <span data-t="supervisor.sections.inProgress">قيد التنفيذ</span> <span class="pill" id="cntProg">0</span></div>
   <div id="listProgress"></div>
 
   <!-- ═══ توصيلات نشطة ═══ -->
-  <div class="sec-title">🚗 توصيلات نشطة <span class="pill" id="cntActive">0</span></div>
+  <div class="sec-title">🚗 <span data-t="supervisor.sections.activeDelivery">توصيلات نشطة</span> <span class="pill" id="cntActive">0</span></div>
   <div id="listActive"></div>
 
   <!-- ═══ سُلّم اليوم ═══ -->
-  <div class="sec-title">✅ سُلّم اليوم <span class="pill" id="cntDone">0</span></div>
+  <div class="sec-title">✅ <span data-t="supervisor.sections.deliveredToday">سُلّم اليوم</span> <span class="pill" id="cntDone">0</span></div>
   <div id="listDone"></div>
 
 </div>
 
-<!-- ═══ منطقة التقرير (للطباعة) ═══ -->
+<!-- ═══ منطقة التقرير ═══ -->
 <div id="reportArea"></div>
 
 <div id="toast"></div>
+
+<!-- ═══ نظام الترجمة المركزي ═══ -->
+<script src="i18n-staff.js"></script>
 
 <script>
 /* ═══════════════════════════════════════════
@@ -211,7 +242,8 @@ const API_BASE = 'https://makaronjy-api.makaronjy.workers.dev';
 const REFRESH_MS = 7000;
 
 let TOKEN = localStorage.getItem('mk_staff_token');
-let USER = JSON.parse(localStorage.getItem('mk_staff_user') || 'null');
+let USER = null;
+try { USER = JSON.parse(localStorage.getItem('mk_staff_user') || 'null'); } catch(e){}
 let DRIVERS = [];
 let LAST_ORDERS = [];
 let knownPending = new Set();
@@ -228,7 +260,8 @@ let audioCtx = null;
       location.href = 'admin.html'; return;
     }
   }
-  document.getElementById('supName').textContent = USER.name;
+  document.getElementById('supName').textContent = USER.name || '—';
+  document.getElementById('supBranch').textContent = USER.branchName || '—';
   updateSoundBtn();
 })();
 
@@ -249,7 +282,7 @@ async function api(path, opts = {}) {
     throw new Error('unauthorized');
   }
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'خطأ');
+  if (!res.ok) throw new Error(data.error || tt('common.error'));
   return data;
 }
 
@@ -295,36 +328,34 @@ function normalizePhone(p) {
   if (d.startsWith('966')) return d;
   return d;
 }
+function waOpen(phone, msg) {
+  const url = 'https://wa.me/' + normalizePhone(phone) + '?text=' + encodeURIComponent(msg);
+  const w = window.open(url, '_blank');
+  if (!w) location.href = url;
+}
 
-/* ─── v2: نوع الطلب ─── */
+/* ─── نوع الطلب ─── */
 function isPickup(o) { return o.order_type === 'pickup'; }
 function typeBadge(o) {
   return isPickup(o)
-    ? '<span class="oc-type pickup">🏪 استلام</span>'
-    : '<span class="oc-type delivery">🛵 توصيل</span>';
+    ? '<span class="oc-type pickup">' + tt('supervisor.badges.pickup') + '</span>'
+    : '<span class="oc-type delivery">' + tt('supervisor.badges.delivery') + '</span>';
 }
 
-/* ─── رسالة واتس التحقق (طلب جديد) ─── */
-function waVerify(o) {
-  const msg =
-`أهلاً ${o.customer_name} 🍝
-هذا مشرف فرع ${USER.branchName || ''} بمكرونجي
-نؤكد استلام طلبك رقم ${o.number}
-بقيمة ${o.total} ريال (${isPickup(o) ? 'استلام من الفرع — الدفع عند الكاشير' : 'توصيل — الدفع عند الاستلام'})
-سيكون جاهزاً خلال 20-30 دقيقة تقريباً
-شكراً لثقتك 🙏`;
-  window.open('https://wa.me/' + normalizePhone(o.customer_phone) + '?text=' + encodeURIComponent(msg), '_blank');
-}
+/* ═══════════════════════════════════════════
+   v2.1: الرسائل — عبر i18n-staff.js
+   ═══════════════════════════════════════════ */
 
-/* ─── v2: رسالة واتس قبول الطلب ─── */
-function waAccept(o) {
-  const msg =
-`أهلاً ${o.customer_name} 🍝
-تم قبول طلبك رقم ${o.number} ✅
-وجارٍ تحضيره الآن 👨‍🍳
-${isPickup(o) ? 'سنراسلك عند جهوزه لاستلامه من الفرع 🏪' : 'سنراسلك عند خروج السائق إليك 🛵'}
-فرع ${USER.branchName || ''} — شكراً لثقتك 🙏`;
-  window.open('https://wa.me/' + normalizePhone(o.customer_phone) + '?text=' + encodeURIComponent(msg), '_blank');
+/* رسالة تأكيد الاستلام (تحل محل waVerify و waAccept) */
+function waConfirm(o) {
+  const msg = tt('messages.supConfirm', {
+    customer_name: o.customer_name,
+    supervisor_name: USER.name || '—',
+    branch_name: USER.branchName || o.branch_name || '—',
+    order_number: o.number,
+    total: o.total
+  });
+  waOpen(o.customer_phone, msg);
 }
 
 /* ─── تحميل البيانات ─── */
@@ -336,9 +367,20 @@ async function loadAll(first) {
     ]);
     DRIVERS = driversRes.drivers || [];
     LAST_ORDERS = ordersRes.orders || [];
+    /* v1.5: Worker يرجع الأسماء لو USER ناقص */
+    if (!USER.branchName && ordersRes.branch_name) {
+      USER.branchName = ordersRes.branch_name;
+      try { localStorage.setItem('mk_staff_user', JSON.stringify(USER)); } catch(e){}
+      document.getElementById('supBranch').textContent = USER.branchName;
+    }
+    if (!USER.name && ordersRes.supervisor_name) {
+      USER.name = ordersRes.supervisor_name;
+      try { localStorage.setItem('mk_staff_user', JSON.stringify(USER)); } catch(e){}
+      document.getElementById('supName').textContent = USER.name;
+    }
     render(first);
   } catch (e) {
-    if (e.message !== 'unauthorized') toast('تعذر التحديث — سيتم إعادة المحاولة', 'err');
+    if (e.message !== 'unauthorized') toast(tt('supervisor.toast.updateFailed'), 'err');
   }
 }
 
@@ -382,19 +424,19 @@ function render(first) {
 
   document.getElementById('listNew').innerHTML =
     news.length ? news.map(o => cardNew(o)).join('') :
-    '<div class="empty">لا توجد طلبات جديدة حالياً 📭</div>';
+    '<div class="empty">' + tt('supervisor.empty.newOrders') + '</div>';
 
   document.getElementById('listProgress').innerHTML =
     progs.length ? progs.map(o => cardProgress(o)).join('') :
-    '<div class="empty">لا توجد طلبات قيد التنفيذ</div>';
+    '<div class="empty">' + tt('supervisor.empty.inProgress') + '</div>';
 
   document.getElementById('listActive').innerHTML =
     actives.length ? actives.map(o => cardActive(o)).join('') :
-    '<div class="empty">لا توجد توصيلات نشطة</div>';
+    '<div class="empty">' + tt('supervisor.empty.activeDelivery') + '</div>';
 
   document.getElementById('listDone').innerHTML =
     dones.length ? dones.slice(0, 20).map(o => cardDone(o)).join('') :
-    '<div class="empty">لم يُسلّم أي طلب بعد</div>';
+    '<div class="empty">' + tt('supervisor.empty.deliveredToday') + '</div>';
 }
 
 /* ─── بطاقة طلب جديد ─── */
@@ -406,72 +448,97 @@ function cardNew(o) {
       ${typeBadge(o)}
       <span class="oc-cust">👤 ${o.customer_name}</span>
       <a class="oc-phone" href="tel:${o.customer_phone}">${o.customer_phone}</a>
-      <span class="oc-total">${o.total} ريال</span>
+      <span class="oc-total">${o.total} ${tt('common.currency')}</span>
     </div>
-    ${o.customer_address ? `<div class="oc-line"><span class="lbl">📍 العنوان:</span> ${o.customer_address}
-      ${o.customer_lat ? `— <a class="map-link" target="_blank" href="https://www.google.com/maps?q=${o.customer_lat},${o.customer_lng}">عرض على الخريطة 🗺️</a>` : ''}</div>` : ''}
-    <div class="oc-items">${o.items.map(i => `▪️ ${i.qty}× ${i.name}${i.size ? ' (' + i.size + ')' : ''} — ${i.qty * i.price} ريال`).join('<br>')}</div>
+    ${o.customer_address ? `<div class="oc-line"><span class="lbl">📍 ${tt('supervisor.labels.address')}:</span> ${o.customer_address}
+      ${o.customer_lat ? `— <a class="map-link" target="_blank" href="https://www.google.com/maps?q=${o.customer_lat},${o.customer_lng}">${tt('supervisor.actions.viewMap')} 🗺️</a>` : ''}</div>` : ''}
+    <div class="oc-items">${o.items.map(i => `▪️ ${i.qty}× ${i.name}${i.size ? ' (' + i.size + ')' : ''} — ${i.qty * i.price} ${tt('common.currency')}`).join('<br>')}</div>
     ${o.notes ? `<div class="oc-note">📝 ${o.notes}</div>` : ''}
-    <div class="oc-line"><span class="lbl">💵 الدفع:</span> ${isPickup(o) ? 'عند الكاشير 🏪' : (o.payment_method === 'cod' ? 'عند الاستلام' : 'بطاقة')}</div>
+    <div class="oc-line"><span class="lbl">💵 ${tt('supervisor.labels.payment')}:</span> ${isPickup(o) ? tt('supervisor.badges.payment.atCashier') : (o.payment_method === 'cod' ? tt('supervisor.badges.payment.cod') : tt('supervisor.badges.payment.card'))}</div>
     <div class="oc-actions">
-      <button class="btn btn-ok" onclick="act(${o.id},'accepted')">✅ تأكيد</button>
-      <button class="btn btn-err" onclick="act(${o.id},'cancelled')">❌ رفض</button>
-      <button class="btn btn-wa" onclick='waVerify(${JSON.stringify(o).replace(/'/g, "&#39;")})'>📱 واتس للتحقق</button>
+      <button class="btn btn-ok" onclick="act(${o.id},'accepted')">${tt('supervisor.actions.confirm')}</button>
+      <button class="btn btn-err" onclick="act(${o.id},'cancelled')">${tt('supervisor.actions.reject')}</button>
+      <button class="btn btn-wa" onclick='waConfirm(${JSON.stringify(o).replace(/"/g, "&quot;")})'>${tt('supervisor.actions.waVerify')}</button>
     </div>
   </div>`;
 }
 
-/* ─── بطاقة قيد التنفيذ (v2: استلام بدون سائق + واتساب القبول) ─── */
+/* ─── بطاقة قيد التنفيذ (v2.1: الحوض التلقائي للتوصيل) ─── */
 function cardProgress(o) {
   let actions = '';
+  let poolInfo = '';
+
   if (o.status === 'accepted') {
-    actions = `<button class="btn btn-gold" onclick="act(${o.id},'preparing')">👨‍ قيد التحضير</button>
-               <button class="btn btn-wa" onclick='waAccept(${JSON.stringify(o).replace(/'/g, "&#39;")})'>📱 واتس: تم القبول</button>`;
+    actions =
+      `<button class="btn btn-gold" onclick="act(${o.id},'preparing')">${tt('supervisor.actions.preparing')}</button>
+       <button class="btn btn-wa" onclick='waConfirm(${JSON.stringify(o).replace(/"/g, "&quot;")})'>${tt('supervisor.actions.waVerify')}</button>`;
   } else if (o.status === 'preparing') {
-    actions = `<button class="btn btn-gold" onclick="act(${o.id},'ready')">📦 الطلب جاهز</button>`;
+    actions = `<button class="btn btn-gold" onclick="act(${o.id},'ready')">${isPickup(o) ? tt('supervisor.actions.readyForPickup') : tt('supervisor.actions.ready')}</button>`;
   } else if (o.status === 'ready') {
     if (isPickup(o)) {
+      /* استلام: زر تقفيل */
       actions = `
-        <button class="btn btn-ok" onclick="act(${o.id},'delivered')">✅ استلمه العميل من الفرع</button>
-        <span class="oc-type pickup" style="align-self:center">💵 حصّل ${o.total} ريال عند الكاشير</span>`;
+        <button class="btn btn-ok" onclick="act(${o.id},'delivered')">${tt('supervisor.actions.pickupFromBranch')}</button>
+        <span class="oc-type pickup" style="align-self:center">${tt('supervisor.actions.pickupHint')} ${o.total} ${tt('supervisor.actions.atCashier')}</span>`;
     } else {
-      actions = `
-        <select class="sel" id="drv-${o.id}">
-          <option value="">— اختر سائقاً —</option>
-          ${DRIVERS.map(d => `<option value="${d.id}">${d.name}</option>`).join('')}
-        </select>
-        <button class="btn btn-ok" onclick="assign(${o.id})">🚗 تعيين</button>`;
+      /* توصيل: الطلب في الحوض تلقائياً — السائقون يرونه */
+      poolInfo = `
+        <div class="pool-info">
+          <div class="ico">📦</div>
+          <div class="txt">
+            <b>${tt('supervisor.actions.sendToPool').replace('📦 ', '')}</b>
+            <small>الطلب متاح لجميع سائقي الفرع — من يختاره أولاً يوصّله</small>
+          </div>
+          <button class="pool-toggle" onclick="togglePoolAssign(${o.id})">${tt('supervisor.actions.assignDriver')} ↴</button>
+        </div>
+        <div class="pool-assign-wrap" id="poolWrap-${o.id}">
+          <small>🔧 تعيين يدوي احتياطي (إذا كان السائق لا يستخدم التطبيق):</small>
+          <div class="oc-actions">
+            <select class="sel" id="drv-${o.id}">
+              <option value="">${tt('supervisor.actions.chooseDriver')}</option>
+              ${DRIVERS.map(d => `<option value="${d.id}">${d.name}</option>`).join('')}
+            </select>
+            <button class="btn btn-blue" onclick="assign(${o.id})">${tt('supervisor.actions.assignDriver')}</button>
+          </div>
+        </div>`;
     }
   }
   return `
-  <div class="order-card">
+  <div class="order-card${o.status === 'ready' && !isPickup(o) ? ' pool' : ''}">
     <div class="oc-head">
       <span class="oc-num">${o.number}</span>
       ${typeBadge(o)}
       <span class="oc-cust">👤 ${o.customer_name}</span>
-      <span class="oc-total">${o.total} ريال</span>
+      <span class="oc-total">${o.total} ${tt('common.currency')}</span>
     </div>
-    <div class="oc-line"><span class="lbl">الحالة:</span> ${o.status_text}</div>
-    <div class="oc-actions">${actions}</div>
+    <div class="oc-line"><span class="lbl">${tt('supervisor.labels.status')}:</span> ${o.status_text}</div>
+    ${poolInfo}
+    ${actions ? `<div class="oc-actions">${actions}</div>` : ''}
   </div>`;
+}
+
+/* فتح/إغلاق قائمة التعيين اليدوي */
+function togglePoolAssign(id) {
+  const w = document.getElementById('poolWrap-' + id);
+  if (w) w.classList.toggle('show');
 }
 
 /* ─── بطاقة توصيل نشط ─── */
 function cardActive(o) {
   const mapLink = (o.driver_lat && o.driver_lng)
-    ? `<a class="map-link" target="_blank" href="https://www.google.com/maps?q=${o.driver_lat},${o.driver_lng}">🗺️ موقع السائق الآن</a>`
+    ? `<a class="map-link" target="_blank" href="https://www.google.com/maps?q=${o.driver_lat},${o.driver_lng}">${tt('supervisor.actions.driverLocation')}</a>`
     : '';
   return `
   <div class="order-card">
     <div class="oc-head">
       <span class="oc-num">${o.number}</span>
       ${typeBadge(o)}
-      <span class="oc-cust">🚗 ${o.driver_name || 'سائق غير معروف'}</span>
+      <span class="oc-cust">🚗 ${o.driver_name || tt('supervisor.actions.unknownDriver')}</span>
       ${o.driver_phone ? `<a class="oc-phone" href="tel:${o.driver_phone}">${o.driver_phone}</a>` : ''}
     </div>
-    <div class="oc-line"><span class="lbl">👤 العميل:</span> ${o.customer_name} — <a class="oc-phone" href="tel:${o.customer_phone}">${o.customer_phone}</a></div>
-    <div class="oc-line"><span class="lbl">الحالة:</span> ${o.status_text} ${mapLink}</div>
-    <div class="oc-line"><a class="map-link" target="_blank" href="track.html?order=${encodeURIComponent(o.number)}">🔎 فتح صفحة تتبع العميل</a></div>
+    <div class="oc-line"><span class="lbl">👤 ${tt('supervisor.labels.customer')}:</span> ${o.customer_name} — <a class="oc-phone" href="tel:${o.customer_phone}">${o.customer_phone}</a></div>
+    <div class="oc-line"><span class="lbl">${tt('supervisor.labels.status')}:</span> ${o.status_text} ${mapLink}</div>
+    <div class="oc-line"><a class="map-link" target="_blank" href="track.html?order=${encodeURIComponent(o.number)}">${tt('supervisor.actions.openTracking')}</a></div>
   </div>`;
 }
 
@@ -483,58 +550,67 @@ function cardDone(o) {
       <span class="oc-num">${o.number}</span>
       ${typeBadge(o)}
       <span class="oc-cust">👤 ${o.customer_name}</span>
-      <span class="oc-total">${o.total} ريال</span>
+      <span class="oc-total">${o.total} ${tt('common.currency')}</span>
     </div>
-    <div class="oc-line"><span class="lbl">🚗 السائق:</span> ${isPickup(o) ? 'استلام من الفرع 🏪' : (o.driver_name || '—')}</div>
+    <div class="oc-line"><span class="lbl">🚗 ${tt('supervisor.labels.driver')}:</span> ${isPickup(o) ? tt('supervisor.badges.pickup') : (o.driver_name || '—')}</div>
   </div>`;
 }
 
 /* ─── تغيير حالة ─── */
 async function act(id, status) {
-  if (status === 'cancelled' && !confirm('هل أنت متأكد من رفض هذا الطلب؟')) return;
-  if (status === 'delivered' && !confirm('تأكيد إغلاق الطلب؟\n(العميل استلم طلبه من الفرع)')) return;
+  if (status === 'cancelled' && !confirm(tt('supervisor.actions.confirmReject'))) return;
+  if (status === 'delivered' && !confirm(tt('supervisor.actions.confirmPickup'))) return;
   try {
     await api(`/api/orders/${id}/status`, {
       method: 'PUT',
       body: JSON.stringify({ status }),
     });
-    toast('تم تحديث الحالة ✅', 'ok');
+    toast(tt('supervisor.toast.statusUpdated'), 'ok');
     loadAll(false);
   } catch (e) {
     toast('⚠️ ' + e.message, 'err');
   }
 }
 
-/* ─── تعيين سائق ─── */
+/* ─── تعيين سائق يدوي (احتياط) ─── */
 async function assign(id) {
   const sel = document.getElementById('drv-' + id);
   const driverId = sel ? sel.value : '';
-  if (!driverId) { toast('⚠️ اختر سائقاً أولاً', 'err'); return; }
+  if (!driverId) { toast(tt('supervisor.toast.chooseDriverFirst'), 'err'); return; }
   try {
     const r = await api(`/api/orders/${id}/assign`, {
       method: 'PUT',
       body: JSON.stringify({ driver_id: parseInt(driverId) }),
     });
-    toast('تم تعيين ' + r.driver_name + ' 🚗', 'ok');
+    toast(tt('supervisor.toast.driverAssigned') + ': ' + r.driver_name, 'ok');
     loadAll(false);
   } catch (e) {
     toast('⚠️ ' + e.message, 'err');
   }
 }
 
-/* ─── تقرير قابل للطباعة / PDF (v2: عمود النوع) ─── */
+/* ─── تقرير قابل للطباعة ─── */
 function printReport() {
   const orders = LAST_ORDERS;
   const done = orders.filter(o => o.status === 'delivered');
   const revenue = done.reduce((s, o) => s + o.total, 0);
   const fees = done.reduce((s, o) => s + o.delivery_fee, 0);
+  const T = tt; // اختصار
 
   document.getElementById('reportArea').innerHTML = `
-    <h2>🍝 مكرونجي — تقرير فرع ${USER.branchName || ''}</h2>
-    <p>التاريخ: ${new Date().toLocaleString('ar-SA')}</p>
-    <p>إجمالي الطلبات المعروضة: ${orders.length} | المسلّمة: ${done.length} | الإيراد: ${revenue} ريال | رسوم توصيل: ${fees} ريال</p>
+    <h2>🍝 ${T('supervisor.report.title')} ${USER.branchName || ''}</h2>
+    <p>${T('supervisor.report.date')}: ${new Date().toLocaleString('ar-SA')}</p>
+    <p>${T('supervisor.report.totalOrders')}: ${orders.length} | ${T('supervisor.report.delivered')}: ${done.length} | ${T('supervisor.report.revenue')}: ${revenue} ${T('common.currency')} | ${T('supervisor.report.fees')}: ${fees} ${T('common.currency')}</p>
     <table>
-      <tr><th>رقم الطلب</th><th>النوع</th><th>العميل</th><th>الجوال</th><th>الإجمالي</th><th>الحالة</th><th>السائق</th></tr>
+      <tr>
+        <th>${T('supervisor.report.columns.orderNum')}</th>
+        <th>${T('supervisor.report.columns.type')}</th>
+        <th>${T('supervisor.report.columns.customer')}</th>
+        <th>${T('supervisor.report.columns.phone')}</th>
+        <th>${T('supervisor.report.columns.total')}</th>
+        <th>${T('supervisor.report.columns.status')}</th>
+        <th>${T('supervisor.report.columns.driver')}</th>
+      </tr>
       ${orders.map(o => `
         <tr>
           <td>${o.number}</td>
@@ -546,27 +622,30 @@ function printReport() {
           <td>${isPickup(o) ? '🏪' : (o.driver_name || '—')}</td>
         </tr>`).join('')}
     </table>
-    <p style="margin-top:1rem">للحفظ PDF: اختر "حفظ كـ PDF" من نافذة الطباعة</p>
+    <p style="margin-top:1rem">${T('supervisor.report.savePdfHint')}</p>
   `;
   window.print();
 }
 
 /* ─── خروج ─── */
 function logout() {
-  if (!confirm('هل تريد تسجيل الخروج؟')) return;
+  if (!confirm(tt('supervisor.confirmLogout'))) return;
   localStorage.removeItem('mk_staff_token');
   localStorage.removeItem('mk_staff_user');
   location.href = 'login.html';
 }
 
 /* ─── الإقلاع ─── */
+initStaffI18n();
 loadAll(true);
 setInterval(() => loadAll(false), REFRESH_MS);
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) loadAll(false);
 });
+/* مزامنة اللغة بين التبويبات */
+window.addEventListener('staff-lang-changed', () => loadAll(true));
 </script>
 
 </body>
 </html>
-<!-- ===== END supervisor.html (v2) ===== -->
+<!-- ===== END supervisor.html (v2.1) ===== -->
