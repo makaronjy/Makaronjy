@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>دخول الموظفين | مكرونجي</title>
+<title data-t="login.title">دخول الموظفين | مكرونجي</title>
 <link rel="icon" href="img/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
 /* ═══════════════════════════════════════════
-   مكرونجي - صفحة دخول الموظفين
+   مكرونجي - صفحة دخول الموظفين (v2 — i18n موحد)
    ═══════════════════════════════════════════ */
 :root{
   --brown:#8e2a4a; --brown2:#a4385c; --dark:#5a1830;
@@ -107,7 +107,7 @@ body{
 }
 .ok-banner.show{display:flex;}
 
-/* ─── تبديل اللغة ─── */
+/* ─── v2: زر اللغة المدمج (متناسق مع i18n-staff) ─── */
 .lang-toggle{
   position:absolute;top:.8rem;inset-inline-end:.8rem;
   display:inline-flex;background:#00000008;border:1px solid var(--line);
@@ -117,6 +117,7 @@ body{
   padding:.28rem .7rem;border-radius:50px;border:none;
   background:transparent;color:var(--muted);
   font-family:inherit;font-weight:900;font-size:.72rem;cursor:pointer;
+  transition:.2s;
 }
 .lang-toggle button.active{
   background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--dark);
@@ -152,43 +153,43 @@ body{
 <div class="login-wrap">
   <div class="login-card">
 
-    <!-- تبديل اللغة -->
+    <!-- v2: زر اللغة المدمج (يرتبط بـ setStaffLang المركزي) -->
     <div class="lang-toggle">
-      <button id="langAr" class="active" onclick="setLang('ar')">AR</button>
-      <button id="langEn" onclick="setLang('en')">EN</button>
+      <button id="langAr" class="active" onclick="pickLang('ar')">AR</button>
+      <button id="langEn" onclick="pickLang('en')">EN</button>
     </div>
 
     <!-- ═══ شاشة الدخول ═══ -->
     <div id="loginScreen">
       <img class="logo" src="img/logo.png" alt="مكرونجي">
-      <h1 data-t="title">دخول الموظفين</h1>
-      <p class="sub" data-t="subtitle">مشرفو الفروع والسائقون فقط</p>
+      <h1 data-t="login.title">دخول الموظفين</h1>
+      <p class="sub" data-t="login.subtitle">مشرفو الفروع والسائقون فقط</p>
 
       <div class="err-banner" id="loginErr"></div>
 
       <div class="field">
-        <label data-t="username">اسم المستخدم</label>
+        <label data-t="login.username">اسم المستخدم</label>
         <input type="text" id="username" class="ltr" autocomplete="username"
-               placeholder="supervisor.badiah">
+               data-t-placeholder="login.username" placeholder="supervisor.badiah">
       </div>
 
       <div class="field">
-        <label data-t="password">كلمة المرور</label>
+        <label data-t="login.password">كلمة المرور</label>
         <input type="password" id="password" autocomplete="current-password"
                placeholder="••••••••">
       </div>
 
       <button class="btn-login" id="btnLogin" onclick="doLogin()">
-        <span data-t="login">دخول</span>
+        <span data-t="login.loginBtn">دخول</span>
       </button>
     </div>
 
     <!-- ═══ شاشة تغيير كلمة المرور (أول دخول) ═══ -->
     <div id="changeScreen">
       <img class="logo" src="img/logo.png" alt="مكرونجي">
-      <h1 data-t="changeTitle">تغيير كلمة المرور</h1>
+      <h1 data-t="login.changeTitle">تغيير كلمة المرور</h1>
 
-      <div class="note-box" data-t="changeNote">
+      <div class="note-box" data-t="login.changeNote">
         هذه أول مرة تدخل بها. لحماية حسابك، اختر كلمة مرور جديدة:
         8 أحرف على الأقل، وتحتوي حرفاً كبيراً وحرفاً صغيراً ورقماً.
       </div>
@@ -197,100 +198,68 @@ body{
       <div class="ok-banner" id="changeOk"></div>
 
       <div class="field">
-        <label data-t="newPass">كلمة المرور الجديدة</label>
+        <label data-t="login.newPass">كلمة المرور الجديدة</label>
         <input type="password" id="newPass" class="ltr" autocomplete="new-password">
       </div>
 
       <div class="field">
-        <label data-t="confirmPass">تأكيد كلمة المرور</label>
+        <label data-t="login.confirmPass">تأكيد كلمة المرور</label>
         <input type="password" id="confirmPass" class="ltr" autocomplete="new-password">
       </div>
 
       <button class="btn-login" id="btnChange" onclick="doChangePassword()">
-        <span data-t="savePass">حفظ ومتابعة</span>
+        <span data-t="login.savePass">حفظ ومتابعة</span>
       </button>
     </div>
 
   </div>
 
-  <div class="foot">🍝 <span data-t="brand">مكرونجي</span> — <span data-t="rights">جميع الحقوق محفوظة</span></div>
+  <div class="foot">🍝 <span data-t="login.brand">مكرونجي</span> — <span data-t="login.rights">جميع الحقوق محفوظة</span></div>
 </div>
+
+<!-- v2: نظام الترجمة المركزي (نفس ملف باقي الصفحات) -->
+<script src="i18n-staff.js"></script>
 
 <script>
 /* ═══════════════════════════════════════════
    إعدادات الربط
-   ⚠️ غيّر هذا الرابط لرابط الـ Worker لديك بعد النشر
    ═══════════════════════════════════════════ */
 const API_BASE = 'https://makaronjy-api.makaronjy.workers.dev';
 
-/* ─── الترجمات ─── */
-const T = {
-  ar: {
-    title: 'دخول الموظفين',
-    subtitle: 'مشرفو الفروع والسائقون فقط',
-    username: 'اسم المستخدم',
-    password: 'كلمة المرور',
-    login: 'دخول',
-    logging: 'جارٍ الدخول...',
-    changeTitle: 'تغيير كلمة المرور',
-    changeNote: 'هذه أول مرة تدخل بها. لحماية حسابك، اختر كلمة مرور جديدة: 8 أحرف على الأقل، وتحتوي حرفاً كبيراً وحرفاً صغيراً ورقماً.',
-    newPass: 'كلمة المرور الجديدة',
-    confirmPass: 'تأكيد كلمة المرور',
-    savePass: 'حفظ ومتابعة',
-    saving: 'جارٍ الحفظ...',
-    brand: 'مكرونجي',
-    rights: 'جميع الحقوق محفوظة',
-    errEmpty: '⚠️ أدخل اسم المستخدم وكلمة المرور',
-    errPassMismatch: '⚠️ كلمتا المرور غير متطابقتين',
-    errPassWeak: '⚠️ كلمة المرور ضعيفة: 8 أحرف + حرف كبير + حرف صغير + رقم',
-    okChanged: '✅ تم تغيير كلمة المرور بنجاح',
-  },
-  en: {
-    title: 'Staff Login',
-    subtitle: 'Branch supervisors & drivers only',
-    username: 'Username',
-    password: 'Password',
-    login: 'Login',
-    logging: 'Logging in...',
-    changeTitle: 'Change Password',
-    changeNote: 'First login detected. Choose a new password: at least 8 characters, with an uppercase, a lowercase and a number.',
-    newPass: 'New Password',
-    confirmPass: 'Confirm Password',
-    savePass: 'Save & Continue',
-    saving: 'Saving...',
-    brand: 'Makaronjy',
-    rights: 'All rights reserved',
-    errEmpty: '⚠️ Enter username and password',
-    errPassMismatch: '⚠️ Passwords do not match',
-    errPassWeak: '⚠️ Weak password: 8 chars + uppercase + lowercase + number',
-    okChanged: '✅ Password changed successfully',
-  }
-};
-
-let LANG = localStorage.getItem('mk_staff_lang') || 'ar';
-
-function setLang(lang) {
-  LANG = lang;
-  localStorage.setItem('mk_staff_lang', lang);
-  document.documentElement.lang = lang;
-  document.documentElement.dir = (lang === 'ar') ? 'rtl' : 'ltr';
-  document.getElementById('langAr').classList.toggle('active', lang === 'ar');
-  document.getElementById('langEn').classList.toggle('active', lang === 'en');
-  document.querySelectorAll('[data-t]').forEach(elm => {
-    const key = elm.getAttribute('data-t');
-    if (T[lang][key]) elm.textContent = T[lang][key];
+/* ═══════════════════════════════════════════
+   v2: اللغة — عبر i18n-staff.js المركزي
+   ═══════════════════════════════════════════ */
+function pickLang(lang){
+  setStaffLang(lang);
+  syncLangUI();
+}
+function syncLangUI(){
+  const lang = getStaffLang();
+  const arBtn = document.getElementById('langAr');
+  const enBtn = document.getElementById('langEn');
+  if(arBtn) arBtn.classList.toggle('active', lang === 'ar');
+  if(enBtn) enBtn.classList.toggle('active', lang === 'en');
+  /* applyStaffI18n يترجم data-t تلقائياً */
+  if(typeof applyStaffI18n === 'function') applyStaffI18n();
+  /* ترجمة placeholders */
+  document.querySelectorAll('[data-t-placeholder]').forEach(function(el){
+    const key = el.getAttribute('data-t-placeholder');
+    const text = tt(key);
+    if(text !== key) el.placeholder = text;
   });
 }
-
-function tt(key) { return T[LANG][key] || key; }
+/* مزامنة عند فتح تبويب آخر يغير اللغة */
+window.addEventListener('staff-lang-changed', syncLangUI);
 
 function showErr(id, msg) {
   const b = document.getElementById(id);
+  if(!b) return;
   b.textContent = msg;
   b.classList.add('show');
 }
 function hideErr(id) {
-  document.getElementById(id).classList.remove('show');
+  const b = document.getElementById(id);
+  if(b) b.classList.remove('show');
 }
 
 /* ─── فك التوكن محلياً (للتحقق من الصلاحية فقط) ─── */
@@ -318,14 +287,12 @@ function redirectByRole(user) {
 
 /* ─── عند فتح الصفحة: فحص جلسة محفوظة ─── */
 (function checkExistingSession() {
-  setLang(LANG);
   const token = localStorage.getItem('mk_staff_token');
   const userRaw = localStorage.getItem('mk_staff_user');
   if (!token || !userRaw) return;
 
   const payload = decodeJwtPayload(token);
   if (!payload || !payload.exp || payload.exp < Math.floor(Date.now() / 1000)) {
-    // منتهي → نمسح ونبقى في شاشة الدخول
     localStorage.removeItem('mk_staff_token');
     localStorage.removeItem('mk_staff_user');
     return;
@@ -333,7 +300,6 @@ function redirectByRole(user) {
 
   const user = JSON.parse(userRaw);
 
-  // لو ما زال مطالباً بتغيير كلمة المرور → شاشة التغيير
   if (user.mustChangePassword) {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('changeScreen').style.display = 'block';
@@ -350,13 +316,13 @@ async function doLogin() {
   const password = document.getElementById('password').value;
 
   if (!username || !password) {
-    showErr('loginErr', tt('errEmpty'));
+    showErr('loginErr', tt('login.errEmpty'));
     return;
   }
 
   const btn = document.getElementById('btnLogin');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>' + tt('logging');
+  btn.innerHTML = '<span class="spinner"></span>' + tt('login.logging');
 
   try {
     const res = await fetch(API_BASE + '/api/auth/login', {
@@ -367,15 +333,13 @@ async function doLogin() {
     const data = await res.json();
 
     if (!res.ok || !data.success) {
-      showErr('loginErr', '⚠️ ' + (data.error || 'خطأ غير معروف'));
+      showErr('loginErr', '⚠️ ' + (data.error || tt('errors.network')));
       return;
     }
 
-    // حفظ الجلسة (30 يوماً عبر exp داخل التوكن)
     localStorage.setItem('mk_staff_token', data.token);
     localStorage.setItem('mk_staff_user', JSON.stringify(data.user));
 
-    // أول دخول → إجبار تغيير كلمة المرور
     if (data.user.mustChangePassword) {
       document.getElementById('loginScreen').style.display = 'none';
       document.getElementById('changeScreen').style.display = 'block';
@@ -385,10 +349,10 @@ async function doLogin() {
     redirectByRole(data.user);
 
   } catch (e) {
-    showErr('loginErr', '⚠️ تعذر الاتصال بالخادم — تحقق من الإنترنت');
+    showErr('loginErr', tt('login.errNetwork') || ('⚠️ ' + (e.message || '')));
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '<span data-t="login">' + tt('login') + '</span>';
+    btn.innerHTML = '<span data-t="login.loginBtn">' + tt('login.loginBtn') + '</span>';
   }
 }
 
@@ -401,18 +365,18 @@ async function doChangePassword() {
   const confirmPass = document.getElementById('confirmPass').value;
 
   if (newPass !== confirmPass) {
-    showErr('changeErr', tt('errPassMismatch'));
+    showErr('changeErr', tt('login.errPassMismatch'));
     return;
   }
   if (newPass.length < 8 || !/[A-Z]/.test(newPass) || !/[a-z]/.test(newPass) || !/[0-9]/.test(newPass)) {
-    showErr('changeErr', tt('errPassWeak'));
+    showErr('changeErr', tt('login.errPassWeak'));
     return;
   }
 
   const token = localStorage.getItem('mk_staff_token');
   const btn = document.getElementById('btnChange');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>' + tt('saving');
+  btn.innerHTML = '<span class="spinner"></span>' + tt('login.saving');
 
   try {
     const res = await fetch(API_BASE + '/api/auth/change-password', {
@@ -426,25 +390,24 @@ async function doChangePassword() {
     const data = await res.json();
 
     if (!res.ok || !data.success) {
-      showErr('changeErr', '⚠️ ' + (data.error || 'خطأ غير معروف'));
+      showErr('changeErr', '⚠️ ' + (data.error || tt('errors.network')));
       return;
     }
 
-    // تحديث بيانات المستخدم المحفوظة
     const user = JSON.parse(localStorage.getItem('mk_staff_user') || '{}');
     user.mustChangePassword = false;
     localStorage.setItem('mk_staff_user', JSON.stringify(user));
 
-    showErr('changeOk', tt('okChanged'));
+    showErr('changeOk', tt('login.okChanged'));
     document.getElementById('changeOk').classList.add('show');
 
     setTimeout(() => redirectByRole(user), 900);
 
   } catch (e) {
-    showErr('changeErr', '⚠️ تعذر الاتصال بالخادم — تحقق من الإنترنت');
+    showErr('changeErr', tt('login.errNetwork') || ('⚠️ ' + (e.message || '')));
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '<span>' + tt('savePass') + '</span>';
+    btn.innerHTML = '<span>' + tt('login.savePass') + '</span>';
   }
 }
 
@@ -455,7 +418,14 @@ document.getElementById('password').addEventListener('keydown', e => {
 document.getElementById('confirmPass').addEventListener('keydown', e => {
   if (e.key === 'Enter') doChangePassword();
 });
+
+/* ═══════════════════════════════════════════
+   v2: الإقلاع — تهيئة i18n المركزي
+   ═══════════════════════════════════════════ */
+initStaffI18n({ autoLangToggle: false }); /* نتجنب الزر العائم (عندنا زر مدمج أجمل) */
+syncLangUI();
 </script>
 
 </body>
 </html>
+<!-- ===== END login.html (v2) ===== -->
