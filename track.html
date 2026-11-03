@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="robots" content="noindex, nofollow">
-<title>تتبع الطلب | مكرونجي</title>
+<title data-t="track.pageTitle">تتبع الطلب | مكرونجي</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800;900&display=swap" rel="stylesheet">
@@ -57,6 +57,15 @@ body{font-family:'Cairo',sans-serif;background:var(--cream);color:var(--ink);min
 .routeinfo{margin-top:.5rem;background:var(--warnbg);border:1px dashed var(--gold);border-radius:10px;padding:.45rem .7rem;font-size:.75rem;font-weight:900;color:var(--warn);text-align:center}
 .maplegend{display:flex;gap:.8rem;justify-content:center;font-size:.68rem;font-weight:800;color:var(--muted);margin-top:.5rem;flex-wrap:wrap}
 .mk-pin-ico{font-size:26px;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))}
+/* v2.3: الشاشة الختامية */
+.final{text-align:center;padding:.6rem 0}
+.final .big{font-size:4rem;animation:pop .5s cubic-bezier(.2,.9,.3,1.4)}
+@keyframes pop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
+.final h2{color:var(--ok);font-size:1.25rem;font-weight:900;margin:.5rem 0 .3rem}
+.final p{color:var(--muted);font-size:.85rem;font-weight:800;line-height:1.8;margin:.2rem 0}
+.final .closeBtn{display:block;width:100%;border:none;border-radius:14px;padding:.95rem;background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--dark);font-family:inherit;font-weight:900;font-size:1rem;cursor:pointer;margin-top:1rem}
+.final .closeHint{display:none;margin-top:.6rem;background:var(--warnbg);border-radius:10px;padding:.5rem .7rem;font-size:.75rem;font-weight:800;color:var(--warn)}
+.final .closeHint.show{display:block}
 /* الأصناف */
 .items h4{font-size:.85rem;font-weight:900;color:var(--brown);margin-bottom:.5rem}
 .it{display:flex;justify-content:space-between;gap:.5rem;font-size:.8rem;font-weight:800;padding:.35rem 0;border-bottom:1px dashed var(--line)}
@@ -72,41 +81,36 @@ body{font-family:'Cairo',sans-serif;background:var(--cream);color:var(--ink);min
 <body>
 
 <div class="top">
-  <b>🍝 مكرونجي</b>
-  <small>تتبع طلبك لحظة بلحظة</small>
+  <b>🍝 <span data-t="login.brand">مكرونجي</span></b>
+  <small data-t="track.subtitle">تتبع طلبك لحظة بلحظة</small>
 </div>
 
 <div class="wrap">
-  <div id="box" class="card"><div class="load"><span class="spin"></span><br>جارٍ تحميل طلبك...</div></div>
+  <div id="box" class="card"><div class="load"><span class="spin"></span><br><span data-t="track.loading">جارٍ تحميل طلبك...</span></div></div>
 
   <div id="mapCard" class="card hidden">
-    <b style="font-size:.9rem;font-weight:900;color:var(--brown)">🗺️ خريطة التتبع المباشر</b>
+    <b style="font-size:.9rem;font-weight:900;color:var(--brown)" data-t="track.map.title">🗺️ خريطة التتبع المباشر</b>
     <div id="mapBox"></div>
     <div id="routeInfo" class="routeinfo hidden"></div>
     <div class="maplegend">
-      <span>🛵 السائق</span><span>📍 وجهتك</span><span>🏪 الفرع</span>
+      <span data-t="track.map.legend.driver">🛵 السائق</span>
+      <span data-t="track.map.legend.target">📍 وجهتك</span>
+      <span data-t="track.map.legend.branch">🏪 الفرع</span>
     </div>
   </div>
 </div>
 
+<!-- نظام الترجمة المركزي -->
+<script src="i18n-staff.js"></script>
+
 <script>
 const CLOUD_API = 'https://makaronjy-api.makaronjy.workers.dev';
 
-const DELIVERY_STEPS = [
-  {s:'pending',         ar:'تم استلام الطلب',   icon:'🧾'},
-  {s:'accepted',        ar:'تم قبول الطلب',     icon:'👨‍'},
-  {s:'preparing',       ar:'جاري التحضير',      icon:'🍳'},
-  {s:'ready',           ar:'جاهز للتسليم',      icon:'✅'},
-  {s:'out_for_delivery',ar:'في الطريق إليك',    icon:'🛵'},
-  {s:'delivered',       ar:'تم التسليم',        icon:'🎉'}
-];
-const PICKUP_STEPS = [
-  {s:'pending',   ar:'تم استلام الطلب',            icon:'🧾'},
-  {s:'accepted',  ar:'تم قبول الطلب',              icon:'👨‍🍳'},
-  {s:'preparing', ar:'جاري التحضير',               icon:'🍳'},
-  {s:'ready',     ar:'جاهز للاستلام من الفرع',     icon:'🏪'},
-  {s:'delivered', ar:'تم استلام الطلب من الفرع ✅', icon:'🎉'}
-];
+/* ترتيب الخطوات (المفاتيح تُترجم عبر i18n-staff) */
+const DELIVERY_KEYS = ['pending','accepted','preparing','ready','out_for_delivery','delivered'];
+const PICKUP_KEYS   = ['pending','accepted','preparing','ready','delivered'];
+
+let LAST_DATA = null;
 
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function orderNum(){
@@ -121,26 +125,36 @@ function fmtTime(t){
     return d.toLocaleString('ar-SA', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
   }catch(e){ return String(t).slice(0,16); }
 }
+/* نص الحالة مترجماً (مع مراعاة نوع الطلب) */
+function statusLabel(o){
+  let key = o.status;
+  if(o.order_type === 'pickup'){
+    if(o.status === 'ready') key = 'ready_pickup';
+    if(o.status === 'delivered') key = 'delivered_pickup';
+  }
+  const t = tt('admin.statuses.' + key);
+  return (t && t !== ('admin.statuses.' + key)) ? t : (o.status_text || o.status);
+}
 
-function stepsHtml(steps, status){
+function stepsHtml(keys, dictPrefix, status){
   const displayStatus = (status === 'driver_assigned') ? 'out_for_delivery' : status;
-  const orderIdx = steps.findIndex(x => x.s === displayStatus);
+  const orderIdx = keys.indexOf(displayStatus);
   const finished = (status === 'delivered' || status === 'archived');
-  const cur = finished ? steps.length - 1 : orderIdx;
-  return '<div class="steps">' + steps.map(function(st, i){
+  const cur = finished ? keys.length - 1 : orderIdx;
+  return '<div class="steps">' + keys.map(function(k, i){
     let cls = 'step';
     if(finished || i < cur) cls += ' done';
     else if(i === cur) cls += ' done now';
     return '<div class="' + cls + '">' +
       '<div class="rail"></div>' +
-      '<div class="dot">' + (i <= cur ? '✓' : st.icon) + '</div>' +
-      '<div class="txt"><b>' + st.ar + '</b></div>' +
+      '<div class="dot">' + (i <= cur ? '✓' : tt('track.icons.' + k)) + '</div>' +
+      '<div class="txt"><b>' + tt(dictPrefix + '.' + k) + '</b></div>' +
     '</div>';
   }).join('') + '</div>';
 }
 
 /* ═══════════════════════════════════════════
-   v2.2: مسار حقيقي على الشوارع (OSRM أسرع مسار)
+   الخريطة + المسار الحقيقي (OSRM)
    ═══════════════════════════════════════════ */
 const OSRM_HOSTS = [
   'https://routing.openstreetmap.de/routed-car',
@@ -179,9 +193,6 @@ async function fetchRoute(a, b){
   return null;
 }
 
-/* ═══════════════════════════════════════════
-   الخريطة
-   ═══════════════════════════════════════════ */
 let map = null, mkDriver = null, mkTarget = null, mkBranch = null;
 let routeLayer = null, straightLayer = null, mapFitted = false;
 
@@ -214,8 +225,6 @@ function clearMarkers(){
   mkDriver = mkTarget = mkBranch = null;
   clearRouteLayers();
 }
-
-/* رسم المسار الحقيقي بين نقطتين */
 async function drawRoute(a, b){
   const info = document.getElementById('routeInfo');
   const rc = await fetchRoute(a, b);
@@ -228,7 +237,10 @@ async function drawRoute(a, b){
     }
     if(info){
       info.classList.remove('hidden');
-      info.innerHTML = '🚗 المسار المتبقي: ' + rc.km.toFixed(1) + ' كم • ⏱️ ~' + rc.min + ' دقيقة (أسرع مسار)';
+      info.innerHTML = tt('track.map.routeInfo.remaining') + ': ' +
+        rc.km.toFixed(1) + ' ' + tt('track.map.routeInfo.km') +
+        ' • ⏱️ ~' + rc.min + ' ' + tt('track.map.routeInfo.minutes') +
+        ' (' + tt('track.map.routeInfo.fastest') + ')';
     }
   } else {
     if(routeLayer){ map.removeLayer(routeLayer); routeLayer = null; }
@@ -239,17 +251,20 @@ async function drawRoute(a, b){
     }
     if(info){
       info.classList.remove('hidden');
-      info.innerHTML = '📡 تعذر حساب المسار لحظياً — خط تقريبي مباشر';
+      info.innerHTML = tt('track.map.routeInfo.fallback');
     }
   }
 }
-
+function hideMap(){
+  document.getElementById('mapCard').classList.add('hidden');
+}
 function updateMap(d){
   const card = document.getElementById('mapCard');
   const info = document.getElementById('routeInfo');
   const o = d.order, br = d.branch, dr = d.driver;
   const cancelled = (o.status === 'cancelled');
-  if(!window.L || cancelled){ card.classList.add('hidden'); return; }
+  const finalState = (o.status === 'delivered' || o.status === 'archived');
+  if(!window.L || cancelled || finalState){ card.classList.add('hidden'); return; }
 
   const isPickup = (o.order_type === 'pickup');
   const branchPt = (br && typeof br.lat === 'number' && typeof br.lng === 'number') ? [br.lat, br.lng] : null;
@@ -258,7 +273,6 @@ function updateMap(d){
   const driverPt = (dr && typeof dr.lat === 'number' && typeof dr.lng === 'number' && dr.lat)
     ? [dr.lat, dr.lng] : null;
 
-  /* استلام: خريطة الفرع فقط */
   if(isPickup){
     if(!branchPt){ card.classList.add('hidden'); return; }
     card.classList.remove('hidden');
@@ -266,7 +280,7 @@ function updateMap(d){
     initMap();
     if(!map) return;
     clearMarkers();
-    mkBranch = L.marker(branchPt, { icon: pinIcon('🏪') }).addTo(map).bindPopup(esc(br.name || 'الفرع'));
+    mkBranch = L.marker(branchPt, { icon: pinIcon('🏪') }).addTo(map).bindPopup(esc(br.name || ''));
     if(!mapFitted){ map.setView(branchPt, 15); mapFitted = true; }
     return;
   }
@@ -277,23 +291,19 @@ function updateMap(d){
   initMap();
   if(!map) return;
 
-  /* السائق */
   if(driverPt){
-    if(!mkDriver){ mkDriver = L.marker(driverPt, { icon: pinIcon('🛵') }).addTo(map).bindPopup('السائق'); }
+    if(!mkDriver){ mkDriver = L.marker(driverPt, { icon: pinIcon('🛵') }).addTo(map).bindPopup(tt('track.map.legend.driver')); }
     else mkDriver.setLatLng(driverPt);
   } else if(mkDriver){ map.removeLayer(mkDriver); mkDriver = null; }
 
-  /* الوجهة */
   if(targetPt){
-    if(!mkTarget){ mkTarget = L.marker(targetPt, { icon: pinIcon(custPt ? '📍' : '🏪') }).addTo(map).bindPopup(custPt ? 'وجهتك' : esc(br.name || 'الفرع')); }
+    if(!mkTarget){ mkTarget = L.marker(targetPt, { icon: pinIcon(custPt ? '📍' : '🏪') }).addTo(map).bindPopup(custPt ? tt('track.map.legend.target') : esc(br.name || '')); }
     else mkTarget.setLatLng(targetPt);
   }
-  /* الفرع (عندما الوجهة عنوان العميل) */
   if(custPt && branchPt && !mkBranch){
-    mkBranch = L.marker(branchPt, { icon: pinIcon('🏪') }).addTo(map).bindPopup(esc(br.name || 'الفرع'));
+    mkBranch = L.marker(branchPt, { icon: pinIcon('🏪') }).addTo(map).bindPopup(esc(br.name || ''));
   }
 
-  /* المسار الحقيقي: سائق ← وجهة */
   if(driverPt && targetPt){
     drawRoute(driverPt, targetPt);
   } else {
@@ -301,79 +311,125 @@ function updateMap(d){
     if(info) info.classList.add('hidden');
   }
 
-  /* الإطار مرة واحدة */
   const pts = [driverPt, targetPt, branchPt].filter(Boolean);
   if(!mapFitted && pts.length){ map.fitBounds(pts, { padding: [36, 36] }); mapFitted = true; }
 }
 
 /* ═══════════════════════════════════════════
+   v2.3: إغلاق الصفحة
+   ═══════════════════════════════════════════ */
+function tryClosePage(){
+  window.close();
+  setTimeout(function(){
+    const hint = document.getElementById('closeHint');
+    if(hint) hint.classList.add('show');
+  }, 500);
+}
+
+/* ═══════════════════════════════════════════
    العرض
    ═══════════════════════════════════════════ */
+function receiptHtml(o, isPickup){
+  if(!o.items || !o.items.length) return '';
+  return '<div class="items" style="margin-top:1rem"><h4>' + tt('track.items.title') + '</h4>' +
+    o.items.map(function(i){
+      return '<div class="it"><span>' + i.qty + ' × ' + esc(i.name) + (i.size ? ' (' + esc(i.size) + ')' : '') + '</span><span>' + (i.qty * i.price) + ' ﷼</span></div>';
+    }).join('') +
+    '<div class="tot" style="margin-top:.5rem"><span>' + tt('track.items.subtotal') + '</span><span>' + o.subtotal + ' ﷼</span></div>' +
+    (isPickup ? '' : '<div class="tot"><span>' + tt('track.items.deliveryFee') + '</span><span>' + (o.delivery_fee || 0) + ' ﷼</span></div>') +
+    '<div class="tot grand"><span>' + tt('track.items.grandTotal') + '</span><span>' + o.total + ' ﷼</span></div>' +
+    '<div class="tot"><span>' + tt('track.items.paymentLabel') + '</span><span>' + (isPickup ? tt('track.items.payCashier') : tt('track.items.payDriver')) + '</span></div>' +
+  '</div>';
+}
+
 function render(d){
+  LAST_DATA = d;
   const o = d.order, br = d.branch, dr = d.driver;
   const isPickup = (o.order_type === 'pickup');
   const cancelled = (o.status === 'cancelled');
-  const delivered = (o.status === 'delivered' || o.status === 'archived');
+  const finalState = (o.status === 'delivered' || o.status === 'archived');
+  const box = document.getElementById('box');
 
-  let pillCls = 'info', pillTxt = o.status_text || o.status;
-  if(delivered){ pillCls = 'ok'; }
-  else if(cancelled){ pillCls = 'err'; }
-  else if(o.status === 'ready' || o.status === 'out_for_delivery' || o.status === 'driver_assigned'){ pillCls = 'warn'; }
+  /* ─── v2.3: الشاشة الختامية ─── */
+  if(finalState){
+    stopPolling();
+    hideMap();
+    box.innerHTML =
+      '<div class="final">' +
+        '<div class="big">🎉</div>' +
+        '<h2>' + tt('track.closed.title') + '</h2>' +
+        '<div class="numbox"><div class="num">' + esc(o.number) + '</div></div>' +
+        '<p>' + tt('track.closed.thankYou') + '</p>' +
+        '<p>' + tt('track.closed.canClose') + '</p>' +
+        '<button class="closeBtn" onclick="tryClosePage()">' + tt('track.closed.closeBtn') + '</button>' +
+        '<div class="closeHint" id="closeHint">👆 ' + tt('track.closed.canClose') + '</div>' +
+      '</div>' +
+      receiptHtml(o, isPickup);
+    box.dataset.filled = '1';
+    return;
+  }
+
+  /* ─── الإلغاء: شاشة نهائية أيضاً ─── */
+  if(cancelled){
+    stopPolling();
+    hideMap();
+    const lastNote = (d.tracking && d.tracking.length) ? d.tracking[d.tracking.length - 1].notes : '';
+    box.innerHTML =
+      '<div class="final">' +
+        '<div class="big">❌</div>' +
+        '<h2 style="color:var(--err)">' + tt('track.closed.cancelled') + '</h2>' +
+        '<div class="numbox"><div class="num">' + esc(o.number) + '</div></div>' +
+        (lastNote ? '<div class="note err">⚠️ ' + esc(lastNote) + '</div>' : '') +
+        '<button class="closeBtn" onclick="tryClosePage()">' + tt('track.closed.closeBtn') + '</button>' +
+        '<div class="closeHint" id="closeHint">👆 ' + tt('track.closed.canClose') + '</div>' +
+      '</div>';
+    box.dataset.filled = '1';
+    return;
+  }
+
+  /* ─── الحالة الحية ─── */
+  let pillCls = 'info';
+  if(o.status === 'ready' || o.status === 'out_for_delivery' || o.status === 'driver_assigned') pillCls = 'warn';
 
   let html = '';
   html += '<div class="numbox">' +
-    '<div class="ico">' + (cancelled ? '❌' : (delivered ? '🎉' : (isPickup ? '🏪' : '🛵'))) + '</div>' +
+    '<div class="ico">' + (isPickup ? '🏪' : '🛵') + '</div>' +
     '<div class="num">' + esc(o.number) + '</div>' +
-    '<div class="pill ' + pillCls + '">' + esc(pillTxt) + '</div>' +
+    '<div class="pill ' + pillCls + '">' + esc(statusLabel(o)) + '</div>' +
     '<div style="color:var(--muted);font-size:.7rem;font-weight:800;margin-top:.4rem">' +
-      (isPickup ? '🏪 طلب استلام من الفرع' : '🛵 طلب توصيل') + ' • ' + fmtTime(o.created_at) +
+      tt(isPickup ? 'track.orderTypeLabel.pickup' : 'track.orderTypeLabel.delivery') + ' • ' + fmtTime(o.created_at) +
     '</div>' +
   '</div>';
 
-  if(cancelled){
-    const lastNote = (d.tracking && d.tracking.length) ? d.tracking[d.tracking.length - 1].notes : '';
-    html += '<div class="note err">⚠️ ' + esc(lastNote || 'تم إلغاء هذا الطلب') + '</div>';
-  }
+  html += '<div style="margin-top:1rem">' +
+    stepsHtml(isPickup ? PICKUP_KEYS : DELIVERY_KEYS,
+              isPickup ? 'track.stepsPickup' : 'track.stepsDelivery',
+              o.status) +
+  '</div>';
 
-  if(!cancelled){
-    html += '<div style="margin-top:1rem">' + stepsHtml(isPickup ? PICKUP_STEPS : DELIVERY_STEPS, o.status) + '</div>';
-  }
-
-  if(!isPickup && dr && dr.name && !delivered && !cancelled){
+  if(!isPickup && dr && dr.name){
     html += '<div class="row">' +
       '<div class="ic">🚗</div>' +
-      '<div class="inf"><b>' + esc(dr.name) + '</b><small>سائق طلبك' + (dr.last_update ? ' • آخر تحديث ' + fmtTime(dr.last_update) : '') + '</small></div>' +
-      (dr.phone ? '<a class="btn green" href="tel:' + esc(dr.phone) + '">📞 اتصال</a>' : '') +
+      '<div class="inf"><b>' + esc(dr.name) + '</b><small>' + tt('track.driver.label') + (dr.last_update ? ' • ' + tt('track.driver.lastUpdate') + ' ' + fmtTime(dr.last_update) : '') + '</small></div>' +
+      (dr.phone ? '<a class="btn green" href="tel:' + esc(dr.phone) + '">' + tt('track.driver.call') + '</a>' : '') +
     '</div>';
   }
 
   if(br && br.name){
     html += '<div class="row">' +
       '<div class="ic">' + (isPickup ? '🏪' : '🍝') + '</div>' +
-      '<div class="inf"><b>' + esc(br.name) + '</b><small>' + (isPickup ? 'استلم طلبك من هذا الفرع' : 'فرع تحضير طلبك') + '</small></div>' +
-      (br.phone ? '<a class="btn green" href="tel:' + esc(br.phone) + '">📞</a>' : '') +
-      ((br.lat && br.lng) ? '<a class="btn gold" href="' + mapsLink(br.lat, br.lng) + '" target="_blank" rel="noopener">🗺️ الوصول</a>' : '') +
+      '<div class="inf"><b>' + esc(br.name) + '</b><small>' + tt(isPickup ? 'track.branch.pickup' : 'track.branch.delivery') + '</small></div>' +
+      (br.phone ? '<a class="btn green" href="tel:' + esc(br.phone) + '">' + tt('track.branch.call') + '</a>' : '') +
+      ((br.lat && br.lng) ? '<a class="btn gold" href="' + mapsLink(br.lat, br.lng) + '" target="_blank" rel="noopener">' + tt('track.branch.arrival') + '</a>' : '') +
     '</div>';
   }
 
-  if(o.items && o.items.length){
-    html += '<div class="items" style="margin-top:1rem"><h4>🧾 تفاصيل الطلب</h4>' +
-      o.items.map(function(i){
-        return '<div class="it"><span>' + i.qty + ' × ' + esc(i.name) + (i.size ? ' (' + esc(i.size) + ')' : '') + '</span><span>' + (i.qty * i.price) + ' ﷼</span></div>';
-      }).join('') +
-      '<div class="tot" style="margin-top:.5rem"><span>المجموع الفرعي</span><span>' + o.subtotal + ' ﷼</span></div>' +
-      (isPickup ? '' : '<div class="tot"><span>رسوم التوصيل</span><span>' + (o.delivery_fee || 0) + ' ﷼</span></div>') +
-      '<div class="tot grand"><span>الإجمالي (شامل الضريبة)</span><span>' + o.total + ' ﷼</span></div>' +
-      (isPickup ? '<div class="tot"><span>💵 الدفع</span><span>نقداً عند الكاشير</span></div>'
-                : '<div class="tot"><span>💵 الدفع</span><span>نقداً للسائق عند التسليم</span></div>') +
-    '</div>';
-  }
+  html += receiptHtml(o, isPickup);
 
   if(o.notes){ html += '<div class="note">📝 ' + esc(o.notes) + '</div>'; }
 
-  html += '<div class="auto">🔄 تحديث تلقائي كل 15 ثانية — لا تحتاج إعادة تحميل الصفحة</div>';
+  html += '<div class="auto">' + tt('track.autoUpdate') + '</div>';
 
-  const box = document.getElementById('box');
   box.innerHTML = html;
   box.dataset.filled = '1';
 
@@ -382,27 +438,42 @@ function render(d){
 
 function renderError(msg){
   document.getElementById('box').innerHTML =
-    '<div class="load">😕<br><br>' + esc(msg || 'الطلب غير موجود') + '<br><small style="font-weight:700">تأكد من رقم الطلب أو رابط التتبع</small></div>';
-  document.getElementById('mapCard').classList.add('hidden');
+    '<div class="load">😕<br><br>' + esc(msg || tt('track.error.notFound')) + '<br><small style="font-weight:700">' + tt('track.error.checkLink') + '</small></div>';
+  hideMap();
 }
 
+/* ═══════════════════════════════════════════
+   التحديث التلقائي
+   ═══════════════════════════════════════════ */
 let timer = null;
+function stopPolling(){
+  if(timer){ clearInterval(timer); timer = null; }
+}
 async function load(){
   const num = orderNum();
-  if(!num){ renderError('لا يوجد رقم طلب في الرابط'); return; }
+  if(!num){ renderError(tt('track.error.noNumber')); return; }
   try{
     const r = await fetch(CLOUD_API + '/api/track/' + encodeURIComponent(num), { cache:'no-store' });
     const d = await r.json();
-    if(!r.ok){ renderError(d.error || 'الطلب غير موجود'); if(timer){ clearInterval(timer); timer = null; } return; }
+    if(!r.ok){ renderError(d.error || tt('track.error.notFound')); stopPolling(); return; }
     render(d);
-    if(!timer) timer = setInterval(load, 15000);
+    const done = (d.order.status === 'delivered' || d.order.status === 'archived' || d.order.status === 'cancelled');
+    if(done){ stopPolling(); }
+    else if(!timer){ timer = setInterval(load, 15000); }
   }catch(e){
     const box = document.getElementById('box');
-    if(!box.dataset.filled){ renderError('تحقق من اتصالك بالإنترنت'); }
+    if(!box.dataset.filled){ renderError(tt('track.error.network')); }
   }
 }
+
+/* مزامنة اللغة: إعادة الرسم من آخر بيانات */
+window.addEventListener('staff-lang-changed', function(){
+  if(LAST_DATA) render(LAST_DATA);
+});
+
+initStaffI18n();
 document.addEventListener('DOMContentLoaded', function(){ load(); });
 </script>
 </body>
 </html>
-<!-- ===== END track.html (v2.2) ===== -->
+<!-- ===== END track.html (v2.3) ===== -->
