@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>لوحة مشرف الفرع | مكرونجي</title>
+<title data-t="supervisor.pageTitle">لوحة مشرف الفرع | مكرونجي</title>
 <link rel="icon" href="img/logo.png">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
@@ -20,17 +20,17 @@ body{
   color:var(--ink);min-height:100vh;padding-bottom:3rem;
 }
 
-/* ─── الشريط العلوي ─── */
+/* ─── الشريط العلوي (v2.2: مرتب، بدون شعار) ─── */
 .topbar{
   position:sticky;top:0;z-index:50;
   background:rgba(90,24,48,.97);backdrop-filter:blur(8px);
-  color:#fff;display:flex;align-items:center;gap:.6rem;
-  padding:.7rem 1rem;box-shadow:0 4px 18px rgba(0,0,0,.25);
+  color:#fff;display:flex;align-items:center;gap:.5rem;
+  flex-wrap:wrap;row-gap:.4rem;
+  padding:.65rem 1rem;box-shadow:0 4px 18px rgba(0,0,0,.25);
 }
-.topbar .brand{display:flex;align-items:center;gap:.5rem;min-width:0;}
-.topbar .brand img{width:40px;height:40px;border-radius:50%;border:2px solid var(--gold);object-fit:cover;}
+.topbar .brand{display:flex;align-items:center;min-width:0;}
 .topbar .brand b{font-size:.95rem;font-weight:900;display:block;line-height:1.2;}
-.topbar .brand small{color:var(--gold2);font-size:.7rem;font-weight:700;}
+.topbar .brand small{color:var(--gold2);font-size:.7rem;font-weight:700;display:block;}
 .topbar .spacer{flex:1;}
 .bell{
   position:relative;background:#ffffff14;border:1px solid #ffffff2b;
@@ -49,6 +49,19 @@ body{
   font-weight:900;font-size:.8rem;cursor:pointer;
 }
 .icon-btn.off{opacity:.5;}
+/* v2.2: زر اللغة المدمج في الهيدر */
+.lang-toggle{
+  display:inline-flex;background:#ffffff14;border:1px solid #ffffff2b;
+  border-radius:50px;padding:3px;gap:2px;
+}
+.lang-toggle button{
+  padding:.3rem .72rem;border-radius:50px;border:none;
+  background:transparent;color:#ffffffb0;
+  font-family:inherit;font-weight:900;font-size:.72rem;cursor:pointer;
+}
+.lang-toggle button.active{
+  background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--dark);
+}
 
 /* ─── الإحصائيات ─── */
 .stats{
@@ -125,7 +138,7 @@ body{
   border-bottom:1.5px dashed var(--gold);
 }
 
-/* v2.1: بطاقة الحوض */
+/* بطاقة الحوض */
 .pool-info{
   background:#e0f2fe;border:1.5px dashed #38bdf8;border-radius:12px;
   padding:.7rem .9rem;margin:.4rem 0;font-size:.82rem;font-weight:800;
@@ -176,17 +189,13 @@ body{
   #reportArea table{width:100%;border-collapse:collapse;font-size:12px;}
   #reportArea th,#reportArea td{border:1px solid #999;padding:6px;text-align:right;}
 }
-
-/* ─── زر اللغة: مساحة في الأعلى ─── */
-.topbar{padding-inline-end:7rem;}
 </style>
 </head>
 <body>
 
-<!-- ═══ الشريط العلوي ═══ -->
+<!-- ═══ الشريط العلوي (v2.2) ═══ -->
 <div class="topbar">
   <div class="brand">
-    <img src="img/logo.png" alt="مكرونجي">
     <div>
       <b id="supName">...</b>
       <small id="supBranch">...</small>
@@ -195,7 +204,11 @@ body{
   <div class="spacer"></div>
   <button class="bell" id="bellBtn">🔔 <span class="cnt" id="bellCnt" hidden>0</span></button>
   <button class="icon-btn" id="soundBtn" onclick="toggleSound()">🔊</button>
-  <button class="icon-btn" onclick="printReport()" data-t-title="supervisor.report.title">📄</button>
+  <button class="icon-btn" onclick="printReport()">📄</button>
+  <div class="lang-toggle">
+    <button id="langAr" class="active" onclick="pickLang('ar')">AR</button>
+    <button id="langEn" onclick="pickLang('en')">EN</button>
+  </div>
   <button class="icon-btn" onclick="logout()" data-t="common.logout">خروج 🚪</button>
 </div>
 
@@ -208,30 +221,25 @@ body{
 
 <div class="wrap">
 
-  <!-- ═══ طلبات جديدة ═══ -->
   <div class="sec-title">🔔 <span data-t="supervisor.sections.newOrders">طلبات جديدة</span> <span class="pill" id="cntNew">0</span></div>
   <div id="listNew"></div>
 
-  <!-- ═══ قيد التنفيذ ═══ -->
   <div class="sec-title">🍳 <span data-t="supervisor.sections.inProgress">قيد التنفيذ</span> <span class="pill" id="cntProg">0</span></div>
   <div id="listProgress"></div>
 
-  <!-- ═══ توصيلات نشطة ═══ -->
   <div class="sec-title">🚗 <span data-t="supervisor.sections.activeDelivery">توصيلات نشطة</span> <span class="pill" id="cntActive">0</span></div>
   <div id="listActive"></div>
 
-  <!-- ═══ سُلّم اليوم ═══ -->
   <div class="sec-title">✅ <span data-t="supervisor.sections.deliveredToday">سُلّم اليوم</span> <span class="pill" id="cntDone">0</span></div>
   <div id="listDone"></div>
 
 </div>
 
-<!-- ═══ منطقة التقرير ═══ -->
 <div id="reportArea"></div>
-
 <div id="toast"></div>
 
-<!-- ═══ نظام الترجمة المركزي ═══ -->
+<!-- بيانات الفروع (للأسماء الإنجليزية) + الترجمة المركزية -->
+<script src="settings.js"></script>
 <script src="i18n-staff.js"></script>
 
 <script>
@@ -264,6 +272,53 @@ let audioCtx = null;
   document.getElementById('supBranch').textContent = USER.branchName || '—';
   updateSoundBtn();
 })();
+
+/* ═══════════════════════════════════════════
+   v2.2: أدوات الترجمة الكاملة
+   ═══════════════════════════════════════════ */
+function pickLang(lang){ setStaffLang(lang); }
+function syncLangUI(){
+  const lang = getStaffLang();
+  document.getElementById('langAr').classList.toggle('active', lang === 'ar');
+  document.getElementById('langEn').classList.toggle('active', lang === 'en');
+  if (typeof applyStaffI18n === 'function') applyStaffI18n();
+}
+function cur(){ return tt('common.riyal'); }
+function isEn(){ return getStaffLang() === 'en'; }
+/* اسم الصنف حسب اللغة (الجديدة ثنائية، القديمة كما هي) */
+function itemNameL(i){
+  return (isEn() && i && i.name_en) ? i.name_en : (i ? i.name : '');
+}
+/* اسم الفرع حسب اللغة (من settings.js) */
+function brDisplayName(o){
+  if (isEn()) {
+    try {
+      const list = (window.APP_SETTINGS && APP_SETTINGS.branches) || [];
+      const b = list.find(x => (o.branch_id && x.id === o.branch_id) || (x.nameAr === o.branch_name));
+      if (b && b.nameEn) return b.nameEn;
+    } catch(e){}
+  }
+  return o.branch_name || '';
+}
+/* نص الحالة مترجماً (مع مراعاة الاستلام) */
+function statusLbl(o){
+  let k = o.status;
+  if (o.order_type === 'pickup') {
+    if (o.status === 'ready') k = 'ready_pickup';
+    if (o.status === 'delivered') k = 'delivered_pickup';
+  }
+  const t = tt('admin.statuses.' + k);
+  return (t && t !== ('admin.statuses.' + k)) ? t : (o.status_text || o.status);
+}
+/* تاريخ حسب اللغة */
+function fmtWhen(t){
+  if(!t) return '';
+  try{
+    const d = new Date(String(t).replace(' ', 'T'));
+    return d.toLocaleString(isEn() ? 'en-GB' : 'ar-SA',
+      {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
+  }catch(e){ return String(t).slice(0,16); }
+}
 
 /* ─── غلاف API ─── */
 async function api(path, opts = {}) {
@@ -321,7 +376,7 @@ function updateSoundBtn() {
   b.classList.toggle('off', !soundOn);
 }
 
-/* ─── تطبيع رقم الجوال لـ wa.me ─── */
+/* ─── واتساب ─── */
 function normalizePhone(p) {
   const d = (p || '').replace(/\D/g, '');
   if (d.startsWith('0')) return '966' + d.slice(1);
@@ -333,20 +388,7 @@ function waOpen(phone, msg) {
   const w = window.open(url, '_blank');
   if (!w) location.href = url;
 }
-
-/* ─── نوع الطلب ─── */
-function isPickup(o) { return o.order_type === 'pickup'; }
-function typeBadge(o) {
-  return isPickup(o)
-    ? '<span class="oc-type pickup">' + tt('supervisor.badges.pickup') + '</span>'
-    : '<span class="oc-type delivery">' + tt('supervisor.badges.delivery') + '</span>';
-}
-
-/* ═══════════════════════════════════════════
-   v2.1: الرسائل — عبر i18n-staff.js
-   ═══════════════════════════════════════════ */
-
-/* رسالة تأكيد الاستلام (تحل محل waVerify و waAccept) */
+/* رسالة تأكيد الاستلام المعتمدة */
 function waConfirm(o) {
   const msg = tt('messages.supConfirm', {
     customer_name: o.customer_name,
@@ -358,6 +400,14 @@ function waConfirm(o) {
   waOpen(o.customer_phone, msg);
 }
 
+/* ─── نوع الطلب ─── */
+function isPickup(o) { return o.order_type === 'pickup'; }
+function typeBadge(o) {
+  return isPickup(o)
+    ? '<span class="oc-type pickup">' + tt('supervisor.badges.pickup') + '</span>'
+    : '<span class="oc-type delivery">' + tt('supervisor.badges.delivery') + '</span>';
+}
+
 /* ─── تحميل البيانات ─── */
 async function loadAll(first) {
   try {
@@ -367,7 +417,6 @@ async function loadAll(first) {
     ]);
     DRIVERS = driversRes.drivers || [];
     LAST_ORDERS = ordersRes.orders || [];
-    /* v1.5: Worker يرجع الأسماء لو USER ناقص */
     if (!USER.branchName && ordersRes.branch_name) {
       USER.branchName = ordersRes.branch_name;
       try { localStorage.setItem('mk_staff_user', JSON.stringify(USER)); } catch(e){}
@@ -384,7 +433,7 @@ async function loadAll(first) {
   }
 }
 
-/* ─── العرض ─── */
+/* ─── العرض ── */
 function render(first) {
   const orders = LAST_ORDERS;
 
@@ -416,10 +465,9 @@ function render(first) {
   bellCnt.hidden = news.length === 0;
   bellCnt.textContent = news.length;
 
-  const today = orders;
-  document.getElementById('stOrders').textContent = today.length;
+  document.getElementById('stOrders').textContent = orders.length;
   document.getElementById('stRevenue').textContent =
-    today.filter(isDone).reduce((s, o) => s + o.total, 0);
+    dones.reduce((s, o) => s + o.total, 0);
   document.getElementById('stDrivers').textContent = DRIVERS.length;
 
   document.getElementById('listNew').innerHTML =
@@ -448,11 +496,11 @@ function cardNew(o) {
       ${typeBadge(o)}
       <span class="oc-cust">👤 ${o.customer_name}</span>
       <a class="oc-phone" href="tel:${o.customer_phone}">${o.customer_phone}</a>
-      <span class="oc-total">${o.total} ${tt('common.currency')}</span>
+      <span class="oc-total">${o.total} ${cur()}</span>
     </div>
     ${o.customer_address ? `<div class="oc-line"><span class="lbl">📍 ${tt('supervisor.labels.address')}:</span> ${o.customer_address}
       ${o.customer_lat ? `— <a class="map-link" target="_blank" href="https://www.google.com/maps?q=${o.customer_lat},${o.customer_lng}">${tt('supervisor.actions.viewMap')} 🗺️</a>` : ''}</div>` : ''}
-    <div class="oc-items">${o.items.map(i => `▪️ ${i.qty}× ${i.name}${i.size ? ' (' + i.size + ')' : ''} — ${i.qty * i.price} ${tt('common.currency')}`).join('<br>')}</div>
+    <div class="oc-items">${o.items.map(i => `▪️ ${i.qty}× ${itemNameL(i)}${i.size ? ' (' + i.size + ')' : ''} — ${i.qty * i.price} ${cur()}`).join('<br>')}</div>
     ${o.notes ? `<div class="oc-note">📝 ${o.notes}</div>` : ''}
     <div class="oc-line"><span class="lbl">💵 ${tt('supervisor.labels.payment')}:</span> ${isPickup(o) ? tt('supervisor.badges.payment.atCashier') : (o.payment_method === 'cod' ? tt('supervisor.badges.payment.cod') : tt('supervisor.badges.payment.card'))}</div>
     <div class="oc-actions">
@@ -463,7 +511,7 @@ function cardNew(o) {
   </div>`;
 }
 
-/* ─── بطاقة قيد التنفيذ (v2.1: الحوض التلقائي للتوصيل) ─── */
+/* ─── بطاقة قيد التنفيذ ─── */
 function cardProgress(o) {
   let actions = '';
   let poolInfo = '';
@@ -476,23 +524,21 @@ function cardProgress(o) {
     actions = `<button class="btn btn-gold" onclick="act(${o.id},'ready')">${isPickup(o) ? tt('supervisor.actions.readyForPickup') : tt('supervisor.actions.ready')}</button>`;
   } else if (o.status === 'ready') {
     if (isPickup(o)) {
-      /* استلام: زر تقفيل */
       actions = `
         <button class="btn btn-ok" onclick="act(${o.id},'delivered')">${tt('supervisor.actions.pickupFromBranch')}</button>
         <span class="oc-type pickup" style="align-self:center">${tt('supervisor.actions.pickupHint')} ${o.total} ${tt('supervisor.actions.atCashier')}</span>`;
     } else {
-      /* توصيل: الطلب في الحوض تلقائياً — السائقون يرونه */
       poolInfo = `
         <div class="pool-info">
           <div class="ico">📦</div>
           <div class="txt">
             <b>${tt('supervisor.actions.sendToPool').replace('📦 ', '')}</b>
-            <small>الطلب متاح لجميع سائقي الفرع — من يختاره أولاً يوصّله</small>
+            <small>${isEn() ? 'Available to all branch drivers — first to claim delivers it' : 'الطلب متاح لجميع سائقي الفرع — من يختاره أولاً يوصّله'}</small>
           </div>
           <button class="pool-toggle" onclick="togglePoolAssign(${o.id})">${tt('supervisor.actions.assignDriver')} ↴</button>
         </div>
         <div class="pool-assign-wrap" id="poolWrap-${o.id}">
-          <small>🔧 تعيين يدوي احتياطي (إذا كان السائق لا يستخدم التطبيق):</small>
+          <small>${isEn() ? '🔧 Manual fallback (driver without app):' : '🔧 تعيين يدوي احتياطي (سائق بدون التطبيق):'}</small>
           <div class="oc-actions">
             <select class="sel" id="drv-${o.id}">
               <option value="">${tt('supervisor.actions.chooseDriver')}</option>
@@ -509,15 +555,14 @@ function cardProgress(o) {
       <span class="oc-num">${o.number}</span>
       ${typeBadge(o)}
       <span class="oc-cust">👤 ${o.customer_name}</span>
-      <span class="oc-total">${o.total} ${tt('common.currency')}</span>
+      <span class="oc-total">${o.total} ${cur()}</span>
     </div>
-    <div class="oc-line"><span class="lbl">${tt('supervisor.labels.status')}:</span> ${o.status_text}</div>
+    <div class="oc-line"><span class="lbl">${tt('supervisor.labels.status')}:</span> ${statusLbl(o)}</div>
     ${poolInfo}
     ${actions ? `<div class="oc-actions">${actions}</div>` : ''}
   </div>`;
 }
 
-/* فتح/إغلاق قائمة التعيين اليدوي */
 function togglePoolAssign(id) {
   const w = document.getElementById('poolWrap-' + id);
   if (w) w.classList.toggle('show');
@@ -537,7 +582,7 @@ function cardActive(o) {
       ${o.driver_phone ? `<a class="oc-phone" href="tel:${o.driver_phone}">${o.driver_phone}</a>` : ''}
     </div>
     <div class="oc-line"><span class="lbl">👤 ${tt('supervisor.labels.customer')}:</span> ${o.customer_name} — <a class="oc-phone" href="tel:${o.customer_phone}">${o.customer_phone}</a></div>
-    <div class="oc-line"><span class="lbl">${tt('supervisor.labels.status')}:</span> ${o.status_text} ${mapLink}</div>
+    <div class="oc-line"><span class="lbl">${tt('supervisor.labels.status')}:</span> ${statusLbl(o)} ${mapLink}</div>
     <div class="oc-line"><a class="map-link" target="_blank" href="track.html?order=${encodeURIComponent(o.number)}">${tt('supervisor.actions.openTracking')}</a></div>
   </div>`;
 }
@@ -550,7 +595,7 @@ function cardDone(o) {
       <span class="oc-num">${o.number}</span>
       ${typeBadge(o)}
       <span class="oc-cust">👤 ${o.customer_name}</span>
-      <span class="oc-total">${o.total} ${tt('common.currency')}</span>
+      <span class="oc-total">${o.total} ${cur()}</span>
     </div>
     <div class="oc-line"><span class="lbl">🚗 ${tt('supervisor.labels.driver')}:</span> ${isPickup(o) ? tt('supervisor.badges.pickup') : (o.driver_name || '—')}</div>
   </div>`;
@@ -572,7 +617,7 @@ async function act(id, status) {
   }
 }
 
-/* ─── تعيين سائق يدوي (احتياط) ─── */
+/* ─── تعيين يدوي احتياطي ─── */
 async function assign(id) {
   const sel = document.getElementById('drv-' + id);
   const driverId = sel ? sel.value : '';
@@ -589,40 +634,39 @@ async function assign(id) {
   }
 }
 
-/* ─── تقرير قابل للطباعة ─── */
+/* ─── تقرير الطباعة (v2.2: توابع اللغة) ─── */
 function printReport() {
   const orders = LAST_ORDERS;
   const done = orders.filter(o => o.status === 'delivered');
   const revenue = done.reduce((s, o) => s + o.total, 0);
   const fees = done.reduce((s, o) => s + o.delivery_fee, 0);
-  const T = tt; // اختصار
 
   document.getElementById('reportArea').innerHTML = `
-    <h2>🍝 ${T('supervisor.report.title')} ${USER.branchName || ''}</h2>
-    <p>${T('supervisor.report.date')}: ${new Date().toLocaleString('ar-SA')}</p>
-    <p>${T('supervisor.report.totalOrders')}: ${orders.length} | ${T('supervisor.report.delivered')}: ${done.length} | ${T('supervisor.report.revenue')}: ${revenue} ${T('common.currency')} | ${T('supervisor.report.fees')}: ${fees} ${T('common.currency')}</p>
+    <h2>🍝 ${tt('supervisor.report.title')} ${brDisplayName(orders[0] || {}) || USER.branchName || ''}</h2>
+    <p>${tt('supervisor.report.date')}: ${new Date().toLocaleString(isEn() ? 'en-GB' : 'ar-SA')}</p>
+    <p>${tt('supervisor.report.totalOrders')}: ${orders.length} | ${tt('supervisor.report.delivered')}: ${done.length} | ${tt('supervisor.report.revenue')}: ${revenue} ${cur()} | ${tt('supervisor.report.fees')}: ${fees} ${cur()}</p>
     <table>
       <tr>
-        <th>${T('supervisor.report.columns.orderNum')}</th>
-        <th>${T('supervisor.report.columns.type')}</th>
-        <th>${T('supervisor.report.columns.customer')}</th>
-        <th>${T('supervisor.report.columns.phone')}</th>
-        <th>${T('supervisor.report.columns.total')}</th>
-        <th>${T('supervisor.report.columns.status')}</th>
-        <th>${T('supervisor.report.columns.driver')}</th>
+        <th>${tt('supervisor.report.columns.orderNum')}</th>
+        <th>${tt('supervisor.report.columns.type')}</th>
+        <th>${tt('supervisor.report.columns.customer')}</th>
+        <th>${tt('supervisor.report.columns.phone')}</th>
+        <th>${tt('supervisor.report.columns.total')}</th>
+        <th>${tt('supervisor.report.columns.status')}</th>
+        <th>${tt('supervisor.report.columns.driver')}</th>
       </tr>
       ${orders.map(o => `
         <tr>
           <td>${o.number}</td>
-          <td>${isPickup(o) ? 'استلام' : 'توصيل'}</td>
+          <td>${isPickup(o) ? (isEn()?'Pickup':'استلام') : (isEn()?'Delivery':'توصيل')}</td>
           <td>${o.customer_name}</td>
           <td>${o.customer_phone}</td>
           <td>${o.total}</td>
-          <td>${o.status_text}</td>
+          <td>${statusLbl(o)}</td>
           <td>${isPickup(o) ? '🏪' : (o.driver_name || '—')}</td>
         </tr>`).join('')}
     </table>
-    <p style="margin-top:1rem">${T('supervisor.report.savePdfHint')}</p>
+    <p style="margin-top:1rem">${tt('supervisor.report.savePdfHint')}</p>
   `;
   window.print();
 }
@@ -636,16 +680,19 @@ function logout() {
 }
 
 /* ─── الإقلاع ─── */
-initStaffI18n();
+initStaffI18n({ autoLangToggle: false }); /* الزر مدمج بالهيدر */
+syncLangUI();
+window.addEventListener('staff-lang-changed', function(){
+  syncLangUI();
+  render(false);
+});
 loadAll(true);
 setInterval(() => loadAll(false), REFRESH_MS);
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) loadAll(false);
 });
-/* مزامنة اللغة بين التبويبات */
-window.addEventListener('staff-lang-changed', () => loadAll(true));
 </script>
 
 </body>
 </html>
-<!-- ===== END supervisor.html (v2.1) ===== -->
+<!-- ===== END supervisor.html (v2.2) ===== -->
