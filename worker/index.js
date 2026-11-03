@@ -1,14 +1,17 @@
 // ═══════════════════════════════════════════
 //  مكرونجي - Cloudflare Worker API (كامل)
-//  الإصدار: 1.4
-//  v1.4: رقم طلب بدون # + صلاحية ready للمشرف
-//        + اعتذار السائق (driver_assigned → ready)
-//  يحتوي كل ميزات v1.3:
-//  • أرقام عشوائية غير مسلسلة (58392K)
+//  الإصدار: 1.5
+//  v1.5: حوض طلبات الفرع (pool) + استلام السائق (claim)
+//        + login يرجع اسم الفرع والموظف
+//        + السماح بطلبات بدون GPS (للاستلام)
+//  يحتوي كل ميزات v1.4:
+//  • أرقام عشوائية غير مسلسلة (58392K) بدون #
 //  • مساران: توصيل 🛵 / استلام من الفرع 🏪
 //  • إلغاء تلقائي للمهجور بعد ساعتين
 //  • حذف شهري لغير المسلّم (30 يوم)
 //  • حذف موظفين + حمايات المالك
+//  • صلاحية ready للمشرف
+//  • اعتذار السائق (driver_assigned → ready)
 // ═══════════════════════════════════════════
 
 const CORS_HEADERS = {
@@ -45,7 +48,7 @@ const STATUS_TRANSITIONS = {
   pending:              ['accepted', 'cancelled'],
   accepted:             ['preparing', 'cancelled'],
   preparing:            ['ready', 'cancelled'],
-  ready:                [],
+  ready:                [], // يتم التحكم بها ديناميكياً حسب order_type في allowedNext
   driver_assigned:      ['out_for_delivery', 'ready'],
   driver_at_restaurant: ['out_for_delivery'],
   out_for_delivery:     ['delivered'],
@@ -54,13 +57,13 @@ const STATUS_TRANSITIONS = {
   archived:             [],
 };
 
-// v1.4: أُضيفت صلاحية ready للمشرف (كانت ناقصة = سبب خطأ الصلاحية)
+// v1.5: إضافة المشرف لـ driver_assigned (للتعيين اليدوي كاحتياط)
 const STATUS_ROLES = {
   accepted:             ['supervisor', 'super_admin'],
   cancelled:            ['supervisor', 'super_admin'],
   preparing:            ['supervisor', 'super_admin'],
   ready:                ['supervisor', 'super_admin'],
-  driver_assigned:      ['driver', 'super_admin'],
+  driver_assigned:      ['supervisor', 'driver', 'super_admin'],
   driver_at_restaurant: ['driver', 'super_admin'],
   out_for_delivery:     ['driver', 'super_admin'],
   delivered:            ['driver', 'super_admin'],
@@ -70,9 +73,12 @@ const STATUS_ROLES = {
 // ───────────────────────────────────────────
 //  قواعد ديناميكية حسب نوع الطلب
 // ───────────────────────────────────────────
+// v1.5: ready → driver_assigned للتوصيل / delivered للاستلام
 function allowedNext(order) {
   if (order.status === 'ready') {
-    return order.order_type === 'pickup' ? ['delivered'] : [];
+    if (order.order_type === 'pickup')   return ['delivered'];
+    if (order.order_type === 'delivery') return ['driver_assigned'];
+    return [];
   }
   return STATUS_TRANSITIONS[order.status] || [];
 }
@@ -249,7 +255,7 @@ async function requireAuth(request, env, allowedRoles) {
 }
 
 // ═══════════════════════════════════════════
-//  1) تسجيل الدخول
+//  1) تسجيل الدخول (v1.5: name + branchName)
 // ═══════════════════════════════════════════
 async function handleLogin(request, env) {
   const ip = getIP(request);
@@ -267,6 +273,15 @@ async function handleLogin(request, env) {
 
   const valid = await verifyPassword(body.password, user.password_hash, user.password_salt);
   if (!valid) return error('بيانات الدخول غير صحيحة', 401);
+
+  // v1.5: جلب اسم الفرع (إن وُجد)
+  let branchName = null;
+  if (user.branch_id) {
+    const br = await env.DB.prepare(
+      'SELECT name_ar FROM branches WHERE id = ?'
+    ).bind(user.branch_id).first();
+    if (br) branchName = br.name_ar;
+  }
 
   const payload = {
     userId: user.id,
@@ -294,8 +309,12 @@ async function handleLogin(request, env) {
     token,
     sessionToken,
     user: {
-      id: user.id, name: user.name, username: user.username,
-      role: user.role, branchId: user.branch_id,
+      id: user.id,
+      name: user.name,           // v1.5
+      username: user.username,
+      role: user.role,
+      branchId: user.branch_id,
+      branchName: branchName,    // v1.5
       mustChangePassword: user.must_change_password === 1,
     },
   });
@@ -403,7 +422,7 @@ async function handleChangePassword(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  4) إنشاء طلب (توصيل أو استلام)
+//  4) إنشاء طلب (v1.5: يسمح بطلبات بدون GPS للاستلام)
 // ═══════════════════════════════════════════
 async function handleCreateOrder(request, env) {
   const ip = getIP(request);
@@ -455,6 +474,7 @@ async function handleCreateOrder(request, env) {
   const total = subtotal + deliveryFee;
   const orderNumber = await generateOrderNumber(env.DB);
 
+  // v1.5: السماح بطلبات بدون GPS (للاستلام أو عند رفض العميل)
   const customerLat = parseFloat(body.customer_lat) || null;
   const customerLng = parseFloat(body.customer_lng) || null;
   const customerAddress = orderType === 'delivery' ? sanitize(body.customer_address || '') : '';
@@ -554,7 +574,7 @@ async function handleTrackOrder(orderNumber, env) {
 }
 
 // ═══════════════════════════════════════════
-//  6) طلبات الفرع (المشرف)
+//  6) طلبات الفرع (المشرف) - v1.5: branch_name
 // ═══════════════════════════════════════════
 async function handleSupervisorOrders(request, env) {
   const auth = await requireAuth(request, env, ['supervisor', 'super_admin']);
@@ -563,9 +583,13 @@ async function handleSupervisorOrders(request, env) {
   const url = new URL(request.url);
   const statusFilter = url.searchParams.get('status');
 
+  // v1.5: JOIN branches لجلب branch_name
   let query = `
-    SELECT o.*, u.name as driver_name, u.phone as driver_phone
-    FROM orders o LEFT JOIN users u ON o.driver_id = u.id
+    SELECT o.*, u.name as driver_name, u.phone as driver_phone,
+           b.name_ar as branch_name
+    FROM orders o 
+    LEFT JOIN users u ON o.driver_id = u.id
+    JOIN branches b ON o.branch_id = b.id
     WHERE o.branch_id = ?
   `;
   const params = [auth.user.branch_id];
@@ -577,6 +601,7 @@ async function handleSupervisorOrders(request, env) {
   const orders = result.results.map(o => ({
     id: o.id, number: o.order_number,
     order_type: o.order_type || 'delivery',
+    branch_name: o.branch_name,   // v1.5
     customer_name: o.customer_name, customer_phone: o.customer_phone,
     customer_address: o.customer_address,
     customer_lat: o.customer_lat, customer_lng: o.customer_lng,
@@ -588,7 +613,12 @@ async function handleSupervisorOrders(request, env) {
     notes: o.notes, created_at: o.created_at,
   }));
 
-  return json({ orders, count: orders.length });
+  return json({
+    orders,
+    count: orders.length,
+    supervisor_name: auth.user.name,    // v1.5
+    branch_name: orders[0]?.branch_name || null  // v1.5
+  });
 }
 
 // ═══════════════════════════════════════════
@@ -608,7 +638,117 @@ async function handleSupervisorDrivers(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  8) توصيلات السائق (توصيل فقط)
+//  8) حوض طلبات الفرع (v1.5: pool) - للسائقين
+//     كل طلبات التوصيل الجاهزة وغير المعيّنة
+// ═══════════════════════════════════════════
+async function handleBranchPool(request, env) {
+  const auth = await requireAuth(request, env, ['driver', 'supervisor', 'super_admin']);
+  if (auth.error) return auth.error;
+
+  let branchId = auth.user.branch_id;
+  // المالك يرى كل الفروع (اختياري — للعرض فقط)
+  if (auth.user.role === 'super_admin') {
+    const url = new URL(request.url);
+    const qBranch = url.searchParams.get('branch_id');
+    if (qBranch) branchId = qBranch;
+    if (!branchId) {
+      return json({ orders: [], count: 0, driver_location: null });
+    }
+  }
+  if (!branchId) return json({ orders: [], count: 0, driver_location: null });
+
+  // طلبات التوصيل الجاهزة وغير المعيّنة
+  const result = await env.DB.prepare(`
+    SELECT o.*, b.name_ar as branch_name, b.lat as branch_lat, b.lng as branch_lng
+    FROM orders o
+    JOIN branches b ON o.branch_id = b.id
+    WHERE o.branch_id = ?
+      AND o.order_type = 'delivery'
+      AND o.status = 'ready'
+      AND o.driver_id IS NULL
+    ORDER BY o.created_at ASC
+    LIMIT 50
+  `).bind(branchId).all();
+
+  const orders = result.results.map(o => ({
+    id: o.id, number: o.order_number,
+    branch_name: o.branch_name,
+    branch_lat: o.branch_lat, branch_lng: o.branch_lng,
+    customer_name: o.customer_name, customer_phone: o.customer_phone,
+    customer_address: o.customer_address,
+    customer_lat: o.customer_lat, customer_lng: o.customer_lng,
+    items: JSON.parse(o.items_json),
+    subtotal: o.subtotal, delivery_fee: o.delivery_fee, total: o.total,
+    payment_method: o.payment_method,
+    notes: o.notes, created_at: o.created_at,
+  }));
+
+  // آخر موقع للسائق (إن وُجد) — لحساب الأقرب لاحقاً في السائق
+  let driverLocation = null;
+  if (auth.user.role === 'driver') {
+    const loc = await env.DB.prepare(`
+      SELECT lat, lng, created_at FROM driver_locations
+      WHERE driver_id = ? ORDER BY created_at DESC LIMIT 1
+    `).bind(auth.user.id).first();
+    if (loc) driverLocation = { lat: loc.lat, lng: loc.lng, at: loc.created_at };
+  }
+
+  return json({
+    orders,
+    count: orders.length,
+    branch_id: branchId,
+    driver_location: driverLocation
+  });
+}
+
+// ═══════════════════════════════════════════
+//  9) استلام السائق للطلب (v1.5: claim)
+//     حماية من التعارض عبر WHERE condition
+// ═══════════════════════════════════════════
+async function handleClaim(orderId, request, env) {
+  const auth = await requireAuth(request, env, ['driver']);
+  if (auth.error) return auth.error;
+
+  // تحقق أن الطلب جاهز وغير معيّن وفي فرع السائق
+  const order = await env.DB.prepare(`
+    SELECT * FROM orders WHERE id = ?
+  `).bind(orderId).first();
+  if (!order) return error('الطلب غير موجود', 404);
+  if (order.branch_id !== auth.user.branch_id) return error('الطلب ليس من فرعك', 403);
+  if (order.order_type !== 'delivery') return error('طلبات الاستلام لا تحتاج سائقاً', 409);
+  if (order.status !== 'ready') return error('الطلب لم يعد جاهزاً للتعيين', 409);
+  if (order.driver_id !== null) return error('الطلب مُسند لسائق آخر', 409);
+
+  // التحديث الذري: يتم فقط لو الطلب لا يزال متاحاً
+  const result = await env.DB.prepare(`
+    UPDATE orders 
+    SET status = 'driver_assigned', driver_id = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ? 
+      AND status = 'ready' 
+      AND driver_id IS NULL 
+      AND order_type = 'delivery'
+  `).bind(auth.user.id, orderId).run();
+
+  if (result.meta.changes === 0) {
+    return error('الطلب لم يعد متاحاً — استلمه سائق آخر', 409);
+  }
+
+  await env.DB.prepare(`
+    INSERT INTO order_tracking (order_id, status, notes) 
+    VALUES (?, 'driver_assigned', ?)
+  `).bind(orderId, `تم تعيين السائق: ${auth.user.name}`).run();
+
+  return json({
+    success: true,
+    order_id: orderId,
+    order_number: order.order_number,
+    driver_id: auth.user.id,
+    driver_name: auth.user.name,
+  });
+}
+
+// ═══════════════════════════════════════════
+//  10) توصيلات السائق (توصيل فقط)
 // ═══════════════════════════════════════════
 async function handleDriverOrders(request, env) {
   const auth = await requireAuth(request, env, ['driver']);
@@ -648,7 +788,7 @@ async function handleDriverOrders(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  9) تغيير حالة الطلب (قواعد حسب النوع)
+//  11) تغيير حالة الطلب (قواعد حسب النوع)
 // ═══════════════════════════════════════════
 async function handleUpdateStatus(orderId, request, env) {
   const auth = await requireAuth(request, env, null);
@@ -699,7 +839,7 @@ async function handleUpdateStatus(orderId, request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  10) تعيين سائق (توصيل فقط)
+//  12) تعيين سائق يدوياً (توصيل فقط - للمشرف كاحتياط)
 // ═══════════════════════════════════════════
 async function handleAssignDriver(orderId, request, env) {
   const auth = await requireAuth(request, env, ['supervisor', 'super_admin']);
@@ -738,7 +878,7 @@ async function handleAssignDriver(orderId, request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  11) موقع السائق
+//  13) موقع السائق (v1.5: مستمر طوال الجلسة)
 // ═══════════════════════════════════════════
 async function handleDriverLocation(request, env) {
   const auth = await requireAuth(request, env, ['driver']);
@@ -747,34 +887,51 @@ async function handleDriverLocation(request, env) {
   const body = await request.json().catch(() => null);
   if (!body) return error('بيانات ناقصة');
 
-  const orderId = parseInt(body.order_id);
+  const orderId = body.order_id ? parseInt(body.order_id) : null;
   const lat = parseFloat(body.lat);
   const lng = parseFloat(body.lng);
   const speed = parseFloat(body.speed) || 0;
   const heading = parseFloat(body.heading) || 0;
 
-  if (!orderId || !isFinite(lat) || !isFinite(lng)) return error('إحداثيات غير صالحة');
+  if (!isFinite(lat) || !isFinite(lng)) return error('إحداثيات غير صالحة');
 
-  const order = await env.DB.prepare(`
-    SELECT * FROM orders WHERE id = ? AND driver_id = ? AND order_type = 'delivery'
-      AND status IN ('driver_assigned','driver_at_restaurant','out_for_delivery')
-  `).bind(orderId, auth.user.id).first();
-  if (!order) return error('لا يوجد توصيل نشط بهذا الرقم', 404);
+  // v1.5: السماح بتحديث الموقع حتى بدون طلب نشط
+  // (لحساب الأقرب في الحوض)
+  if (orderId) {
+    const order = await env.DB.prepare(`
+      SELECT * FROM orders WHERE id = ? AND driver_id = ? AND order_type = 'delivery'
+        AND status IN ('driver_assigned','driver_at_restaurant','out_for_delivery')
+    `).bind(orderId, auth.user.id).first();
 
-  await env.DB.prepare(`
-    INSERT INTO driver_locations (order_id, driver_id, lat, lng, speed, heading)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).bind(orderId, auth.user.id, lat, lng, speed, heading).run();
+    if (order) {
+      await env.DB.prepare(`
+        INSERT INTO driver_locations (order_id, driver_id, lat, lng, speed, heading)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).bind(orderId, auth.user.id, lat, lng, speed, heading).run();
 
-  await env.DB.prepare(
-    'UPDATE orders SET driver_lat = ?, driver_lng = ? WHERE id = ?'
-  ).bind(lat, lng, orderId).run();
+      await env.DB.prepare(
+        'UPDATE orders SET driver_lat = ?, driver_lng = ? WHERE id = ?'
+      ).bind(lat, lng, orderId).run();
+    } else {
+      // v1.5: حفظ الموقع بدون order_id (للاستخدام في pool)
+      await env.DB.prepare(`
+        INSERT INTO driver_locations (order_id, driver_id, lat, lng, speed, heading)
+        VALUES (NULL, ?, ?, ?, ?, ?)
+      `).bind(auth.user.id, lat, lng, speed, heading).run();
+    }
+  } else {
+    // v1.5: حفظ الموقع بدون order_id
+    await env.DB.prepare(`
+      INSERT INTO driver_locations (order_id, driver_id, lat, lng, speed, heading)
+      VALUES (NULL, ?, ?, ?, ?, ?)
+    `).bind(auth.user.id, lat, lng, speed, heading).run();
+  }
 
   return json({ success: true, received_at: new Date().toISOString() });
 }
 
 // ═══════════════════════════════════════════
-//  12) صورة التسليم (توصيل فقط)
+//  14) صورة التسليم (توصيل فقط)
 // ═══════════════════════════════════════════
 async function handleUploadPhoto(orderId, request, env) {
   const auth = await requireAuth(request, env, ['driver', 'super_admin']);
@@ -817,7 +974,7 @@ async function handleUploadPhoto(orderId, request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  13) كل الطلبات (المالك) + فلاتر
+//  15) كل الطلبات (المالك) + فلاتر
 // ═══════════════════════════════════════════
 async function handleAdminOrders(request, env) {
   const auth = await requireAuth(request, env, ['super_admin']);
@@ -869,7 +1026,7 @@ async function handleAdminOrders(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  14) إدارة المستخدمين + حذف + حمايات
+//  16) إدارة المستخدمين + حذف + حمايات
 // ═══════════════════════════════════════════
 async function handleAdminUsersList(request, env) {
   const auth = await requireAuth(request, env, ['super_admin']);
@@ -1003,7 +1160,7 @@ async function handleAdminUsersReset(userId, request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  15) التقارير والإحصائيات
+//  17) التقارير والإحصائيات
 // ═══════════════════════════════════════════
 async function handleReportsSummary(request, env) {
   const auth = await requireAuth(request, env, ['super_admin', 'supervisor']);
@@ -1105,7 +1262,7 @@ export default {
 
     try {
       if (path === '/api/health' && request.method === 'GET') {
-        return json({ status: 'ok', version: '1.4', live_mode: env.LIVE_MODE || 'polling' });
+        return json({ status: 'ok', version: '1.5', live_mode: env.LIVE_MODE || 'polling' });
       }
 
       if (path === '/api/auth/login' && request.method === 'POST') return await handleLogin(request, env);
@@ -1116,6 +1273,9 @@ export default {
       if (path.startsWith('/api/track/') && request.method === 'GET') {
         return await handleTrackOrder(decodeURIComponent(path.split('/').pop()), env);
       }
+
+      // v1.5: حوض طلبات الفرع
+      if (path === '/api/branch/pool' && request.method === 'GET') return await handleBranchPool(request, env);
 
       if (path === '/api/supervisor/orders' && request.method === 'GET') return await handleSupervisorOrders(request, env);
       if (path === '/api/supervisor/drivers' && request.method === 'GET') return await handleSupervisorDrivers(request, env);
@@ -1128,6 +1288,10 @@ export default {
 
       m = path.match(/^\/api\/orders\/(\d+)\/assign$/);
       if (m && request.method === 'PUT') return await handleAssignDriver(parseInt(m[1]), request, env);
+
+      // v1.5: استلام السائق للطلب
+      m = path.match(/^\/api\/orders\/(\d+)\/claim$/);
+      if (m && request.method === 'POST') return await handleClaim(parseInt(m[1]), request, env);
 
       m = path.match(/^\/api\/orders\/(\d+)\/photo$/);
       if (m && request.method === 'POST') return await handleUploadPhoto(parseInt(m[1]), request, env);
@@ -1194,7 +1358,6 @@ export default {
           )
         `).run();
 
-        // حذف غير المسلّم الأقدم من 30 يوماً + اليتيمة
         await env.DB.prepare(`
           DELETE FROM orders
           WHERE status NOT IN ('delivered','archived')
@@ -1207,7 +1370,6 @@ export default {
           'DELETE FROM driver_locations WHERE order_id NOT IN (SELECT id FROM orders)'
         ).run();
 
-        // نسخ احتياطي يومي
         const [orders, users, branches, tracking] = await Promise.all([
           env.DB.prepare('SELECT * FROM orders').all(),
           env.DB.prepare('SELECT id, name, phone, username, role, branch_id, is_active FROM users').all(),
@@ -1242,5 +1404,5 @@ export default {
 };
 
 // ═══════════════════════════════════════════
-//  نهاية worker/index.js (v1.4)
+//  نهاية worker/index.js (v1.5)
 // ═══════════════════════════════════════════
