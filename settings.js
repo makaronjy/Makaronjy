@@ -569,5 +569,9 @@ window.APP_SETTINGS = {
       "provider": "moyasar",
       "publishableKey": ""
     }
+  },
+  "deliveryAvailability": {
+    "mode": "none",
+    "branchIds": []
   }
 };
