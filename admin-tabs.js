@@ -1,5 +1,5 @@
-/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v9.3) ===== */
-/* v9.3: بطاقة "توفر خدمة التوصيل" داخل الإعدادات (بدون ملف جديد) */
+/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v9.4) ===== */
+/* v9.4: تبويب التقارير المحاسبية الكامل (دفتر + ضريبة 15% + CSV + PDF) */
 
 function nmOf(x){
 return (ALANG===`ar`) ? x.ar : (x.en || x.ar);
@@ -1351,7 +1351,7 @@ const APP_IMGS = [
 ];
 const imgPending = {};
 let imgRenderStamp = Date.now();
-/* v9.3: نشر إعداد توفر التوصيل */
+/* نشر إعداد توفر التوصيل */
 async function publishAvail(btn){
 var mode = el(`availMode`).value;
 var ids = Array.prototype.slice
@@ -1400,7 +1400,6 @@ pendBtns +
 `<input type="file" accept="image/png,image/jpeg,image/webp" hidden data-ifile="` + im.key + `">` +
 `</div>`;
 }).join(``);
-/* v9.3: بطاقة توفر التوصيل */
 var da = s.deliveryAvailability || { mode:`all`, branchIds: [] };
 if(da.mode!==`all` && da.mode!==`none` && da.mode!==`selected`) da.mode = `all`;
 if(!Array.isArray(da.branchIds)) da.branchIds = [];
@@ -1459,7 +1458,6 @@ var b = e.target.closest(`button[data-iact]`);
 if(!b) return;
 var key = b.dataset.img;
 var act = b.dataset.iact;
-/* v9.3: نشر توفر التوصيل */
 if(act === `availPublish`){ publishAvail(b); return; }
 var meta = APP_IMGS.find(function(x){
 return x.key===key;
@@ -1502,7 +1500,6 @@ toast(L(`imgUploadFailApp`)+err.message, `error`);
 })(); }
 });
 el(`settingsForm`).addEventListener(`change`, function(e){
-/* v9.3: تبديل وضع توفر التوصيل */
 if(e.target && e.target.id === `availMode`){
 var m = e.target.value;
 el(`availBranchWrap`).style.display =
@@ -1788,7 +1785,7 @@ async function loadUsersTab(){
 }
 
 /* =====================================================
-   v9.2: تبويب الطلبات (مع عمود النوع + فلتر)
+   v9.2: تبويب الطلبات
    ===================================================== */
 function buildOrdersTab(){
   var sec = el(`tab-cloud-orders`);
@@ -1895,73 +1892,226 @@ async function loadOrdersTab(){
 }
 
 /* =====================================================
-   v9.2: تبويب التقارير
+   v9.4: تبويب التقارير المحاسبية (دفتر دائم + ضريبة 15%)
    ===================================================== */
+let LAST_ACCT = null;
+
+function arEn(ar, en){ return (ALANG===`ar`) ? ar : en; }
+function money(v){ return Math.round((+v||0)*100)/100; }
+function stat(v, label){ return `<div class="cl-stat"><b>` + v + `</b><small>` + label + `</small></div>`; }
+function table(title, heads, rows){
+  return `<h4 style="margin:1rem 0 .5rem;color:var(--brown);font-weight:900">` + title + `</h4>` +
+    `<table class="cl-tbl"><tr>` + heads.map(h=>`<th>`+h+`</th>`).join(``) + `</tr>` +
+    rows.map(r=>`<tr>` + r.map(c=>`<td>`+c+`</td>`).join(``) + `</tr>`).join(``) + `</table>`;
+}
+function computeRange(){
+  const preset = el(`crPreset`).value;
+  const now = new Date();
+  const p2 = n => String(n).padStart(2,'0');
+  const today = now.getFullYear()+`-`+p2(now.getMonth()+1)+`-`+p2(now.getDate());
+  if(preset===`today`) return {from:today, to:today};
+  if(preset===`thisMonth`) return {from: today.slice(0,8)+`01`, to: today};
+  if(preset===`lastMonth`){
+    const d = new Date(now.getFullYear(), now.getMonth()-1, 1);
+    const last = new Date(now.getFullYear(), now.getMonth(), 0);
+    return {from: d.getFullYear()+`-`+p2(d.getMonth()+1)+`-01`,
+            to:   d.getFullYear()+`-`+p2(d.getMonth()+1)+`-`+p2(last.getDate())};
+  }
+  if(preset===`thisYear`) return {from: now.getFullYear()+`-01-01`, to: today};
+  if(preset===`month`){
+    const mv = el(`crMonth`).value || today.slice(0,7);
+    const y = +mv.slice(0,4), mo = +mv.slice(5,7);
+    const last = new Date(y, mo, 0).getDate();
+    return {from: mv+`-01`, to: mv+`-`+p2(last)};
+  }
+  if(preset===`year`){
+    const y = el(`crYear`).value || now.getFullYear();
+    return {from: y+`-01-01`, to: y+`-12-31`};
+  }
+  return {from: el(`crFrom`).value || (today.slice(0,8)+`01`), to: el(`crTo`).value || today};
+}
+function syncRangeInputs(){
+  const v = el(`crPreset`).value;
+  el(`crMonthWrap`).style.display = (v===`month`) ? `` : `none`;
+  el(`crYearWrap`).style.display  = (v===`year`)  ? `` : `none`;
+  el(`crFromWrap`).style.display  = (v===`custom`)? `` : `none`;
+  el(`crToWrap`).style.display    = (v===`custom`)? `` : `none`;
+}
 function buildReportsTab(){
   var sec = el(`tab-cloud-reports`);
   if(!sec) return;
   if(!STATE) return;
   var brs = branches();
   var brOpts = `<option value="">` + L(`ordersAllBranches`) + `</option>` +
-    brs.map(function(b){
-      return `<option value="` + esc(b.id) + `">` + esc(brName(b)) + `</option>`;
-    }).join(``);
+    brs.map(function(b){ return `<option value="` + esc(b.id) + `">` + esc(brName(b)) + `</option>`; }).join(``);
   sec.innerHTML =
     `<div class="cl-card">` +
-      `<h3>` + L(`reportsTitle`) + `</h3>` +
+      `<h3>📊 ` + arEn(`التقارير المحاسبية`,`Accounting Reports`) + `</h3>` +
       `<div class="cl-row">` +
-        `<div class="cl-f"><label>` + L(`reportsPeriod`) + `</label><select id="crPeriod">` +
-          `<option value="today">` + L(`reportsToday`) + `</option>` +
-          `<option value="week">` + L(`reportsWeek`) + `</option>` +
-          `<option value="month">` + L(`reportsMonth`) + `</option>` +
+        `<div class="cl-f"><label>` + arEn(`الفترة`,`Period`) + `</label><select id="crPreset">` +
+          `<option value="thisMonth">` + arEn(`هذا الشهر`,`This month`) + `</option>` +
+          `<option value="lastMonth">` + arEn(`الشهر الماضي`,`Last month`) + `</option>` +
+          `<option value="thisYear">` + arEn(`هذه السنة`,`This year`) + `</option>` +
+          `<option value="today">` + arEn(`اليوم`,`Today`) + `</option>` +
+          `<option value="month">` + arEn(`شهر محدد`,`Specific month`) + `</option>` +
+          `<option value="year">` + arEn(`سنة محددة`,`Specific year`) + `</option>` +
+          `<option value="custom">` + arEn(`مدى مخصص`,`Custom range`) + `</option>` +
         `</select></div>` +
-        `<div class="cl-f"><label>` + L(`ordersBranch`) + `</label><select id="crBranch">` + brOpts + `</select></div>` +
-        `<button class="cl-btn cl-add" id="crGo" style="align-self:flex-end">` + L(`reportsShow`) + `</button>` +
+        `<div class="cl-f" id="crMonthWrap" style="display:none"><label>` + arEn(`الشهر`,`Month`) + `</label><input type="month" id="crMonth"></div>` +
+        `<div class="cl-f" id="crYearWrap" style="display:none"><label>` + arEn(`السنة`,`Year`) + `</label><input type="number" id="crYear" min="2020" max="2040" value="` + new Date().getFullYear() + `"></div>` +
+        `<div class="cl-f" id="crFromWrap" style="display:none"><label>` + arEn(`من`,`From`) + `</label><input type="date" id="crFrom"></div>` +
+        `<div class="cl-f" id="crToWrap" style="display:none"><label>` + arEn(`إلى`,`To`) + `</label><input type="date" id="crTo"></div>` +
+        `<div class="cl-f"><label>` + L(`ordersBranch`) + `</label><select id="crBranch2">` + brOpts + `</select></div>` +
+        `<button class="cl-btn cl-add" id="crGo" style="align-self:flex-end">` + arEn(`📊 عرض`,`📊 Show`) + `</button>` +
+        `<button class="cl-btn cl-plain" id="crCsv" style="align-self:flex-end">⬇ CSV</button>` +
+        `<button class="cl-btn cl-plain" id="crPrint" style="align-self:flex-end">🖨 PDF</button>` +
       `</div>` +
-      `<div id="crBox" style="margin-top:.8rem"></div>` +
+      `<div id="crBox" style="margin-top:.9rem"></div>` +
     `</div>`;
-  var goBtn = el(`crGo`);
-  if(goBtn) goBtn.addEventListener(`click`, loadReportsTab);
+  el(`crPreset`).addEventListener(`change`, syncRangeInputs);
+  el(`crGo`).addEventListener(`click`, loadReportsTab);
+  el(`crCsv`).addEventListener(`click`, exportCsv);
+  el(`crPrint`).addEventListener(`click`, printAcct);
+  syncRangeInputs();
 }
-
 async function loadReportsTab(){
   var box = el(`crBox`);
   if(!box) return;
-  var q = `/api/reports/summary?period=` + (el(`crPeriod`) ? el(`crPeriod`).value : `today`);
-  var b = el(`crBranch`) ? el(`crBranch`).value : ``;
+  const range = computeRange();
+  let q = `/api/reports/accounting?from=` + range.from + `&to=` + range.to;
+  const b = el(`crBranch2`) ? el(`crBranch2`).value : ``;
   if(b) q += `&branch_id=` + encodeURIComponent(b);
+  box.innerHTML = `<div class="cl-empty">` + L(`publishing`) + `</div>`;
   try{
     if(!CLOUD_JWT) await cloudBridge();
-    var d = await capi(q);
-    var t = d.totals || {};
-    var html = `<div class="cl-stats">` +
-      `<div class="cl-stat"><b>` + (t.total_orders || 0) + `</b><small>` + L(`reportsTotal`) + `</small></div>` +
-      `<div class="cl-stat"><b>` + (t.delivered || 0) + `</b><small>` + L(`reportsDelivered`) + `</small></div>` +
-      `<div class="cl-stat"><b>` + (t.pickup_delivered || 0) + `</b><small>🏪 ` + ((ALANG===`ar`)?`استلام مسلّم`:`Pickup`) + `</small></div>` +
-      `<div class="cl-stat"><b>` + (t.delivery_delivered || 0) + `</b><small>🛵 ` + ((ALANG===`ar`)?`توصيل مسلّم`:`Delivery`) + `</small></div>` +
-      `<div class="cl-stat"><b>` + (t.cancelled || 0) + `</b><small>` + L(`reportsCancelled`) + `</small></div>` +
-      `<div class="cl-stat"><b>` + (t.revenue || 0) + `</b><small>` + L(`reportsRevenue`) + `</small></div>` +
-      `<div class="cl-stat"><b>` + (t.avg_order || 0) + `</b><small>` + L(`reportsAvg`) + `</small></div>` +
-    `</div>`;
-    if(d.drivers && d.drivers.length){
-      html += `<h4 style="margin-top:1rem;color:var(--brown);font-weight:900">` + L(`reportsDriverPerf`) + `</h4>` +
-        `<table class="cl-tbl"><tr>` +
-          `<th>` + L(`reportsDriverName`) + `</th>` +
-          `<th>` + L(`reportsDeliveries`) + `</th>` +
-          `<th>` + L(`reportsEarnings`) + `</th>` +
-        `</tr>` +
-        d.drivers.map(function(x){
-          return `<tr>` +
-            `<td>` + esc(x.driver_name) + `</td>` +
-            `<td>` + x.deliveries + `</td>` +
-            `<td>` + x.earnings + `</td>` +
-          `</tr>`;
-        }).join(``) + `</table>`;
-    }
-    box.innerHTML = html;
+    const d = await capi(q);
+    LAST_ACCT = { from: range.from, to: range.to, data: d };
+    renderAcct(d, box);
   }catch(err){
     box.innerHTML = `<div class="cl-empty">⚠️ ` + esc(err.message) + `</div>`;
   }
+}
+function renderAcct(d, box){
+  const t = d.totals || {};
+  const gross = money(t.gross), fees = money(t.fees);
+  const net = money(gross / 1.15), vat = money(gross - net);
+  let html = `<div class="cl-stats">` +
+    stat(t.orders||0,        arEn(`إجمالي الطلبات`,`Total orders`)) +
+    stat(t.delivered||0,     arEn(`مسلّمة ✅`,`Delivered ✅`)) +
+    stat(t.cancelled||0,     arEn(`ملغية ❌`,`Cancelled ❌`)) +
+    stat(t.abandoned||0,     arEn(`مهجورة 🌙`,`Abandoned 🌙`)) +
+    stat(gross,              arEn(`الإيراد شامل الضريبة`,`Gross revenue`)) +
+    stat(net,                arEn(`الصافي قبل الضريبة`,`Net (excl. VAT)`)) +
+    stat(vat,                arEn(`ضريبة القيمة 15%`,`VAT 15%`)) +
+    stat(fees,               arEn(`رسوم توصيل`,`Delivery fees`)) +
+    stat(t.avg||0,           arEn(`متوسط الطلب`,`Avg order`)) +
+    stat((t.cancel_rate||0)+`%`, arEn(`معدل الإلغاء`,`Cancel rate`)) +
+    stat(money(t.pickup_gross),  arEn(`إيراد استلام 🏪`,`Pickup revenue`)) +
+    stat(money(t.delivery_gross),arEn(`إيراد توصيل 🛵`,`Delivery revenue`)) +
+  `</div>`;
+  const months = d.months || [];
+  if(months.length){
+    const max = Math.max.apply(null, months.map(m=>+m.gross||0).concat([1]));
+    html += `<h4 style="margin:1rem 0 .5rem;color:var(--brown);font-weight:900">` + arEn(`📊 الإيراد الشهري`,`📊 Monthly revenue`) + `</h4>` +
+      `<div style="display:flex;gap:.4rem;align-items:flex-end;height:160px;background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:.6rem">` +
+      months.map(function(m){
+        const h = Math.max(6, Math.round((+m.gross||0)/max*115));
+        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:.2rem">` +
+          `<small style="font-size:.6rem;font-weight:900;color:var(--brown)">` + money(m.gross) + `</small>` +
+          `<div style="width:100%;max-width:34px;height:` + h + `px;background:linear-gradient(180deg,var(--gold),var(--gold2));border-radius:6px 6px 0 0"></div>` +
+          `<small style="font-size:.58rem;font-weight:800;color:var(--muted)">` + m.ym.slice(5) + `/` + m.ym.slice(2,4) + `</small>` +
+        `</div>`;
+      }).join(``) + `</div>`;
+    html += table(arEn(`📅 تفاصيل الأشهر`,`📅 Month details`),
+      [arEn(`الشهر`,`Month`), arEn(`طلبات`,`Orders`), arEn(`مسلّمة`,`Delivered`), arEn(`ملغية`,`Cancelled`), arEn(`مهجورة`,`Abandoned`), arEn(`الإيراد`,`Gross`), arEn(`الضريبة`,`VAT`)],
+      months.map(function(m){
+        const g = money(m.gross);
+        return [m.ym, m.orders, m.delivered, m.cancelled, m.abandoned, g, money(g - g/1.15)];
+      }));
+  }
+  if((d.drivers||[]).length){
+    html += table(arEn(`🚗 أداء السائقين`,`🚗 Driver performance`),
+      [arEn(`السائق`,`Driver`), arEn(`توصيلات`,`Deliveries`), arEn(`أرباح`,`Earnings`)],
+      d.drivers.map(function(x){ return [esc(x.driver_name), x.deliveries, money(x.earnings)]; }));
+  }
+  if((d.branches||[]).length){
+    html += table(arEn(`🏪 أداء الفروع`,`🏪 Branch performance`),
+      [arEn(`الفرع`,`Branch`), arEn(`طلبات`,`Orders`), arEn(`مسلّمة`,`Delivered`), arEn(`الإيراد`,`Gross`)],
+      d.branches.map(function(x){ return [esc(ALANG===`ar` ? x.branch_name : x.branch_name_en), x.orders, x.delivered, money(x.gross)]; }));
+  }
+  if((d.top_items||[]).length){
+    html += table(arEn(`🍝 الأكثر مبيعاً`,`🍝 Top items`),
+      [arEn(`الصنف`,`Item`), arEn(`كمية`,`Qty`), arEn(`إيراد`,`Revenue`)],
+      d.top_items.map(function(x){ return [esc(ALANG===`ar` ? (x.name_ar||x.name_en) : (x.name_en||x.name_ar)), x.qty, money(x.revenue)]; }));
+  }
+  html += `<div style="text-align:center;color:var(--muted);font-size:.68rem;font-weight:800;margin-top:.8rem">` +
+    arEn(`الفترة: `,`Period: `) + d.from + ` → ` + d.to + ` • ` +
+    arEn(`الإيراد يُحتسب بتاريخ التسليم`,`Revenue recognized on delivery date`) + `</div>`;
+  box.innerHTML = html;
+}
+function exportCsv(){
+  if(!LAST_ACCT){ toast(arEn(`اعرض التقرير أولاً`,`Show a report first`), `warn`); return; }
+  const d = LAST_ACCT.data, t = d.totals||{};
+  const gross = money(t.gross), net = money(gross/1.15), vat = money(gross-net);
+  const R = [];
+  R.push([arEn(`تقرير مكرونجي المحاسبي`,`Makaronjy accounting report`)]);
+  R.push([arEn(`الفترة`,`Period`), LAST_ACCT.from, LAST_ACCT.to]);
+  R.push([]);
+  R.push([arEn(`المؤشر`,`Metric`), arEn(`القيمة`,`Value`)]);
+  R.push([arEn(`إجمالي الطلبات`,`Total orders`), t.orders||0]);
+  R.push([arEn(`مسلّمة`,`Delivered`), t.delivered||0]);
+  R.push([arEn(`ملغية`,`Cancelled`), t.cancelled||0]);
+  R.push([arEn(`مهجورة`,`Abandoned`), t.abandoned||0]);
+  R.push([arEn(`الإيراد شامل الضريبة`,`Gross revenue`), gross]);
+  R.push([arEn(`الصافي قبل الضريبة`,`Net (excl. VAT)`), net]);
+  R.push([arEn(`ضريبة القيمة 15%`,`VAT 15%`), vat]);
+  R.push([arEn(`رسوم توصيل`,`Delivery fees`), money(t.fees)]);
+  R.push([arEn(`متوسط الطلب`,`Avg order`), t.avg||0]);
+  R.push([arEn(`معدل الإلغاء %`,`Cancel rate %`), t.cancel_rate||0]);
+  R.push([arEn(`إيراد استلام`,`Pickup revenue`), money(t.pickup_gross)]);
+  R.push([arEn(`إيراد توصيل`,`Delivery revenue`), money(t.delivery_gross)]);
+  R.push([]);
+  R.push([arEn(`الشهر`,`Month`), arEn(`طلبات`,`Orders`), arEn(`مسلّمة`,`Delivered`), arEn(`ملغية`,`Cancelled`), arEn(`مهجورة`,`Abandoned`), arEn(`الإيراد`,`Gross`), arEn(`رسوم`,`Fees`)]);
+  (d.months||[]).forEach(function(m){ R.push([m.ym, m.orders, m.delivered, m.cancelled, m.abandoned, money(m.gross), money(m.fees)]); });
+  const csv = '\uFEFF' + R.map(function(r){ return r.join(`,`); }).join(`\n`);
+  const blob = new Blob([csv], {type:`text/csv;charset=utf-8`});
+  const a = document.createElement(`a`);
+  a.href = URL.createObjectURL(blob);
+  a.download = `makaronjy-report-` + LAST_ACCT.from + `-` + LAST_ACCT.to + `.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast(arEn(`تم تصدير CSV ✔`,`CSV exported ✔`), `success`);
+}
+function printAcct(){
+  if(!LAST_ACCT){ toast(arEn(`اعرض التقرير أولاً`,`Show a report first`), `warn`); return; }
+  const d = LAST_ACCT.data, t = d.totals||{};
+  const gross = money(t.gross), net = money(gross/1.15), vat = money(gross-net);
+  const rowsM = (d.months||[]).map(function(m){
+    return `<tr><td>${m.ym}</td><td>${m.orders}</td><td>${m.delivered}</td><td>${m.cancelled}</td><td>${m.abandoned}</td><td>${money(m.gross)}</td><td>${money(m.fees)}</td></tr>`;
+  }).join(``);
+  const html = `<html dir="rtl"><head><meta charset="utf-8"><title>report</title>
+   <style>body{font-family:Cairo,Arial,sans-serif;padding:2rem;color:#2b1a15}
+   h1{font-size:1.3rem} table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:12px}
+   th,td{border:1px solid #999;padding:6px;text-align:right}
+   .k{display:inline-block;margin:.3rem .8rem .3rem 0;font-weight:700}</style></head><body>
+   <h1>🍝 ${arEn(`تقرير مكرونجي المحاسبي`,`Makaronjy accounting report`)}</h1>
+   <p>${arEn(`الفترة`,`Period`)}: ${LAST_ACCT.from} → ${LAST_ACCT.to}</p>
+   <p><span class="k">${arEn(`الإجمالي`,`Gross`)}: ${gross}</span>
+      <span class="k">${arEn(`الصافي`,`Net`)}: ${net}</span>
+      <span class="k">${arEn(`الضريبة`,`VAT`)}: ${vat}</span>
+      <span class="k">${arEn(`رسوم`,`Fees`)}: ${money(t.fees)}</span>
+      <span class="k">${arEn(`طلبات`,`Orders`)}: ${t.orders||0}</span>
+      <span class="k">${arEn(`مسلّمة`,`Delivered`)}: ${t.delivered||0}</span>
+      <span class="k">${arEn(`ملغية`,`Cancelled`)}: ${t.cancelled||0}</span>
+      <span class="k">${arEn(`مهجورة`,`Abandoned`)}: ${t.abandoned||0}</span></p>
+   <table><tr><th>${arEn(`الشهر`,`Month`)}</th><th>${arEn(`طلبات`,`Orders`)}</th><th>${arEn(`مسلّمة`,`Delivered`)}</th><th>${arEn(`ملغية`,`Cancelled`)}</th><th>${arEn(`مهجورة`,`Abandoned`)}</th><th>${arEn(`الإيراد`,`Gross`)}</th><th>${arEn(`رسوم`,`Fees`)}</th></tr>${rowsM}</table>
+   <p style="font-size:11px">${arEn(`طُبع بتاريخ`,`Printed on`)}: ${new Date().toLocaleString()}</p>
+   </body></html>`;
+  const w = window.open(``, `_blank`);
+  if(!w){ toast(arEn(`اسمح بالنوافذ المنبثقة للطباعة`,`Allow popups for printing`), `warn`); return; }
+  w.document.write(html);
+  w.document.close();
+  setTimeout(function(){ w.print(); }, 400);
 }
 
 /* =====================================================
@@ -2045,4 +2195,4 @@ return;
 applyAdminLang();
 })();
 window.__ADMIN_BOOTED = true;
-/* ===== END admin-tabs.js (v9.3) ===== */
+/* ===== END admin-tabs.js (v9.4) ===== */
