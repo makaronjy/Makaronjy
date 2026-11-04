@@ -1,5 +1,5 @@
-/* ===== admin-core.js — النواة: دخول + GitHub + نوافذ (v3.1) ===== */
-/* v3.1: try-catch شامل + حماية من البيانات المكسورة */
+/* ===== admin-core.js — النواة: دخول + GitHub + نوافذ (v3.2) ===== */
+/* v3.2: حذف البانر الفعلي من GitHub + زر تنظيف الصور اليتيمة */
 
 /* ===== إيقاف التكبير ===== */
 document.addEventListener(`touchstart`,
@@ -425,6 +425,38 @@ method:`PUT`,
 headers:{ [`Content-Type`]:`application/json` },
 body: JSON.stringify(body)
 });
+}
+/* v3.2: حذف ملف من GitHub */
+async function ghDeleteFile(path, sha, msg){
+var body = {
+message: msg || (`حذف ملف: ` + path),
+sha: sha,
+branch: CFG.branch
+};
+var q = `/repos/` + CFG.owner + `/` + CFG.repo +
+`/contents/` + path;
+return gh(q, {
+method:`DELETE`,
+headers:{ [`Content-Type`]:`application/json` },
+body: JSON.stringify(body)
+});
+}
+/* v3.2: جلب قائمة ملفات مجلد */
+async function listDir(dirPath){
+var q = `/repos/` + CFG.owner + `/` + CFG.repo +
+`/contents/` + dirPath + `?ref=` + CFG.branch;
+try{
+var r = await gh(q);
+if(!Array.isArray(r)) return [];
+return r.filter(function(x){
+return x.type === `file`;
+}).map(function(x){
+return { name: x.name, path: x.path, sha: x.sha };
+});
+}catch(e){
+if(e.http === 404) return [];
+throw e;
+}
 }
 function b64OfFile(file){
 return file.arrayBuffer().then(function(buf){
@@ -969,6 +1001,7 @@ st.textContent =
 `.v15-row{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap}` +
 `.v15-add{border:none;border-radius:12px;padding:.7rem 1.2rem;background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--dark);font-weight:900;cursor:pointer;font-family:inherit}` +
 `.v15-pub{border:none;border-radius:12px;padding:.7rem 1.2rem;background:var(--wa);color:#fff;font-weight:900;cursor:pointer;font-family:inherit}` +
+`.v15-clean{border:none;border-radius:12px;padding:.7rem 1.2rem;background:#fff6e6;color:#a06b1c;border:1.5px dashed #e0912f;font-weight:900;cursor:pointer;font-family:inherit}` +
 `.v15-fee{width:110px;border:1.5px solid var(--line);border-radius:10px;padding:.55rem .6rem;font-family:inherit;font-weight:900;font-size:1rem;text-align:center}` +
 `.v15-sel{width:110px;border:1.5px solid var(--line);border-radius:10px;padding:.55rem .6rem;font-family:inherit;font-weight:800;background:#fff;color:var(--ink)}` +
 `.v15-bfees{display:flex;flex-direction:column;gap:.5rem;margin-top:.7rem}` +
@@ -1009,6 +1042,7 @@ card.innerHTML =
 `<div class="v15-row">` +
 `<button class="v15-add" id="bnAddBtn">➕ إضافة بانر / Add</button>` +
 `<button class="v15-pub" id="bnPublishBtn">🚀 نشر / Publish</button>` +
+`<button class="v15-clean" id="bnCleanBtn">🧹 تنظيف اليتيمة / Clean orphans</button>` +
 `<input type="file" id="bnFile" accept="image/*" hidden>` +
 `</div>`;
 host.insertBefore(card, host.firstChild);
@@ -1056,6 +1090,7 @@ toast(`فشل الرفع: ` + err.message, `error`);
 }
 });
 el(`bnPublishBtn`).addEventListener(`click`, publishV15);
+el(`bnCleanBtn`).addEventListener(`click`, cleanOrphanBanners);
 el(`feePublishBtn`).addEventListener(`click`, publishV15);
 el(`v15FeeMode`).addEventListener(`change`, function(e){
 STATE.SETTINGS.deliveryFeeMode = e.target.value;
@@ -1106,13 +1141,29 @@ return;
 }
 if(del){
 var k = +del.dataset.bndel;
+var bn = list[k];
 var ok = await askConfirm(
-`سيُحذف البانر من السلايدر (ملف الصورة يبقى بالمستودع).`,
+`سيُحذف البانر من السلايدر ومن المستودع نهائياً.\n\nالملف: ${bn ? bn.img : `—`}`,
 `حذف بانر`, `🗑`, `حذف`);
 if(!ok) return;
 list.splice(k, 1);
+/* v3.2: حذف الملف من GitHub فعلياً */
+if(bn && bn.img){
+try{
+toast(`جارٍ حذف الملف من المستودع...`, `info`);
+var f = await getFile(bn.img).catch(function(){ return null; });
+if(f && f.sha){
+await ghDeleteFile(bn.img, f.sha, `حذف بانر غير مستخدم: ` + bn.img);
+toast(`✔ تم حذف الملف من GitHub`, `success`);
+}else{
+toast(`الملف غير موجود بالمستودع أصلاً`, `info`);
+}
+}catch(err){
+toast(`⚠️ فشل حذف الملف: ` + err.message, `warn`);
+}
+}
 renderBannersAdmin();
-toast(`✔ تم الحذف — اضغط نشر`, `success`);
+toast(`✔ تم الحذف من السلايدر — اضغط نشر`, `success`);
 }
 });
 }
@@ -1218,6 +1269,72 @@ return;
 btn.disabled = false;
 btn.textContent = old;
 }
+/* ═══════════════════════════════════════════
+   v3.2: تنظيف الصور اليتيمة
+   ═══════════════════════════════════════════ */
+async function cleanOrphanBanners(){
+if(!STATE || !CFG){
+toast(`سجّل الدخول أولاً`, `error`);
+return;
+}
+var btn = el(`bnCleanBtn`);
+var old = btn.textContent;
+btn.disabled = true;
+btn.textContent = `... جاري الفحص ...`;
+try{
+/* 1) قائمة ملفات المجلد من GitHub */
+var files = await listDir(`img/banners`);
+/* 2) قائمة الملفات المستخدمة في settings.js */
+var used = {};
+(STATE.SETTINGS.banners || []).forEach(function(b){
+if(b && b.img) used[b.img] = true;
+});
+/* 3) تحديد اليتيمة */
+var orphans = files.filter(function(f){
+return !used[f.path];
+});
+if(!orphans.length){
+toast(`✔ لا توجد صور يتيمة — المستودع نظيف`, `success`);
+btn.disabled = false;
+btn.textContent = old;
+return;
+}
+/* 4) تأكيد */
+var list = orphans.map(function(f){ return `• ${f.name}`; }).join(`\n`);
+var msg = `يوجد ${orphans.length} صورة يتيمة في المستودع:\n\n${list}\n\nهل تريد حذفها نهائياً من GitHub؟`;
+var ok = await askConfirm(msg, `تنظيف اليتيمة`, `🧹`, `حذف الكل`, true);
+if(!ok){
+btn.disabled = false;
+btn.textContent = old;
+return;
+}
+/* 5) حذف متتابع */
+var successCount = 0;
+var failCount = 0;
+for(var i=0; i<orphans.length; i++){
+try{
+await ghDeleteFile(
+orphans[i].path,
+orphans[i].sha,
+`تنظيف صورة بانر يتيمة: ` + orphans[i].name
+);
+successCount++;
+toast(`✔ ${orphans[i].name}`, `success`);
+}catch(err){
+failCount++;
+console.warn(`فشل حذف:`, orphans[i].path, err);
+}
+}
+toast(
+`انتهى التنظيف: ${successCount} تم، ${failCount} فشل`,
+successCount > 0 ? `success` : `error`
+);
+}catch(err){
+toast(`⚠️ فشل التنظيف: ` + err.message, `error`);
+}
+btn.disabled = false;
+btn.textContent = old;
+}
 /* لفّ loadAll لتشغيل هجرات وواجهة v15 بعد كل تحميل */
 var _loadAllOrig = loadAll;
 loadAll = async function(){
@@ -1227,4 +1344,4 @@ ensureV15Cards();
 renderBannersAdmin();
 return r;
 };
-/* ===== END admin-core.js (v3.1) ===== */
+/* ===== END admin-core.js (v3.2) ===== */
