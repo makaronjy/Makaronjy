@@ -1,9 +1,7 @@
 /* =====================================================
 مكرونجي — الطبقة السحابية (cloud.js)
-v17.6: أسماء الأصناف ثنائية اللغة (name_ar + name_en)
-       لكل ما عدا ذلك مطابق لـ v17.5:
-       قواعد توفر التوصيل + موقع إجباري للتوصيل
-       + شاشة إرشاد ذكية حسب الجهاز + زر إتمام نظيف
+v17.7: قفل الطلب المكرر + سلة Minimal + نافذة بيانات
+       لكل ما عدا ذلك مطابق لـ v17.6
 ===================================================== */
 
 const CLOUD_API = 'https://makaronjy-api.makaronjy.workers.dev';
@@ -26,7 +24,7 @@ function saveCustomerInfo(name, phone){
 }
 function isAr(){ return (typeof currentLang !== 'undefined' && currentLang === 'ar'); }
 
-/* ===== توفر خدمة التوصيل من settings.js ===== */
+/* ===== توفر خدمة التوصيل ===== */
 function deliveryAvailability(){
   try{
     const da = (typeof S === 'function' && S() && S().deliveryAvailability) ? S().deliveryAvailability : null;
@@ -43,8 +41,6 @@ function branchHasDelivery(br){
   if(da.mode === 'selected') return da.branchIds.includes(br.id);
   return true;
 }
-
-/* ===== فرض القاعدة على واجهة نوع الطلب ===== */
 function enforceDeliveryUI(){
   try{
     const br = (typeof currentBranch === 'function') ? currentBranch() : null;
@@ -74,7 +70,7 @@ function enforceDeliveryUI(){
   }catch(e){}
 }
 
-/* ===== زر إتمام نظيف (بدون أيقونة واتساب) ===== */
+/* ===== زر إتمام نظيف ===== */
 function cleanCheckoutBtn(){
   try{
     document.querySelectorAll('button').forEach(function(b){
@@ -84,6 +80,172 @@ function cleanCheckoutBtn(){
       }
     });
   }catch(e){}
+}
+function findCheckoutBtn(){
+  const list = document.querySelectorAll('button');
+  for(let i=0;i<list.length;i++){
+    const t = list[i].textContent || '';
+    if(/إتمام الطلب|Complete Order/i.test(t)) return list[i];
+  }
+  return null;
+}
+
+/* ═══════════════════════════════════════════
+   v17.7: السلة Minimal
+   ═══════════════════════════════════════════ */
+(function injectCartCss(){
+  if(el('mkCartCss')) return;
+  const st = document.createElement('style');
+  st.id = 'mkCartCss';
+  st.textContent =
+    /* إخفاء عناصر الزحمة (مهما حاول app.js إظهارها) */
+    '#saveFavBtn, #subRow, #feeRow { display:none !important; }' +
+    /* زر الملاحظة */
+    '#mkNoteBtn{display:block;width:100%;border:1.5px dashed var(--line, #eadfd2);background:#fffdf9;' +
+    'border-radius:12px;padding:.6rem .8rem;font-family:inherit;font-weight:800;font-size:.8rem;' +
+    'color:#8a6f63;cursor:pointer;margin:.6rem 0 .2rem;text-align:start}' +
+    '#mkNoteBtn.on{border-color:#e0912f;color:#a06b1c;background:#fff6e6}' +
+    /* نافذة البيانات */
+    '#mkInfoModal{position:fixed;inset:0;z-index:5150;background:rgba(40,12,24,.72);display:none;' +
+    'align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}' +
+    '#mkInfoModal.show{display:flex}' +
+    '#mkInfoModal .card{background:#fffdf9;border:2px solid #e0912f;border-radius:22px;padding:1.4rem 1.2rem;' +
+    'max-width:380px;width:100%;font-family:Cairo,sans-serif}' +
+    '#mkInfoModal h3{color:#8e2a4a;font-size:1.05rem;font-weight:900;margin-bottom:.2rem;text-align:center}' +
+    '#mkInfoModal small{display:block;color:#8a6f63;font-size:.72rem;font-weight:700;text-align:center;margin-bottom:1rem}' +
+    '#mkInfoModal label{display:block;font-size:.8rem;font-weight:900;color:#a4385c;margin-bottom:.3rem}' +
+    '#mkInfoModal input{width:100%;padding:.8rem .9rem;border:1.5px solid #eadfd2;border-radius:12px;' +
+    'font-family:inherit;font-size:1rem;font-weight:700;background:#fff;color:#2b1a15;outline:none;margin-bottom:.9rem}' +
+    '#mkInfoModal input:focus{border-color:#e0912f;box-shadow:0 0 0 3px #e0912f33}' +
+    '#mkInfoModal .err{display:none;background:#fee2e2;color:#b91c1c;border-radius:10px;padding:.5rem .7rem;' +
+    'font-size:.78rem;font-weight:800;margin-bottom:.7rem}' +
+    '#mkInfoModal .err.show{display:block}' +
+    '#mkInfoModal .row{display:flex;gap:.5rem}' +
+    '#mkInfoModal .row button{flex:1;border:none;border-radius:12px;padding:.85rem;font-family:inherit;font-weight:900;cursor:pointer;font-size:.9rem}' +
+    '#mkInfoGo{background:linear-gradient(135deg,#e0912f,#f2b95f);color:#5a1830}' +
+    '#mkInfoCancel{background:#f3e7d7;color:#8e2a4a}';
+  document.head.appendChild(st);
+})();
+
+/* إخفاء غلاف حقل (label أو .field) حول عنصر */
+function hideFieldWrap(id){
+  const inp = el(id);
+  if(!inp) return;
+  let n = inp;
+  for(let d=0; d<4; d++){
+    n = n.parentElement;
+    if(!n) break;
+    const cls = n.className || '';
+    if(n.tagName === 'LABEL' || /\bfield\b/.test(cls) || /\brow\b/.test(cls)){
+      n.style.display = 'none';
+      n.dataset.mkHidden = '1';
+      return;
+    }
+  }
+  inp.style.display = 'none';
+  const prev = inp.previousElementSibling;
+  if(prev && prev.tagName === 'LABEL') prev.style.display = 'none';
+}
+
+/* زر الملاحظة + إخفاء الحقول عند فتح السلة */
+function ensureCartMinimal(){
+  try{
+    hideFieldWrap('cName');
+    hideFieldWrap('cPhone');
+    hideFieldWrap('cnotes');
+    const notesWrap = (function(){
+      const t = el('cnotes');
+      if(!t) return null;
+      let n = t;
+      for(let d=0; d<4; d++){
+        n = n.parentElement;
+        if(!n) break;
+        if(n.dataset && n.dataset.mkHidden === '1') return n;
+      }
+      return t;
+    })();
+    const items = el('dItems');
+    if(items && !el('mkNoteBtn')){
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.id = 'mkNoteBtn';
+      b.textContent = isAr() ? '📝 إضافة توصية / ملاحظة للطبخ' : '📝 Add a note / instruction';
+      b.addEventListener('click', function(){
+        if(!notesWrap) return;
+        const shown = notesWrap.style.display !== 'none';
+        notesWrap.style.display = shown ? 'none' : '';
+        b.classList.toggle('on', !shown);
+        if(!shown){ try{ el('cnotes').focus(); }catch(e){} }
+      });
+      items.parentNode.insertBefore(b, items.nextSibling);
+    }
+  }catch(e){}
+}
+
+/* ═══════════════════════════════════════════
+   v17.7: نافذة بيانات العميل عند الإتمام
+   ═══════════════════════════════════════════ */
+function openInfoModal(){
+  return new Promise(function(resolve){
+    let box = el('mkInfoModal');
+    if(!box){
+      box = document.createElement('div');
+      box.id = 'mkInfoModal';
+      box.innerHTML =
+        '<div class="card">' +
+          '<h3 id="mkInfoTitle"></h3>' +
+          '<small id="mkInfoSub"></small>' +
+          '<div class="err" id="mkInfoErr"></div>' +
+          '<label id="mkInfoNameLbl"></label>' +
+          '<input id="mkInfoName" autocomplete="name">' +
+          '<label id="mkInfoPhoneLbl"></label>' +
+          '<input id="mkInfoPhone" class="ltr" inputmode="numeric" autocomplete="tel" style="direction:ltr;text-align:left">' +
+          '<div class="row">' +
+            '<button id="mkInfoGo"></button>' +
+            '<button id="mkInfoCancel"></button>' +
+          '</div>' +
+        '</div>';
+      document.body.appendChild(box);
+    }
+    const ar = isAr();
+    const saved = getCustomerInfo();
+    el('mkInfoTitle').textContent = ar ? '👤 بيانات الطلب' : '👤 Your details';
+    el('mkInfoSub').textContent = saved.name
+      ? (ar ? 'بياناتك المحفوظة — يمكنك تعديلها قبل المتابعة' : 'Saved details — edit anytime before continuing')
+      : (ar ? 'نحتاج اسمك ورقم جوالك لتجهيز طلبك' : 'We need your name & phone to prepare your order');
+    el('mkInfoNameLbl').textContent = ar ? '👤 الاسم *' : '👤 Name *';
+    el('mkInfoPhoneLbl').textContent = ar ? '📱 رقم الجوال *' : '📱 Phone *';
+    el('mkInfoGo').textContent = ar ? 'متابعة ➜' : 'Continue ➜';
+    el('mkInfoCancel').textContent = ar ? 'إلغاء' : 'Cancel';
+    el('mkInfoErr').classList.remove('show');
+    el('mkInfoName').value = saved.name || '';
+    el('mkInfoPhone').value = saved.phone || '';
+    box.classList.add('show');
+    setTimeout(function(){ try{ el('mkInfoName').focus(); }catch(e){} }, 120);
+
+    function done(val){
+      box.classList.remove('show');
+      el('mkInfoGo').onclick = null;
+      el('mkInfoCancel').onclick = null;
+      resolve(val);
+    }
+    el('mkInfoCancel').onclick = function(){ done(null); };
+    box.onclick = function(e){ if(e.target === box) done(null); };
+    el('mkInfoGo').onclick = function(){
+      const name = sanitize(el('mkInfoName').value);
+      const phone = sanitize(el('mkInfoPhone').value);
+      const err = el('mkInfoErr');
+      if(name.length < 2){
+        err.textContent = ar ? '⚠️ يرجى كتابة الاسم (حرفان على الأقل)' : '⚠️ Please enter your name';
+        err.classList.add('show'); return;
+      }
+      if(phone.replace(/\D/g,'').length < 9){
+        err.textContent = ar ? '⚠️ يرجى كتابة رقم جوال صحيح' : '⚠️ Please enter a valid phone';
+        err.classList.add('show'); return;
+      }
+      done({ name: name, phone: phone });
+    };
+  });
 }
 
 /* ===== ربطات واحدة ===== */
@@ -95,12 +257,7 @@ function cleanCheckoutBtn(){
     const _orig = window.openCart;
     window.openCart = function(){
       _orig.apply(this, arguments);
-      try{
-        const info = getCustomerInfo();
-        const n = el('cName'), p = el('cPhone');
-        if(n && !n.value && info.name) n.value = info.name;
-        if(p && !p.value && info.phone) p.value = info.phone;
-      }catch(e){}
+      setTimeout(ensureCartMinimal, 60);
     };
     window.openCart._mkFill = true;
   }
@@ -119,10 +276,19 @@ function cleanCheckoutBtn(){
     const _a = window.applyLang;
     window.applyLang = function(){
       const r = _a.apply(this, arguments);
-      setTimeout(cleanCheckoutBtn, 80);
+      setTimeout(function(){ cleanCheckoutBtn(); ensureCartMinimal(); }, 80);
       return r;
     };
     window.applyLang._mkClean = true;
+  }
+  if(typeof window.updateCart === 'function' && !window.updateCart._mkMin){
+    const _u = window.updateCart;
+    window.updateCart = function(){
+      const r = _u.apply(this, arguments);
+      setTimeout(ensureCartMinimal, 30);
+      return r;
+    };
+    window.updateCart._mkMin = true;
   }
   if(document.readyState === 'loading'){
     document.addEventListener('DOMContentLoaded', function(){
@@ -133,7 +299,7 @@ function cleanCheckoutBtn(){
   }
 })();
 
-/* ===== موقع التوصيل (خام) ===== */
+/* ===== موقع التوصيل ===== */
 function captureGeoRaw(){
   return new Promise(function(resolve){
     if(!navigator.geolocation){ resolve(null); return; }
@@ -156,8 +322,6 @@ async function getPermState(){
   }catch(e){}
   return 'unknown';
 }
-
-/* ===== شاشة الإرشاد الذكية حسب الجهاز ===== */
 function deviceKind(){
   const ua = navigator.userAgent || '';
   if(/iphone|ipad|ipod/i.test(ua)) return 'ios';
@@ -257,8 +421,6 @@ function showLocationGuide(){
     el('mkLocConvert').onclick = function(){ box.style.display = 'none'; resolve('convert'); };
   });
 }
-
-/* ===== ضمان موقع التوصيل ===== */
 async function ensureDeliveryLocation(){
   for(;;){
     const st = await getPermState();
@@ -334,9 +496,13 @@ function showOrderSuccess(res, waMsg, br, orderType){
 }
 
 /* =====================================================
-   checkout() السحابي v17.6
+   checkout() السحابي v17.7
    ===================================================== */
+let CHECKOUT_BUSY = false;
+
 async function checkout(){
+  /* v17.7: قفل الطلب المكرر */
+  if(CHECKOUT_BUSY) return;
   try{
     if(orderLocked()) return;
     const TT = T();
@@ -344,154 +510,159 @@ async function checkout(){
     if(!br){ openGate('switch'); return; }
     if(!cart.size){ toast(TT.emptyMsg); return; }
 
-    const nameEl = el('cName'), phoneEl = el('cPhone');
-    let cname = '', cphone = '';
-    if(nameEl && phoneEl){
-      cname = sanitize(nameEl.value);
-      cphone = sanitize(phoneEl.value);
-      if(cname.length < 2){
-        toast(tt('nameRequired','⚠️ يرجى كتابة الاسم','⚠️ Please enter your name'));
-        openCart();
-        setTimeout(function(){ nameEl.focus(); }, 250);
-        return;
-      }
-      if(cphone.replace(/\D/g,'').length < 9){
-        toast(tt('phoneRequired','⚠️ يرجى كتابة رقم جوال صحيح','⚠️ Please enter a valid phone number'));
-        openCart();
-        setTimeout(function(){ phoneEl.focus(); }, 250);
-        return;
-      }
-      saveCustomerInfo(cname, cphone);
-    } else {
-      const saved = getCustomerInfo();
-      cname = saved.name || '';
-      cphone = saved.phone || '';
+    CHECKOUT_BUSY = true;
+    const btn = findCheckoutBtn();
+    const btnLabel = btn ? btn.innerHTML : '';
+    if(btn){
+      btn.disabled = true;
+      btn.innerHTML = isAr() ? '⏳ جارٍ الإرسال...' : '⏳ Sending...';
     }
 
-    /* فرض قاعدة توفر التوصيل */
-    let m = getOrderMode();
-    if(m === 'delivery' && !branchHasDelivery(br)){
-      if(typeof setOrderMode === 'function') setOrderMode('pickup');
-      m = 'pickup';
-      toast(isAr() ? '🏪 تم التحويل للاستلام — لا يتوفر توصيل لهذا الفرع' : '🏪 Switched to pickup — no delivery for this branch');
-    }
-    let isPickup = (m !== 'delivery');
-
-    /* الموقع إجباري للتوصيل */
-    let loc = null, addrText = '';
-    if(!isPickup){
-      const res = await ensureDeliveryLocation();
-      if(res.convert){
-        if(typeof setOrderMode === 'function') setOrderMode('pickup');
-        isPickup = true;
-        toast(isAr() ? '🏪 حوّلنا طلبك لاستلام من الفرع' : '🏪 Order switched to branch pickup');
-      } else {
-        loc = res.loc;
-        const lineEl = el('dAddressLine') || el('dAddress');
-        if(lineEl && lineEl.value && lineEl.value.trim()){
-          addrText = sanitize(lineEl.value.trim());
-        }
+    try{
+      await doCheckoutFlow(TT, br, btn, btnLabel);
+    } finally {
+      CHECKOUT_BUSY = false;
+      if(btn){
+        btn.disabled = false;
+        btn.innerHTML = btnLabel;
+        cleanCheckoutBtn();
       }
-    }
-
-    const fee = isPickup ? 0 : deliveryFee();
-
-    const invoiceID = generateInvoiceID(branchCode(br));
-    const d = new Date();
-    const p2 = function(n){ return String(n).padStart(2,'0'); };
-    const dateStr = p2(d.getDate()) + '/' + p2(d.getMonth()+1) + '/' + d.getFullYear();
-    let hh = d.getHours();
-    const ampm = hh >= 12 ? (isAr() ? 'م' : 'PM') : (isAr() ? 'ص' : 'AM');
-    hh = hh % 12 || 12;
-    const timeStr = hh + ':' + p2(d.getMinutes()) + ' ' + ampm;
-
-    let total = 0;
-    const cloudItems = [];
-    const lines = [];
-    cart.forEach(function(i){
-      const it = findMenuItem(i.id);
-      if(!it) return;
-      const unit = itemPrice(it, i.sizeIdx);
-      total += i.qty * unit;
-      const size = i.sizeIdx >= 0 ? ' (' + TT.sizes[i.sizeIdx] + ')' : '';
-      /* v17.6: ثلاثة أسماء — للتوافق + الترجمة المستقبلية */
-      cloudItems.push({
-        id: it.id,
-        name: itemName(it),
-        name_ar: it.ar || itemName(it),
-        name_en: it.en || it.ar || itemName(it),
-        qty: i.qty,
-        price: unit,
-        size: (i.sizeIdx >= 0 ? TT.sizes[i.sizeIdx] : '')
-      });
-      lines.push('▪️ ' + i.qty + ' × ' + itemName(it) + size + ' = ' + (i.qty * unit) + ' ' + TT.currency);
-    });
-
-    const notes = sanitize(el('cnotes') ? el('cnotes').value.trim() : '');
-
-    const typeShort = isPickup
-      ? tt('typePickupShort','استلام','Pickup')
-      : tt('typeDeliveryShort','توصيل','Delivery');
-    const payLine = isPickup
-      ? ('💵 ' + tt('payCashier','الدفع: عند الكاشير','Payment: at cashier'))
-      : ('💵 ' + tt('payDriver','الدفع: للسائق عند التسليم','Payment: to driver on delivery'));
-    const feeLine = isPickup ? '' : ('🛵 ' + tt('deliveryFee','رسوم التوصيل','Delivery fee') + ': ' + feeLabel(fee) + '\n');
-    const grand = total + fee;
-    const pickupNote = isPickup ? ('⏳ ' + tt('pickupNote','طلبك يكون جاهزاً عند وصولك للفرع','Your order will be ready upon arrival') + '\n') : '';
-
-    const msg =
-      brandize(TT.waGreeting) + '\n' +
-      '🧾 ' + TT.waOrderTitle + ' | *@@NUM@@*\n' +
-      '📅 ' + dateStr + ' • ⏰ ' + timeStr + '\n' +
-      '📦 ' + tt('waOrderType','نوع الطلب','Order type') + ': *' + typeShort + '* ' + (isPickup ? '🏪' : '🛵') + '\n' +
-      (cname ? ('👤 ' + tt('waCustomerName','الاسم','Name') + ': ' + cname + '\n') : '') +
-      (cphone ? ('📱 ' + tt('waCustomerPhone','الجوال','Phone') + ': ' + cphone + '\n') : '') +
-      pickupNote +
-      payLine + '\n' +
-      '🍝 ' + tt('waBranch','الفرع','Branch') + ': ' + branchName(br) + '\n' +
-      '━━━━━━━━━━━━\n' +
-      lines.join('\n') + '\n' +
-      '━━━━━━━━━━━━\n' +
-      feeLine +
-      '*' + TT.total + ': ' + grand + ' ' + TT.currency + '* ' + TT.taxInc + '\n' +
-      (notes ? ('📝 ' + TT.waNote + ': ' + notes + '\n') : '') +
-      '━━━━━━━━━━━━\n' +
-      brandize(TT.waThanks);
-
-    const cloud = await createCloudOrder({
-      customer_name: cname,
-      customer_phone: cphone,
-      branch_id: br.id,
-      items: cloudItems,
-      subtotal: total,
-      delivery_fee: fee,
-      delivery_fee_mode: deliveryFeeMode(),
-      customer_lat: loc ? loc.lat : null,
-      customer_lng: loc ? loc.lng : null,
-      customer_address: isPickup ? '' : addrText,
-      notes: notes,
-      order_type: isPickup ? 'pickup' : 'delivery'
-    });
-
-    const finalNum = cloud ? cloud.order_number : invoiceID;
-    const finalMsg = msg.split('@@NUM@@').join(finalNum);
-
-    cart.clear();
-    if(el('cnotes')) el('cnotes').value = '';
-    updateCart();
-    closeCart();
-
-    if(cloud){
-      showOrderSuccess(cloud, finalMsg, br, isPickup ? 'pickup' : 'delivery');
-    } else {
-      const waUrl = 'https://wa.me/' + br.wa + '?text=' + encodeURIComponent(finalMsg);
-      const w = window.open(waUrl, '_blank');
-      if(!w){ location.href = waUrl; }
-      toast(TT.orderSent);
     }
   }catch(e){
+    CHECKOUT_BUSY = false;
     console.error('checkout error:', e);
     toast('⚠️ ' + (e && e.message ? e.message : 'حدث خطأ — حاول مرة أخرى'));
   }
 }
-/* ===== END cloud.js (v17.6) ===== */
+
+async function doCheckoutFlow(TT, br, btn, btnLabel){
+  /* v17.7: نافذة البيانات أولاً */
+  const info = await openInfoModal();
+  if(!info){
+    return; /* إلغاء — لا طلب */
+  }
+  saveCustomerInfo(info.name, info.phone);
+  const cname = info.name, cphone = info.phone;
+
+  /* فرض قاعدة توفر التوصيل */
+  let m = getOrderMode();
+  if(m === 'delivery' && !branchHasDelivery(br)){
+    if(typeof setOrderMode === 'function') setOrderMode('pickup');
+    m = 'pickup';
+    toast(isAr() ? '🏪 تم التحويل للاستلام — لا يتوفر توصيل لهذا الفرع' : '🏪 Switched to pickup — no delivery for this branch');
+  }
+  let isPickup = (m !== 'delivery');
+
+  /* الموقع إجباري للتوصيل */
+  let loc = null, addrText = '';
+  if(!isPickup){
+    const res = await ensureDeliveryLocation();
+    if(res.convert){
+      if(typeof setOrderMode === 'function') setOrderMode('pickup');
+      isPickup = true;
+      toast(isAr() ? '🏪 حوّلنا طلبك لاستلام من الفرع' : '🏪 Order switched to branch pickup');
+    } else {
+      loc = res.loc;
+      const lineEl = el('dAddressLine') || el('dAddress');
+      if(lineEl && lineEl.value && lineEl.value.trim()){
+        addrText = sanitize(lineEl.value.trim());
+      }
+    }
+  }
+
+  const fee = isPickup ? 0 : deliveryFee();
+
+  const invoiceID = generateInvoiceID(branchCode(br));
+  const d = new Date();
+  const p2 = function(n){ return String(n).padStart(2,'0'); };
+  const dateStr = p2(d.getDate()) + '/' + p2(d.getMonth()+1) + '/' + d.getFullYear();
+  let hh = d.getHours();
+  const ampm = hh >= 12 ? (isAr() ? 'م' : 'PM') : (isAr() ? 'ص' : 'AM');
+  hh = hh % 12 || 12;
+  const timeStr = hh + ':' + p2(d.getMinutes()) + ' ' + ampm;
+
+  let total = 0;
+  const cloudItems = [];
+  const lines = [];
+  cart.forEach(function(i){
+    const it = findMenuItem(i.id);
+    if(!it) return;
+    const unit = itemPrice(it, i.sizeIdx);
+    total += i.qty * unit;
+    const size = i.sizeIdx >= 0 ? ' (' + TT.sizes[i.sizeIdx] + ')' : '';
+    cloudItems.push({
+      id: it.id,
+      name: itemName(it),
+      name_ar: it.ar || itemName(it),
+      name_en: it.en || it.ar || itemName(it),
+      qty: i.qty,
+      price: unit,
+      size: (i.sizeIdx >= 0 ? TT.sizes[i.sizeIdx] : '')
+    });
+    lines.push('▪️ ' + i.qty + ' × ' + itemName(it) + size + ' = ' + (i.qty * unit) + ' ' + TT.currency);
+  });
+
+  const notes = sanitize(el('cnotes') ? el('cnotes').value.trim() : '');
+
+  const typeShort = isPickup
+    ? tt('typePickupShort','استلام','Pickup')
+    : tt('typeDeliveryShort','توصيل','Delivery');
+  const payLine = isPickup
+    ? ('💵 ' + tt('payCashier','الدفع: عند الكاشير','Payment: at cashier'))
+    : ('💵 ' + tt('payDriver','الدفع: للسائق عند التسليم','Payment: to driver on delivery'));
+  const feeLine = isPickup ? '' : ('🛵 ' + tt('deliveryFee','رسوم التوصيل','Delivery fee') + ': ' + feeLabel(fee) + '\n');
+  const grand = total + fee;
+  const pickupNote = isPickup ? ('⏳ ' + tt('pickupNote','طلبك يكون جاهزاً عند وصولك للفرع','Your order will be ready upon arrival') + '\n') : '';
+
+  const msg =
+    brandize(TT.waGreeting) + '\n' +
+    '🧾 ' + TT.waOrderTitle + ' | *@@NUM@@*\n' +
+    '📅 ' + dateStr + ' • ⏰ ' + timeStr + '\n' +
+    '📦 ' + tt('waOrderType','نوع الطلب','Order type') + ': *' + typeShort + '* ' + (isPickup ? '🏪' : '🛵') + '\n' +
+    '👤 ' + tt('waCustomerName','الاسم','Name') + ': ' + cname + '\n' +
+    '📱 ' + tt('waCustomerPhone','الجوال','Phone') + ': ' + cphone + '\n' +
+    pickupNote +
+    payLine + '\n' +
+    '🍝 ' + tt('waBranch','الفرع','Branch') + ': ' + branchName(br) + '\n' +
+    '━━━━━━━━━━━━\n' +
+    lines.join('\n') + '\n' +
+    '━━━━━━━━━━━━\n' +
+    feeLine +
+    '*' + TT.total + ': ' + grand + ' ' + TT.currency + '* ' + TT.taxInc + '\n' +
+    (notes ? ('📝 ' + TT.waNote + ': ' + notes + '\n') : '') +
+    '━━━━━━━━━━━━\n' +
+    brandize(TT.waThanks);
+
+  const cloud = await createCloudOrder({
+    customer_name: cname,
+    customer_phone: cphone,
+    branch_id: br.id,
+    items: cloudItems,
+    subtotal: total,
+    delivery_fee: fee,
+    delivery_fee_mode: deliveryFeeMode(),
+    customer_lat: loc ? loc.lat : null,
+    customer_lng: loc ? loc.lng : null,
+    customer_address: isPickup ? '' : addrText,
+    notes: notes,
+    order_type: isPickup ? 'pickup' : 'delivery'
+  });
+
+  const finalNum = cloud ? cloud.order_number : invoiceID;
+  const finalMsg = msg.split('@@NUM@@').join(finalNum);
+
+  cart.clear();
+  if(el('cnotes')) el('cnotes').value = '';
+  updateCart();
+  closeCart();
+
+  if(cloud){
+    showOrderSuccess(cloud, finalMsg, br, isPickup ? 'pickup' : 'delivery');
+  } else {
+    const waUrl = 'https://wa.me/' + br.wa + '?text=' + encodeURIComponent(finalMsg);
+    const w = window.open(waUrl, '_blank');
+    if(!w){ location.href = waUrl; }
+    toast(TT.orderSent);
+  }
+}
+/* ===== END cloud.js (v17.7) ===== */
