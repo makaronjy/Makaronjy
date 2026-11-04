@@ -530,7 +530,7 @@ window.APP_SETTINGS = {
     "oncePerDay": true,
     "icon": "🍝",
     "titleAr": "افتتاح قريب",
-    "titleEn": "Coming Soon",
+    "titleEn": "Coming Soon</label></div><div class=",
     "textAr": "تابعونا على حساباتنا لمعرفة آخر العروض",
     "textEn": "Follow us on our accounts to stay updated on the latest offers",
     "btnAr": "حسناً 🍝",
