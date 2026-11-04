@@ -20,7 +20,7 @@ body{
   color:var(--ink);min-height:100vh;padding-bottom:3rem;
 }
 
-/* ─── الشريط العلوي (v2.2: مرتب، بدون شعار) ─── */
+/* ─── الشريط العلوي ─── */
 .topbar{
   position:sticky;top:0;z-index:50;
   background:rgba(90,24,48,.97);backdrop-filter:blur(8px);
@@ -49,7 +49,6 @@ body{
   font-weight:900;font-size:.8rem;cursor:pointer;
 }
 .icon-btn.off{opacity:.5;}
-/* v2.2: زر اللغة المدمج في الهيدر */
 .lang-toggle{
   display:inline-flex;background:#ffffff14;border:1px solid #ffffff2b;
   border-radius:50px;padding:3px;gap:2px;
@@ -179,6 +178,42 @@ body{
 .toast.ok{background:var(--ok);}
 @keyframes pop{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
 
+/* ─── v2.3: نافذة التأكيد branded ─── */
+.mk-confirm{
+  position:fixed;inset:0;z-index:5200;
+  background:rgba(40,12,24,.62);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  display:none;align-items:center;justify-content:center;padding:1rem;
+}
+.mk-confirm.show{display:flex;animation:mkFade .2s ease}
+@keyframes mkFade{from{opacity:0}to{opacity:1}}
+.mk-confirm .box{
+  background:var(--card);border:2px solid var(--gold);border-radius:22px;
+  padding:1.5rem 1.2rem;max-width:360px;width:100%;
+  box-shadow:0 20px 60px rgba(90,24,48,.4);
+  animation:mkPop .25s cubic-bezier(.2,.9,.3,1.3);
+}
+@keyframes mkPop{from{transform:scale(.9);opacity:0}to{transform:scale(1);opacity:1}}
+.mk-confirm .ico{font-size:2.4rem;text-align:center;margin-bottom:.3rem}
+.mk-confirm h3{text-align:center;color:var(--brown);font-size:1.05rem;font-weight:900;margin-bottom:.7rem}
+.mk-confirm .msg{
+  background:var(--cream);border:1px dashed var(--line);border-radius:12px;
+  padding:.8rem .9rem;margin-bottom:.6rem;font-size:.85rem;font-weight:700;
+  color:var(--ink);line-height:1.7;text-align:center;
+}
+.mk-confirm .meta{
+  padding:.5rem .7rem;background:#fff6e6;border:1px dashed var(--gold);
+  border-radius:10px;font-size:.75rem;color:#a06b1c;text-align:center;
+  font-weight:900;margin-bottom:.9rem;direction:ltr;
+}
+.mk-confirm .acts{display:flex;gap:.5rem}
+.mk-confirm .acts button{
+  flex:1;border:none;border-radius:12px;padding:.85rem;
+  font-family:inherit;font-weight:900;font-size:.88rem;cursor:pointer;
+}
+.mk-confirm .btn-yes{background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--dark)}
+.mk-confirm .btn-no{background:#f3e7d7;color:var(--brown2)}
+.mk-confirm .btn-danger{background:var(--err);color:#fff}
+
 /* ─── الطباعة ─── */
 #reportArea{display:none;}
 @media print{
@@ -193,7 +228,7 @@ body{
 </head>
 <body>
 
-<!-- ═══ الشريط العلوي (v2.2) ═══ -->
+<!-- ═══ الشريط العلوي ═══ -->
 <div class="topbar">
   <div class="brand">
     <div>
@@ -235,10 +270,23 @@ body{
 
 </div>
 
+<!-- نافذة التأكيد branded -->
+<div class="mk-confirm" id="mkConfirm">
+  <div class="box">
+    <div class="ico" id="mkCfIco">⚠️</div>
+    <h3 id="mkCfTitle"></h3>
+    <div class="msg" id="mkCfMsg"></div>
+    <div class="meta" id="mkCfMeta" style="display:none"></div>
+    <div class="acts">
+      <button class="btn-no" id="mkCfNo">إلغاء</button>
+      <button class="btn-yes" id="mkCfYes">تأكيد</button>
+    </div>
+  </div>
+</div>
+
 <div id="reportArea"></div>
 <div id="toast"></div>
 
-<!-- بيانات الفروع (للأسماء الإنجليزية) + الترجمة المركزية -->
 <script src="settings.js"></script>
 <script src="i18n-staff.js"></script>
 
@@ -257,6 +305,8 @@ let LAST_ORDERS = [];
 let knownPending = new Set();
 let soundOn = localStorage.getItem('sup_sound') !== 'off';
 let audioCtx = null;
+let MENU_DATA = null;
+let MENU_LOADING = null;
 
 /* ─── حماية الصفحة ─── */
 (function guard() {
@@ -274,7 +324,49 @@ let audioCtx = null;
 })();
 
 /* ═══════════════════════════════════════════
-   v2.2: أدوات الترجمة الكاملة
+   v2.3: ترجمة الأصناف عبر menu.js
+   ═══════════════════════════════════════════ */
+async function loadMenu(){
+  if(MENU_DATA) return MENU_DATA;
+  if(MENU_LOADING) return MENU_LOADING;
+  MENU_LOADING = (async function(){
+    try{
+      const r = await fetch('menu.js', { cache:'no-store' });
+      if(!r.ok) return [];
+      const text = await r.text();
+      const match = text.match(/window\.MENU\s*=\s*(\[[\s\S]*?\]);/);
+      if(!match) return [];
+      try{ return JSON.parse(match[1]); }catch(e){ return []; }
+    }catch(e){ return []; }
+  })();
+  MENU_DATA = await MENU_LOADING;
+  return MENU_DATA;
+}
+function findMenuById(id){
+  if(!MENU_DATA || !id) return null;
+  for(const sec of MENU_DATA){
+    for(const it of sec.items || []){
+      if(it.id === id) return it;
+    }
+  }
+  return null;
+}
+function itemNameL(i){
+  const isEnNow = isEn();
+  if(isEnNow && i && i.name_en) return i.name_en;
+  if(!isEnNow && i && i.name_ar) return i.name_ar;
+  if(i && i.id){
+    const live = findMenuById(i.id);
+    if(live){
+      if(isEnNow && live.en) return live.en;
+      if(!isEnNow && live.ar) return live.ar;
+    }
+  }
+  return (i ? i.name : '');
+}
+
+/* ═══════════════════════════════════════════
+   أدوات اللغة
    ═══════════════════════════════════════════ */
 function pickLang(lang){ setStaffLang(lang); }
 function syncLangUI(){
@@ -285,11 +377,6 @@ function syncLangUI(){
 }
 function cur(){ return tt('common.riyal'); }
 function isEn(){ return getStaffLang() === 'en'; }
-/* اسم الصنف حسب اللغة (الجديدة ثنائية، القديمة كما هي) */
-function itemNameL(i){
-  return (isEn() && i && i.name_en) ? i.name_en : (i ? i.name : '');
-}
-/* اسم الفرع حسب اللغة (من settings.js) */
 function brDisplayName(o){
   if (isEn()) {
     try {
@@ -300,7 +387,6 @@ function brDisplayName(o){
   }
   return o.branch_name || '';
 }
-/* نص الحالة مترجماً (مع مراعاة الاستلام) */
 function statusLbl(o){
   let k = o.status;
   if (o.order_type === 'pickup') {
@@ -310,7 +396,6 @@ function statusLbl(o){
   const t = tt('admin.statuses.' + k);
   return (t && t !== ('admin.statuses.' + k)) ? t : (o.status_text || o.status);
 }
-/* تاريخ حسب اللغة */
 function fmtWhen(t){
   if(!t) return '';
   try{
@@ -388,7 +473,6 @@ function waOpen(phone, msg) {
   const w = window.open(url, '_blank');
   if (!w) location.href = url;
 }
-/* رسالة تأكيد الاستلام المعتمدة */
 function waConfirm(o) {
   const msg = tt('messages.supConfirm', {
     customer_name: o.customer_name,
@@ -398,6 +482,58 @@ function waConfirm(o) {
     total: o.total
   });
   waOpen(o.customer_phone, msg);
+}
+
+/* ═══════════════════════════════════════════
+   v2.3: نافذة التأكيد branded
+   ═══════════════════════════════════════════ */
+let _cfResolve = null;
+function confirmModal(msg, opts){
+  opts = opts || {};
+  return new Promise(function(resolve){
+    _cfResolve = resolve;
+    document.getElementById('mkCfIco').textContent = opts.icon || '⚠️';
+    document.getElementById('mkCfTitle').textContent = opts.title || tt('common.confirm');
+    document.getElementById('mkCfMsg').textContent = msg;
+    const meta = document.getElementById('mkCfMeta');
+    if(opts.meta){ meta.textContent = opts.meta; meta.style.display = ''; }
+    else meta.style.display = 'none';
+    const yesBtn = document.getElementById('mkCfYes');
+    document.getElementById('mkCfNo').textContent = opts.no || tt('common.cancel');
+    yesBtn.textContent = opts.yes || tt('common.confirm');
+    yesBtn.className = opts.danger ? 'btn-danger' : 'btn-yes';
+    document.getElementById('mkConfirm').classList.add('show');
+  });
+}
+document.getElementById('mkCfYes').addEventListener('click', function(){
+  document.getElementById('mkConfirm').classList.remove('show');
+  if(_cfResolve){ const r = _cfResolve; _cfResolve = null; r(true); }
+});
+document.getElementById('mkCfNo').addEventListener('click', function(){
+  document.getElementById('mkConfirm').classList.remove('show');
+  if(_cfResolve){ const r = _cfResolve; _cfResolve = null; r(false); }
+});
+
+/* ═══════════════════════════════════════════
+   v2.3: عرض صورة إثبات التسليم
+   ═══════════════════════════════════════════ */
+async function viewPhoto(id){
+  try{
+    const r = await fetch(API_BASE + '/api/orders/' + id + '/photo', {
+      headers: { 'Authorization': 'Bearer ' + TOKEN }
+    });
+    if(!r.ok){
+      toast(isEn() ? 'No proof photo for this order' : 'لا توجد صورة إثبات لهذا الطلب', 'err');
+      return;
+    }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const w = window.open(url, '_blank');
+    if(!w) location.href = url;
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+  }catch(e){
+    toast('⚠️ ' + e.message, 'err');
+  }
 }
 
 /* ─── نوع الطلب ─── */
@@ -433,7 +569,7 @@ async function loadAll(first) {
   }
 }
 
-/* ─── العرض ── */
+/* ─── العرض ─── */
 function render(first) {
   const orders = LAST_ORDERS;
 
@@ -587,8 +723,10 @@ function cardActive(o) {
   </div>`;
 }
 
-/* ─── بطاقة تسليم ─── */
+/* ─── بطاقة تسليم (v2.3: زر صورة الإثبات) ─── */
 function cardDone(o) {
+  const photoBtn = isPickup(o) ? '' :
+    `<button class="btn btn-plain" data-act="photo" data-id="${o.id}" title="${isEn() ? 'Delivery proof photo' : 'صورة إثبات التسليم'}">📸</button>`;
   return `
   <div class="order-card">
     <div class="oc-head">
@@ -598,13 +736,32 @@ function cardDone(o) {
       <span class="oc-total">${o.total} ${cur()}</span>
     </div>
     <div class="oc-line"><span class="lbl">🚗 ${tt('supervisor.labels.driver')}:</span> ${isPickup(o) ? tt('supervisor.badges.pickup') : (o.driver_name || '—')}</div>
+    <div class="oc-actions">${photoBtn}</div>
   </div>`;
 }
 
-/* ─── تغيير حالة ─── */
+/* ─── تغيير حالة (v2.3: نوافذ branded) ─── */
 async function act(id, status) {
-  if (status === 'cancelled' && !confirm(tt('supervisor.actions.confirmReject'))) return;
-  if (status === 'delivered' && !confirm(tt('supervisor.actions.confirmPickup'))) return;
+  const o = LAST_ORDERS.find(x => x.id === id);
+  if (status === 'cancelled') {
+    const ok = await confirmModal(tt('supervisor.actions.confirmReject'), {
+      icon: '❌',
+      title: tt('supervisor.actions.reject'),
+      yes: tt('supervisor.actions.reject'),
+      danger: true,
+      meta: o ? (o.number + ' • ' + o.customer_name + ' • ' + o.total + ' ' + cur()) : ''
+    });
+    if (!ok) return;
+  }
+  if (status === 'delivered') {
+    const ok = await confirmModal(tt('supervisor.actions.confirmPickup'), {
+      icon: '✅',
+      title: tt('supervisor.actions.pickupFromBranch'),
+      yes: isEn() ? 'Yes, picked up' : 'نعم، استلمه العميل',
+      meta: o ? (o.number + ' • ' + o.customer_name + ' • ' + o.total + ' ' + cur()) : ''
+    });
+    if (!ok) return;
+  }
   try {
     await api(`/api/orders/${id}/status`, {
       method: 'PUT',
@@ -634,7 +791,14 @@ async function assign(id) {
   }
 }
 
-/* ─── تقرير الطباعة (v2.2: توابع اللغة) ─── */
+/* ─── تفويض النقر لزر الصورة ─── */
+document.getElementById('listDone').addEventListener('click', function(e){
+  const b = e.target.closest('[data-act="photo"]');
+  if(!b) return;
+  viewPhoto(+b.dataset.id);
+});
+
+/* ─── تقرير الطباعة ─── */
 function printReport() {
   const orders = LAST_ORDERS;
   const done = orders.filter(o => o.status === 'delivered');
@@ -672,21 +836,28 @@ function printReport() {
 }
 
 /* ─── خروج ─── */
-function logout() {
-  if (!confirm(tt('supervisor.confirmLogout'))) return;
+async function logout() {
+  const ok = await confirmModal(tt('supervisor.confirmLogout'), {
+    icon: '🚪',
+    title: tt('common.logout'),
+    yes: tt('common.confirm')
+  });
+  if (!ok) return;
   localStorage.removeItem('mk_staff_token');
   localStorage.removeItem('mk_staff_user');
   location.href = 'login.html';
 }
 
 /* ─── الإقلاع ─── */
-initStaffI18n({ autoLangToggle: false }); /* الزر مدمج بالهيدر */
+initStaffI18n({ autoLangToggle: false });
 syncLangUI();
 window.addEventListener('staff-lang-changed', function(){
   syncLangUI();
   render(false);
 });
-loadAll(true);
+loadMenu().then(function(){
+  loadAll(true);
+});
 setInterval(() => loadAll(false), REFRESH_MS);
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) loadAll(false);
@@ -695,4 +866,4 @@ document.addEventListener('visibilitychange', () => {
 
 </body>
 </html>
-<!-- ===== END supervisor.html (v2.2) ===== -->
+<!-- ===== END supervisor.html (v2.3) ===== -->
