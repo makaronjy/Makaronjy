@@ -105,6 +105,18 @@ body{
 .oc-cust{font-weight:900;font-size:.95rem;}
 .oc-phone{color:var(--muted);font-weight:800;font-size:.8rem;direction:ltr;}
 .oc-total{margin-inline-start:auto;font-weight:900;color:var(--ok);font-size:1rem;}
+
+/* v2.4: الوقت النسبي */
+.oc-time{
+  display:inline-flex;align-items:center;gap:.25rem;
+  font-size:.72rem;font-weight:900;color:var(--muted);
+  background:#f3e7d7;border-radius:50px;padding:.15rem .6rem;
+  direction:ltr;
+}
+.oc-time.urgent{background:#fee2e2;color:var(--err);}
+.oc-time.warn{background:#fff6e6;color:#a06b1c;}
+.oc-time.fresh{background:#dcf5e8;color:var(--ok);}
+
 .oc-line{font-size:.85rem;font-weight:700;color:var(--ink);margin:.25rem 0;line-height:1.7;}
 .oc-line .lbl{color:var(--muted);}
 .oc-items{
@@ -158,391 +170,316 @@ body{
 .pool-assign-wrap.show{display:block;}
 .pool-assign-wrap small{
   display:block;color:var(--muted);font-size:.72rem;
-  font-weight:700;margin-bottom:.4rem;
+  font-weight:800;margin-bottom:.4rem;
 }
+.pool-assign-wrap .row{display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;}
+.pool-assign-wrap .sel{flex:1;min-width:140px;}
 
-/* ─── فارغ ─── */
-.empty{
-  text-align:center;color:var(--muted);font-weight:800;
-  padding:1.6rem;border:1.5px dashed var(--line);border-radius:16px;font-size:.9rem;
+/* النافذة branded */
+.mk-modal-overlay{
+  position:fixed;inset:0;z-index:9999;
+  background:rgba(90,24,48,.6);backdrop-filter:blur(8px);
+  display:flex;align-items:center;justify-content:center;
+  padding:1rem;animation:fadeIn .2s;
 }
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.mk-modal{
+  background:var(--card);border:2px solid var(--gold);
+  border-radius:20px;padding:1.5rem;max-width:420px;width:100%;
+  box-shadow:0 20px 50px rgba(90,24,48,.4);animation:popIn .25s;
+}
+@keyframes popIn{from{transform:scale(.9);opacity:0}to{transform:scale(1);opacity:1}}
+.mk-modal-ico{
+  font-size:3rem;text-align:center;margin-bottom:.5rem;
+}
+.mk-modal-title{
+  font-size:1.2rem;font-weight:900;color:var(--brown);
+  text-align:center;margin-bottom:.5rem;
+}
+.mk-modal-msg{
+  font-size:.9rem;font-weight:800;color:var(--ink);
+  text-align:center;line-height:1.8;margin-bottom:.8rem;
+}
+.mk-modal-meta{
+  background:#faf3ea;border:1px dashed var(--gold);border-radius:10px;
+  padding:.5rem .8rem;font-size:.78rem;font-weight:900;color:var(--brown);
+  text-align:center;margin-bottom:1rem;direction:ltr;
+}
+.mk-modal-actions{
+  display:flex;gap:.5rem;justify-content:center;
+}
+.mk-modal-actions .btn{flex:1;padding:.7rem 1rem;font-size:.9rem;}
+.mk-modal-actions .btn-danger{background:#fee2e2;color:var(--err);border:1.5px solid var(--err);}
+.mk-modal-actions .btn-gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--dark);}
+.mk-modal-actions .btn-cancel{background:#f3e7d7;color:var(--brown2);}
 
-/* ─── توست ─── */
-#toast{position:fixed;bottom:1.2rem;inset-inline:0;display:flex;flex-direction:column;align-items:center;gap:.5rem;z-index:4000;pointer-events:none;}
-.toast{
-  background:var(--dark);color:#fff;border-radius:50px;
-  padding:.6rem 1.4rem;font-weight:900;font-size:.85rem;
-  box-shadow:0 10px 30px rgba(0,0,0,.3);animation:pop .3s ease;
+/* ─── التوست ─── */
+.mk-toast{
+  position:fixed;bottom:2rem;inset-inline-start:50%;transform:translateX(-50%);
+  background:var(--dark);color:#fff;border-radius:50px;padding:.7rem 1.3rem;
+  font-weight:900;font-size:.88rem;z-index:10000;box-shadow:0 8px 24px rgba(0,0,0,.3);
+  animation:slideUp .3s;
 }
-.toast.err{background:var(--err);}
-.toast.ok{background:var(--ok);}
-@keyframes pop{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes slideUp{from{transform:translate(-50%,20px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+.mk-toast.err{background:var(--err);}
+.mk-toast.ok{background:var(--ok);}
 
-/* ─── v2.3: نافذة التأكيد branded ─── */
-.mk-confirm{
-  position:fixed;inset:0;z-index:5200;
-  background:rgba(40,12,24,.62);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-  display:none;align-items:center;justify-content:center;padding:1rem;
-}
-.mk-confirm.show{display:flex;animation:mkFade .2s ease}
-@keyframes mkFade{from{opacity:0}to{opacity:1}}
-.mk-confirm .box{
-  background:var(--card);border:2px solid var(--gold);border-radius:22px;
-  padding:1.5rem 1.2rem;max-width:360px;width:100%;
-  box-shadow:0 20px 60px rgba(90,24,48,.4);
-  animation:mkPop .25s cubic-bezier(.2,.9,.3,1.3);
-}
-@keyframes mkPop{from{transform:scale(.9);opacity:0}to{transform:scale(1);opacity:1}}
-.mk-confirm .ico{font-size:2.4rem;text-align:center;margin-bottom:.3rem}
-.mk-confirm h3{text-align:center;color:var(--brown);font-size:1.05rem;font-weight:900;margin-bottom:.7rem}
-.mk-confirm .msg{
-  background:var(--cream);border:1px dashed var(--line);border-radius:12px;
-  padding:.8rem .9rem;margin-bottom:.6rem;font-size:.85rem;font-weight:700;
-  color:var(--ink);line-height:1.7;text-align:center;
-}
-.mk-confirm .meta{
-  padding:.5rem .7rem;background:#fff6e6;border:1px dashed var(--gold);
-  border-radius:10px;font-size:.75rem;color:#a06b1c;text-align:center;
-  font-weight:900;margin-bottom:.9rem;direction:ltr;
-}
-.mk-confirm .acts{display:flex;gap:.5rem}
-.mk-confirm .acts button{
-  flex:1;border:none;border-radius:12px;padding:.85rem;
-  font-family:inherit;font-weight:900;font-size:.88rem;cursor:pointer;
-}
-.mk-confirm .btn-yes{background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--dark)}
-.mk-confirm .btn-no{background:#f3e7d7;color:var(--brown2)}
-.mk-confirm .btn-danger{background:var(--err);color:#fff}
-
-/* ─── الطباعة ─── */
-#reportArea{display:none;}
+/* ─── تقرير الطباعة ─── */
 @media print{
-  body *{visibility:hidden;}
-  #reportArea, #reportArea *{visibility:visible;}
-  #reportArea{display:block;position:absolute;inset:0;padding:2rem;}
-  #reportArea h2{margin-bottom:1rem;}
-  #reportArea table{width:100%;border-collapse:collapse;font-size:12px;}
-  #reportArea th,#reportArea td{border:1px solid #999;padding:6px;text-align:right;}
+  .topbar,.oc-actions,.stats,.sec-title,.btn,.pool-toggle,.pool-assign-wrap{display:none!important}
+  body{background:#fff;}
+  .order-card{break-inside:avoid;border:1px solid #999;box-shadow:none;}
+  .report-area{display:block!important;}
 }
+.report-area{display:none;}
+.report-area h2{color:var(--brown);margin-bottom:.5rem;}
+.report-area table{width:100%;border-collapse:collapse;margin-top:1rem;font-size:12px;}
+.report-area th,.report-area td{border:1px solid #999;padding:6px;text-align:start;}
+.report-area th{background:#f3e7d7;}
 </style>
 </head>
 <body>
 
-<!-- ═══ الشريط العلوي ═══ -->
+<!-- ─── الشريط العلوي ─── -->
 <div class="topbar">
   <div class="brand">
-    <div>
-      <b id="supName">...</b>
-      <small id="supBranch">...</small>
-    </div>
+    <b data-t="supervisor.pageTitle">لوحة مشرف الفرع</b>
+    <small id="brName">—</small>
   </div>
   <div class="spacer"></div>
-  <button class="bell" id="bellBtn">🔔 <span class="cnt" id="bellCnt" hidden>0</span></button>
-  <button class="icon-btn" id="soundBtn" onclick="toggleSound()">🔊</button>
-  <button class="icon-btn" onclick="printReport()">📄</button>
-  <div class="lang-toggle">
-    <button id="langAr" class="active" onclick="pickLang('ar')">AR</button>
-    <button id="langEn" onclick="pickLang('en')">EN</button>
+  <button class="bell" onclick="location.reload()">
+    🔔 <span data-t="supervisor.actions.refresh">تحديث</span>
+    <span class="cnt" id="newCnt" style="display:none">0</span>
+  </button>
+  <button class="icon-btn" onclick="printReport()">🖨️</button>
+  <button class="icon-btn" onclick="logout()" data-t="common.logout">خروج</button>
+  <div class="lang-toggle" id="langToggle">
+    <button data-lang="ar" class="active">AR</button>
+    <button data-lang="en">EN</button>
   </div>
-  <button class="icon-btn" onclick="logout()" data-t="common.logout">خروج 🚪</button>
 </div>
 
-<!-- ═══ الإحصائيات ═══ -->
+<!-- ─── الإحصائيات ─── -->
 <div class="stats">
-  <div class="stat"><b id="stOrders">0</b><small data-t="supervisor.stats.todayOrders">طلبات اليوم</small></div>
-  <div class="stat"><b id="stRevenue">0</b><small data-t="supervisor.stats.todayRevenue">مبيعات اليوم (ريال)</small></div>
-  <div class="stat"><b id="stDrivers">0</b><small data-t="supervisor.stats.availableDrivers">سائقون متاحون</small></div>
+  <div class="stat"><b id="stToday">0</b><small data-t="supervisor.stats.todayOrders">طلبات اليوم</small></div>
+  <div class="stat"><b id="stRev">0</b><small data-t="supervisor.stats.todayRevenue">مبيعات اليوم (ريال)</small></div>
+  <div class="stat"><b id="stDrv">0</b><small data-t="supervisor.stats.availableDrivers">سائقون متاحون</small></div>
 </div>
 
+<!-- ─── المحتوى ─── -->
 <div class="wrap">
-
-  <div class="sec-title">🔔 <span data-t="supervisor.sections.newOrders">طلبات جديدة</span> <span class="pill" id="cntNew">0</span></div>
+  <h3 class="sec-title">🆕 <span data-t="supervisor.sections.newOrders">طلبات جديدة</span> <span class="pill" id="cntNew">0</span></h3>
   <div id="listNew"></div>
 
-  <div class="sec-title">🍳 <span data-t="supervisor.sections.inProgress">قيد التنفيذ</span> <span class="pill" id="cntProg">0</span></div>
+  <h3 class="sec-title">🔥 <span data-t="supervisor.sections.inProgress">قيد التنفيذ</span> <span class="pill" id="cntProg">0</span></h3>
   <div id="listProgress"></div>
 
-  <div class="sec-title">🚗 <span data-t="supervisor.sections.activeDelivery">توصيلات نشطة</span> <span class="pill" id="cntActive">0</span></div>
+  <h3 class="sec-title">🚗 <span data-t="supervisor.sections.activeDelivery">توصيلات نشطة</span> <span class="pill" id="cntActive">0</span></h3>
   <div id="listActive"></div>
 
-  <div class="sec-title">✅ <span data-t="supervisor.sections.deliveredToday">سُلّم اليوم</span> <span class="pill" id="cntDone">0</span></div>
+  <h3 class="sec-title">✅ <span data-t="supervisor.sections.deliveredToday">سُلّم اليوم</span> <span class="pill" id="cntDone">0</span></h3>
   <div id="listDone"></div>
-
 </div>
 
-<!-- نافذة التأكيد branded -->
-<div class="mk-confirm" id="mkConfirm">
-  <div class="box">
-    <div class="ico" id="mkCfIco">⚠️</div>
-    <h3 id="mkCfTitle"></h3>
-    <div class="msg" id="mkCfMsg"></div>
-    <div class="meta" id="mkCfMeta" style="display:none"></div>
-    <div class="acts">
-      <button class="btn-no" id="mkCfNo">إلغاء</button>
-      <button class="btn-yes" id="mkCfYes">تأكيد</button>
-    </div>
-  </div>
-</div>
+<!-- منطقة التقرير (للطباعة) -->
+<div class="report-area" id="reportArea"></div>
 
-<div id="reportArea"></div>
-<div id="toast"></div>
-
-<script src="settings.js"></script>
 <script src="i18n-staff.js"></script>
-
+<script src="menu.js"></script>
 <script>
 /* ═══════════════════════════════════════════
-   إعدادات الربط
+   مكرونجي — لوحة مشرف الفرع (v2.4)
+   v2.4: الوقت النسبي المتجدد كل 5 ثوانٍ + تصحيح المنطقة الزمنية
+   v2.3: نوافذ branded + صورة الإثبات + ترجمة المنيو
    ═══════════════════════════════════════════ */
-const API_BASE = 'https://makaronjy-api.makaronjy.workers.dev';
-const REFRESH_MS = 7000;
 
-let TOKEN = localStorage.getItem('mk_staff_token');
+const API = 'https://makaronjy-api.makaronjy.workers.dev';
+const REFRESH_MS = 5000; // 5 ثوانٍ للتحديث الدوري
+const TIME_REFRESH_MS = 5000; // 5 ثوانٍ لتحديث الوقت النسبي
+
+let JWT = localStorage.getItem('mk_staff_token') || '';
 let USER = null;
-try { USER = JSON.parse(localStorage.getItem('mk_staff_user') || 'null'); } catch(e){}
-let DRIVERS = [];
 let LAST_ORDERS = [];
-let knownPending = new Set();
-let soundOn = localStorage.getItem('sup_sound') !== 'off';
-let audioCtx = null;
+let DRIVERS = [];
 let MENU_DATA = null;
-let MENU_LOADING = null;
+let TIME_TICK = 0;
 
-/* ─── حماية الصفحة ─── */
-(function guard() {
-  if (!TOKEN || !USER) { location.href = 'login.html'; return; }
-  if (USER.role !== 'supervisor' && USER.role !== 'super_admin') { location.href = 'login.html'; return; }
-  if (USER.mustChangePassword) { location.href = 'login.html'; return; }
-  if (USER.role === 'super_admin') {
-    if (!confirm('أنت المالك – لوحتك الشاملة في admin.html\nهل تريد البقاء في عرض المشرف؟')) {
-      location.href = 'admin.html'; return;
-    }
-  }
-  document.getElementById('supName').textContent = USER.name || '—';
-  document.getElementById('supBranch').textContent = USER.branchName || '—';
-  updateSoundBtn();
-})();
+/* ─── التهيئة ─── */
+try { USER = JSON.parse(localStorage.getItem('mk_staff_user') || 'null'); } catch (e) { USER = null; }
+if (!JWT || !USER) location.href = 'login.html';
+if (USER.role !== 'supervisor' && USER.role !== 'super_admin') {
+  location.href = USER.role === 'driver' ? 'driver.html' : 'index.html';
+}
 
-/* ═══════════════════════════════════════════
-   v2.3: ترجمة الأصناف عبر menu.js
-   ═══════════════════════════════════════════ */
-async function loadMenu(){
-  if(MENU_DATA) return MENU_DATA;
-  if(MENU_LOADING) return MENU_LOADING;
-  MENU_LOADING = (async function(){
-    try{
-      const r = await fetch('menu.js', { cache:'no-store' });
-      if(!r.ok) return [];
-      const text = await r.text();
-      const match = text.match(/window\.MENU\s*=\s*(\[[\s\S]*?\]);/);
-      if(!match) return [];
-      try{ return JSON.parse(match[1]); }catch(e){ return []; }
-    }catch(e){ return []; }
-  })();
-  MENU_DATA = await MENU_LOADING;
+/* ─── API ─── */
+async function api(path, opts = {}) {
+  opts.headers = opts.headers || {};
+  opts.headers['Content-Type'] = 'application/json';
+  opts.headers['Authorization'] = 'Bearer ' + JWT;
+  const r = await fetch(API + path, opts);
+  if (r.status === 401) { logout(); throw new Error('unauthorized'); }
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+  return d;
+}
+
+/* ─── اللغة ─── */
+function isEn() { return getStaffLang() === 'en'; }
+function cur() { return tt('common.riyal'); }
+function syncLangUI() {
+  document.documentElement.lang = getStaffLang();
+  document.documentElement.dir = isEn() ? 'ltr' : 'rtl';
+  applyStaffI18n();
+  document.querySelectorAll('#langToggle button').forEach(b => {
+    b.classList.toggle('active', b.dataset.lang === getStaffLang());
+  });
+}
+document.getElementById('langToggle').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  setStaffLang(b.dataset.lang);
+  syncLangUI();
+  render(false);
+});
+
+/* ─── ترجمة المنيو ─── */
+async function loadMenu() {
+  if (MENU_DATA) return MENU_DATA;
+  try {
+    const r = await fetch('menu.js', { cache: 'no-store' });
+    const text = await r.text();
+    const m = text.match(/window\.MENU\s*=\s*(\[[\s\S]*?\]);/);
+    if (m) MENU_DATA = JSON.parse(m[1]);
+    else MENU_DATA = [];
+  } catch (e) { MENU_DATA = []; }
   return MENU_DATA;
 }
-function findMenuById(id){
-  if(!MENU_DATA || !id) return null;
-  for(const sec of MENU_DATA){
-    for(const it of sec.items || []){
-      if(it.id === id) return it;
-    }
+function findMenuItem(id) {
+  if (!MENU_DATA || !id) return null;
+  for (const sec of MENU_DATA) {
+    for (const it of sec.items || []) if (it.id === id) return it;
   }
   return null;
 }
-function itemNameL(i){
-  const isEnNow = isEn();
-  if(isEnNow && i && i.name_en) return i.name_en;
-  if(!isEnNow && i && i.name_ar) return i.name_ar;
-  if(i && i.id){
-    const live = findMenuById(i.id);
-    if(live){
-      if(isEnNow && live.en) return live.en;
-      if(!isEnNow && live.ar) return live.ar;
+function itemName(item) {
+  if (isEn() && item.name_en) return item.name_en;
+  if (!isEn() && item.name_ar) return item.name_ar;
+  const live = findMenuItem(item.id);
+  if (live) return isEn() ? (live.en || live.ar) : (live.ar || live.en);
+  return item.name || '';
+}
+
+/* ─── v2.4: الوقت النسبي (توقيت الرياض) ─── */
+function parseServerDate(str) {
+  // D1 يرجع نصاً بصيغة "2026-11-05 14:30:00" بـ UTC
+  if (!str) return null;
+  let s = String(str);
+  if (!s.includes('T') && !s.includes('Z')) s = s.replace(' ', 'T') + 'Z';
+  return new Date(s);
+}
+function timeAgo(date) {
+  if (!date) return '—';
+  const now = new Date();
+  const sec = Math.floor((now - date) / 1000);
+  const en = isEn();
+  if (sec < 5) return en ? 'just now' : 'الآن';
+  if (sec < 60) return en ? `${sec}s ago` : `قبل ${sec} ثانية`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) {
+    if (en) return min === 1 ? '1 min ago' : `${min} min ago`;
+    if (min === 1) return 'قبل دقيقة';
+    if (min === 2) return 'قبل دقيقتين';
+    if (min <= 10) return `قبل ${min} دقائق`;
+    return `قبل ${min} دقيقة`;
+  }
+  const hr = Math.floor(min / 60);
+  if (hr < 24) {
+    if (en) return hr === 1 ? '1 hour ago' : `${hr} hours ago`;
+    if (hr === 1) return 'قبل ساعة';
+    if (hr === 2) return 'قبل ساعتين';
+    if (hr <= 10) return `قبل ${hr} ساعات`;
+    return `قبل ${hr} ساعة`;
+  }
+  const day = Math.floor(hr / 24);
+  if (day === 1) return en ? 'yesterday' : 'أمس';
+  if (day < 7) return en ? `${day} days ago` : `قبل ${day} أيام`;
+  return date.toLocaleDateString(en ? 'en-GB' : 'ar-SA', {
+    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+  });
+}
+function timeClass(date) {
+  if (!date) return '';
+  const sec = (Date.now() - date.getTime()) / 1000;
+  if (sec < 300) return 'fresh';        // < 5 دقائق: أخضر
+  if (sec < 1800) return '';              // 5-30 دقيقة: رمادي عادي
+  return 'warn';                          // > 30 دقيقة: برتقالي
+}
+function refreshTimeAgo() {
+  document.querySelectorAll('[data-time]').forEach(el => {
+    const dt = parseServerDate(el.dataset.time);
+    if (dt) {
+      el.textContent = timeAgo(dt);
+      el.className = 'oc-time ' + timeClass(dt);
     }
-  }
-  return (i ? i.name : '');
-}
-
-/* ═══════════════════════════════════════════
-   أدوات اللغة
-   ═══════════════════════════════════════════ */
-function pickLang(lang){ setStaffLang(lang); }
-function syncLangUI(){
-  const lang = getStaffLang();
-  document.getElementById('langAr').classList.toggle('active', lang === 'ar');
-  document.getElementById('langEn').classList.toggle('active', lang === 'en');
-  if (typeof applyStaffI18n === 'function') applyStaffI18n();
-}
-function cur(){ return tt('common.riyal'); }
-function isEn(){ return getStaffLang() === 'en'; }
-function brDisplayName(o){
-  if (isEn()) {
-    try {
-      const list = (window.APP_SETTINGS && APP_SETTINGS.branches) || [];
-      const b = list.find(x => (o.branch_id && x.id === o.branch_id) || (x.nameAr === o.branch_name));
-      if (b && b.nameEn) return b.nameEn;
-    } catch(e){}
-  }
-  return o.branch_name || '';
-}
-function statusLbl(o){
-  let k = o.status;
-  if (o.order_type === 'pickup') {
-    if (o.status === 'ready') k = 'ready_pickup';
-    if (o.status === 'delivered') k = 'delivered_pickup';
-  }
-  const t = tt('admin.statuses.' + k);
-  return (t && t !== ('admin.statuses.' + k)) ? t : (o.status_text || o.status);
-}
-function fmtWhen(t){
-  if(!t) return '';
-  try{
-    const d = new Date(String(t).replace(' ', 'T'));
-    return d.toLocaleString(isEn() ? 'en-GB' : 'ar-SA',
-      {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
-  }catch(e){ return String(t).slice(0,16); }
-}
-
-/* ─── غلاف API ─── */
-async function api(path, opts = {}) {
-  const res = await fetch(API_BASE + path, {
-    ...opts,
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + TOKEN,
-      ...(opts.headers || {}),
-    },
-  });
-  if (res.status === 401) {
-    localStorage.removeItem('mk_staff_token');
-    localStorage.removeItem('mk_staff_user');
-    location.href = 'login.html';
-    throw new Error('unauthorized');
-  }
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || tt('common.error'));
-  return data;
-}
-
-/* ─── توست ─── */
-function toast(msg, kind) {
-  const t = document.createElement('div');
-  t.className = 'toast ' + (kind || '');
-  t.textContent = msg;
-  document.getElementById('toast').appendChild(t);
-  setTimeout(() => t.remove(), 3200);
-}
-
-/* ─── تنبيه صوتي ─── */
-function beep() {
-  if (!soundOn) return;
-  try {
-    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    const o = audioCtx.createOscillator();
-    const g = audioCtx.createGain();
-    o.connect(g); g.connect(audioCtx.destination);
-    o.frequency.value = 880;
-    g.gain.setValueAtTime(0.25, audioCtx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.6);
-    o.start(); o.stop(audioCtx.currentTime + 0.65);
-  } catch (e) {}
-}
-function toggleSound() {
-  soundOn = !soundOn;
-  localStorage.setItem('sup_sound', soundOn ? 'on' : 'off');
-  updateSoundBtn();
-  if (soundOn) beep();
-}
-function updateSoundBtn() {
-  const b = document.getElementById('soundBtn');
-  b.textContent = soundOn ? '🔊' : '🔇';
-  b.classList.toggle('off', !soundOn);
-}
-
-/* ─── واتساب ─── */
-function normalizePhone(p) {
-  const d = (p || '').replace(/\D/g, '');
-  if (d.startsWith('0')) return '966' + d.slice(1);
-  if (d.startsWith('966')) return d;
-  return d;
-}
-function waOpen(phone, msg) {
-  const url = 'https://wa.me/' + normalizePhone(phone) + '?text=' + encodeURIComponent(msg);
-  const w = window.open(url, '_blank');
-  if (!w) location.href = url;
-}
-function waConfirm(o) {
-  const msg = tt('messages.supConfirm', {
-    customer_name: o.customer_name,
-    supervisor_name: USER.name || '—',
-    branch_name: USER.branchName || o.branch_name || '—',
-    order_number: o.number,
-    total: o.total
-  });
-  waOpen(o.customer_phone, msg);
-}
-
-/* ═══════════════════════════════════════════
-   v2.3: نافذة التأكيد branded
-   ═══════════════════════════════════════════ */
-let _cfResolve = null;
-function confirmModal(msg, opts){
-  opts = opts || {};
-  return new Promise(function(resolve){
-    _cfResolve = resolve;
-    document.getElementById('mkCfIco').textContent = opts.icon || '⚠️';
-    document.getElementById('mkCfTitle').textContent = opts.title || tt('common.confirm');
-    document.getElementById('mkCfMsg').textContent = msg;
-    const meta = document.getElementById('mkCfMeta');
-    if(opts.meta){ meta.textContent = opts.meta; meta.style.display = ''; }
-    else meta.style.display = 'none';
-    const yesBtn = document.getElementById('mkCfYes');
-    document.getElementById('mkCfNo').textContent = opts.no || tt('common.cancel');
-    yesBtn.textContent = opts.yes || tt('common.confirm');
-    yesBtn.className = opts.danger ? 'btn-danger' : 'btn-yes';
-    document.getElementById('mkConfirm').classList.add('show');
   });
 }
-document.getElementById('mkCfYes').addEventListener('click', function(){
-  document.getElementById('mkConfirm').classList.remove('show');
-  if(_cfResolve){ const r = _cfResolve; _cfResolve = null; r(true); }
-});
-document.getElementById('mkCfNo').addEventListener('click', function(){
-  document.getElementById('mkConfirm').classList.remove('show');
-  if(_cfResolve){ const r = _cfResolve; _cfResolve = null; r(false); }
-});
 
-/* ═══════════════════════════════════════════
-   v2.3: عرض صورة إثبات التسليم
-   ═══════════════════════════════════════════ */
-async function viewPhoto(id){
-  try{
-    const r = await fetch(API_BASE + '/api/orders/' + id + '/photo', {
-      headers: { 'Authorization': 'Bearer ' + TOKEN }
+/* ─── نافذة التأكيد branded ─── */
+function confirmModal(msg, opts = {}) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'mk-modal-overlay';
+    const yesClass = opts.danger ? 'btn btn-danger' : 'btn btn-gold';
+    overlay.innerHTML = `
+      <div class="mk-modal">
+        <div class="mk-modal-ico">${opts.icon || '⚠️'}</div>
+        <div class="mk-modal-title">${opts.title || ''}</div>
+        <div class="mk-modal-msg">${msg}</div>
+        ${opts.meta ? `<div class="mk-modal-meta">${opts.meta}</div>` : ''}
+        <div class="mk-modal-actions">
+          <button class="btn btn-cancel" data-act="no">${opts.no || tt('common.cancel') || 'إلغاء'}</button>
+          <button class="${yesClass}" data-act="yes">${opts.yes || tt('common.confirm') || 'تأكيد'}</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', e => {
+      const act = e.target.dataset.act;
+      if (!act && e.target !== overlay) return;
+      overlay.remove();
+      resolve(act === 'yes');
     });
-    if(!r.ok){
-      toast(isEn() ? 'No proof photo for this order' : 'لا توجد صورة إثبات لهذا الطلب', 'err');
-      return;
-    }
-    const blob = await r.blob();
-    const url = URL.createObjectURL(blob);
-    const w = window.open(url, '_blank');
-    if(!w) location.href = url;
-    setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
-  }catch(e){
-    toast('⚠️ ' + e.message, 'err');
-  }
+  });
 }
 
-/* ─── نوع الطلب ─── */
+/* ─── التوست ─── */
+function toast(msg, type = 'info') {
+  const t = document.createElement('div');
+  t.className = 'mk-toast ' + type;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 2800);
+}
+
+/* ─── الأدوات ─── */
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); }
 function isPickup(o) { return o.order_type === 'pickup'; }
 function typeBadge(o) {
-  return isPickup(o)
-    ? '<span class="oc-type pickup">' + tt('supervisor.badges.pickup') + '</span>'
-    : '<span class="oc-type delivery">' + tt('supervisor.badges.delivery') + '</span>';
+  if (isPickup(o)) return `<span class="oc-type pickup">🏪 ${tt('supervisor.badges.pickup')}</span>`;
+  return `<span class="oc-type delivery">🛵 ${tt('supervisor.badges.delivery')}</span>`;
 }
+function statusLbl(o) {
+  if (isPickup(o)) {
+    if (o.status === 'ready') return tt('supervisor.actions.readyForPickup');
+    if (o.status === 'delivered') return '✅ ' + (isEn() ? 'Picked up' : 'تم الاستلام');
+  }
+  return o.status_text || o.status;
+}
+function itemsLine(items) {
+  if (!items || !items.length) return '—';
+  return items.map(i => `${i.qty}× ${esc(itemName(i))}${i.size ? ' (' + esc(i.size) + ')' : ''}`).join(' • ');
+}
+function branchName() { return USER.branchName || (isEn() ? 'Branch' : 'الفرع'); }
 
 /* ─── تحميل البيانات ─── */
 async function loadAll(first) {
@@ -553,74 +490,13 @@ async function loadAll(first) {
     ]);
     DRIVERS = driversRes.drivers || [];
     LAST_ORDERS = ordersRes.orders || [];
-    if (!USER.branchName && ordersRes.branch_name) {
-      USER.branchName = ordersRes.branch_name;
-      try { localStorage.setItem('mk_staff_user', JSON.stringify(USER)); } catch(e){}
-      document.getElementById('supBranch').textContent = USER.branchName;
-    }
-    if (!USER.name && ordersRes.supervisor_name) {
-      USER.name = ordersRes.supervisor_name;
-      try { localStorage.setItem('mk_staff_user', JSON.stringify(USER)); } catch(e){}
-      document.getElementById('supName').textContent = USER.name;
+    if (first && ordersRes.branch_name) {
+      document.getElementById('brName').textContent = ordersRes.branch_name;
     }
     render(first);
   } catch (e) {
-    if (e.message !== 'unauthorized') toast(tt('supervisor.toast.updateFailed'), 'err');
+    if (e.message !== 'unauthorized') toast('⚠️ ' + tt('supervisor.toast.updateFailed'), 'err');
   }
-}
-
-/* ─── العرض ─── */
-function render(first) {
-  const orders = LAST_ORDERS;
-
-  const isNew = o => o.status === 'pending';
-  const isProg = o => ['accepted', 'preparing', 'ready'].includes(o.status);
-  const isActive = o => ['driver_assigned', 'driver_at_restaurant', 'out_for_delivery'].includes(o.status);
-  const isDone = o => o.status === 'delivered';
-
-  const news = orders.filter(isNew);
-  const progs = orders.filter(isProg);
-  const actives = orders.filter(isActive);
-  const dones = orders.filter(isDone);
-
-  if (!first) {
-    let newOne = false;
-    news.forEach(o => {
-      if (!knownPending.has(o.number)) { newOne = true; knownPending.add(o.number); }
-    });
-    if (newOne) beep();
-  } else {
-    news.forEach(o => knownPending.add(o.number));
-  }
-
-  document.getElementById('cntNew').textContent = news.length;
-  document.getElementById('cntProg').textContent = progs.length;
-  document.getElementById('cntActive').textContent = actives.length;
-  document.getElementById('cntDone').textContent = dones.length;
-  const bellCnt = document.getElementById('bellCnt');
-  bellCnt.hidden = news.length === 0;
-  bellCnt.textContent = news.length;
-
-  document.getElementById('stOrders').textContent = orders.length;
-  document.getElementById('stRevenue').textContent =
-    dones.reduce((s, o) => s + o.total, 0);
-  document.getElementById('stDrivers').textContent = DRIVERS.length;
-
-  document.getElementById('listNew').innerHTML =
-    news.length ? news.map(o => cardNew(o)).join('') :
-    '<div class="empty">' + tt('supervisor.empty.newOrders') + '</div>';
-
-  document.getElementById('listProgress').innerHTML =
-    progs.length ? progs.map(o => cardProgress(o)).join('') :
-    '<div class="empty">' + tt('supervisor.empty.inProgress') + '</div>';
-
-  document.getElementById('listActive').innerHTML =
-    actives.length ? actives.map(o => cardActive(o)).join('') :
-    '<div class="empty">' + tt('supervisor.empty.activeDelivery') + '</div>';
-
-  document.getElementById('listDone').innerHTML =
-    dones.length ? dones.slice(0, 20).map(o => cardDone(o)).join('') :
-    '<div class="empty">' + tt('supervisor.empty.deliveredToday') + '</div>';
 }
 
 /* ─── بطاقة طلب جديد ─── */
@@ -630,19 +506,18 @@ function cardNew(o) {
     <div class="oc-head">
       <span class="oc-num">${o.number}</span>
       ${typeBadge(o)}
-      <span class="oc-cust">👤 ${o.customer_name}</span>
-      <a class="oc-phone" href="tel:${o.customer_phone}">${o.customer_phone}</a>
+      <span class="oc-cust">👤 ${esc(o.customer_name)}</span>
+      <a class="oc-phone" href="tel:${esc(o.customer_phone)}">${esc(o.customer_phone)}</a>
       <span class="oc-total">${o.total} ${cur()}</span>
     </div>
-    ${o.customer_address ? `<div class="oc-line"><span class="lbl">📍 ${tt('supervisor.labels.address')}:</span> ${o.customer_address}
-      ${o.customer_lat ? `— <a class="map-link" target="_blank" href="https://www.google.com/maps?q=${o.customer_lat},${o.customer_lng}">${tt('supervisor.actions.viewMap')} 🗺️</a>` : ''}</div>` : ''}
-    <div class="oc-items">${o.items.map(i => `▪️ ${i.qty}× ${itemNameL(i)}${i.size ? ' (' + i.size + ')' : ''} — ${i.qty * i.price} ${cur()}`).join('<br>')}</div>
-    ${o.notes ? `<div class="oc-note">📝 ${o.notes}</div>` : ''}
-    <div class="oc-line"><span class="lbl">💵 ${tt('supervisor.labels.payment')}:</span> ${isPickup(o) ? tt('supervisor.badges.payment.atCashier') : (o.payment_method === 'cod' ? tt('supervisor.badges.payment.cod') : tt('supervisor.badges.payment.card'))}</div>
+    <div class="oc-line"><span class="oc-time fresh" data-time="${o.created_at}">${timeAgo(parseServerDate(o.created_at))}</span></div>
+    <div class="oc-line"><span class="lbl">${tt('supervisor.labels.address')}:</span> ${esc(o.customer_address || '—')}</div>
+    <div class="oc-items"><span class="lbl">${tt('supervisor.labels.items')}:</span> ${itemsLine(o.items)}</div>
+    ${o.notes ? `<div class="oc-note">📝 ${esc(o.notes)}</div>` : ''}
     <div class="oc-actions">
-      <button class="btn btn-ok" onclick="act(${o.id},'accepted')">${tt('supervisor.actions.confirm')}</button>
-      <button class="btn btn-err" onclick="act(${o.id},'cancelled')">${tt('supervisor.actions.reject')}</button>
-      <button class="btn btn-wa" onclick='waConfirm(${JSON.stringify(o).replace(/"/g, "&quot;")})'>${tt('supervisor.actions.waVerify')}</button>
+      <button class="btn btn-ok" onclick="act(${o.id},'accepted')">✅ ${tt('supervisor.actions.confirm')}</button>
+      <button class="btn btn-err" onclick="act(${o.id},'cancelled')">❌ ${tt('supervisor.actions.reject')}</button>
+      <button class="btn btn-wa" onclick='waConfirm(${JSON.stringify(o).replace(/"/g,"&quot;")})'>📱 ${tt('supervisor.actions.waVerify')}</button>
     </div>
   </div>`;
 }
@@ -651,34 +526,32 @@ function cardNew(o) {
 function cardProgress(o) {
   let actions = '';
   let poolInfo = '';
-
   if (o.status === 'accepted') {
-    actions =
-      `<button class="btn btn-gold" onclick="act(${o.id},'preparing')">${tt('supervisor.actions.preparing')}</button>
-       <button class="btn btn-wa" onclick='waConfirm(${JSON.stringify(o).replace(/"/g, "&quot;")})'>${tt('supervisor.actions.waVerify')}</button>`;
+    actions = `<button class="btn btn-gold" onclick="act(${o.id},'preparing')">👨‍🍳 ${tt('supervisor.actions.preparing')}</button>
+      <button class="btn btn-wa" onclick='waConfirm(${JSON.stringify(o).replace(/"/g,"&quot;")})'>📱 ${tt('supervisor.actions.waVerify')}</button>`;
   } else if (o.status === 'preparing') {
-    actions = `<button class="btn btn-gold" onclick="act(${o.id},'ready')">${isPickup(o) ? tt('supervisor.actions.readyForPickup') : tt('supervisor.actions.ready')}</button>`;
+    actions = `<button class="btn btn-gold" onclick="act(${o.id},'ready')">📦 ${isPickup(o) ? tt('supervisor.actions.readyForPickup') : tt('supervisor.actions.ready')}</button>`;
   } else if (o.status === 'ready') {
     if (isPickup(o)) {
       actions = `
-        <button class="btn btn-ok" onclick="act(${o.id},'delivered')">${tt('supervisor.actions.pickupFromBranch')}</button>
-        <span class="oc-type pickup" style="align-self:center">${tt('supervisor.actions.pickupHint')} ${o.total} ${tt('supervisor.actions.atCashier')}</span>`;
+        <button class="btn btn-ok" onclick="act(${o.id},'delivered')">✅ ${tt('supervisor.actions.pickupFromBranch')}</button>
+        <span style="align-self:center;font-weight:900;font-size:.78rem;color:var(--ok)">${tt('supervisor.actions.pickupHint')} ${o.total} ${tt('supervisor.actions.atCashier')}</span>`;
     } else {
       poolInfo = `
         <div class="pool-info">
           <div class="ico">📦</div>
           <div class="txt">
-            <b>${tt('supervisor.actions.sendToPool').replace('📦 ', '')}</b>
-            <small>${isEn() ? 'Available to all branch drivers — first to claim delivers it' : 'الطلب متاح لجميع سائقي الفرع — من يختاره أولاً يوصّله'}</small>
+            <b>${isEn() ? 'Ready for drivers pool' : 'جاهز لحوض السائقين'}</b>
+            <small>${isEn() ? 'Drivers will see and claim this order' : 'السائقون سيرون الطلب ويستلمونه'}</small>
           </div>
           <button class="pool-toggle" onclick="togglePoolAssign(${o.id})">${tt('supervisor.actions.assignDriver')} ↴</button>
         </div>
         <div class="pool-assign-wrap" id="poolWrap-${o.id}">
-          <small>${isEn() ? '🔧 Manual fallback (driver without app):' : '🔧 تعيين يدوي احتياطي (سائق بدون التطبيق):'}</small>
-          <div class="oc-actions">
+          <small>${isEn() ? 'Manual fallback — assign a specific driver' : 'احتياط يدوي — اختر سائقاً محدداً'}</small>
+          <div class="row">
             <select class="sel" id="drv-${o.id}">
               <option value="">${tt('supervisor.actions.chooseDriver')}</option>
-              ${DRIVERS.map(d => `<option value="${d.id}">${d.name}</option>`).join('')}
+              ${DRIVERS.map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('')}
             </select>
             <button class="btn btn-blue" onclick="assign(${o.id})">${tt('supervisor.actions.assignDriver')}</button>
           </div>
@@ -690,18 +563,17 @@ function cardProgress(o) {
     <div class="oc-head">
       <span class="oc-num">${o.number}</span>
       ${typeBadge(o)}
-      <span class="oc-cust">👤 ${o.customer_name}</span>
+      <span class="oc-cust">👤 ${esc(o.customer_name)}</span>
       <span class="oc-total">${o.total} ${cur()}</span>
     </div>
-    <div class="oc-line"><span class="lbl">${tt('supervisor.labels.status')}:</span> ${statusLbl(o)}</div>
+    <div class="oc-line">
+      <span class="lbl">${tt('supervisor.labels.status')}:</span> ${statusLbl(o)}
+      <span class="oc-time" data-time="${o.created_at}">${timeAgo(parseServerDate(o.created_at))}</span>
+    </div>
     ${poolInfo}
+    <div class="oc-items"><span class="lbl">${tt('supervisor.labels.items')}:</span> ${itemsLine(o.items)}</div>
     ${actions ? `<div class="oc-actions">${actions}</div>` : ''}
   </div>`;
-}
-
-function togglePoolAssign(id) {
-  const w = document.getElementById('poolWrap-' + id);
-  if (w) w.classList.toggle('show');
 }
 
 /* ─── بطاقة توصيل نشط ─── */
@@ -714,16 +586,22 @@ function cardActive(o) {
     <div class="oc-head">
       <span class="oc-num">${o.number}</span>
       ${typeBadge(o)}
-      <span class="oc-cust">🚗 ${o.driver_name || tt('supervisor.actions.unknownDriver')}</span>
-      ${o.driver_phone ? `<a class="oc-phone" href="tel:${o.driver_phone}">${o.driver_phone}</a>` : ''}
+      <span class="oc-cust">🚗 ${esc(o.driver_name || tt('supervisor.actions.unknownDriver'))}</span>
+      ${o.driver_phone ? `<a class="oc-phone" href="tel:${esc(o.driver_phone)}">${esc(o.driver_phone)}</a>` : ''}
     </div>
-    <div class="oc-line"><span class="lbl">👤 ${tt('supervisor.labels.customer')}:</span> ${o.customer_name} — <a class="oc-phone" href="tel:${o.customer_phone}">${o.customer_phone}</a></div>
-    <div class="oc-line"><span class="lbl">${tt('supervisor.labels.status')}:</span> ${statusLbl(o)} ${mapLink}</div>
+    <div class="oc-line">
+      <span class="lbl">👤 ${tt('supervisor.labels.customer')}:</span> ${esc(o.customer_name)} — 
+      <a class="oc-phone" href="tel:${esc(o.customer_phone)}">${esc(o.customer_phone)}</a>
+    </div>
+    <div class="oc-line">
+      <span class="lbl">${tt('supervisor.labels.status')}:</span> ${statusLbl(o)} ${mapLink}
+      <span class="oc-time" data-time="${o.created_at}">${timeAgo(parseServerDate(o.created_at))}</span>
+    </div>
     <div class="oc-line"><a class="map-link" target="_blank" href="track.html?order=${encodeURIComponent(o.number)}">${tt('supervisor.actions.openTracking')}</a></div>
   </div>`;
 }
 
-/* ─── بطاقة تسليم (v2.3: زر صورة الإثبات) ─── */
+/* ─── بطاقة تسليم ─── */
 function cardDone(o) {
   const photoBtn = isPickup(o) ? '' :
     `<button class="btn btn-plain" data-act="photo" data-id="${o.id}" title="${isEn() ? 'Delivery proof photo' : 'صورة إثبات التسليم'}">📸</button>`;
@@ -732,15 +610,76 @@ function cardDone(o) {
     <div class="oc-head">
       <span class="oc-num">${o.number}</span>
       ${typeBadge(o)}
-      <span class="oc-cust">👤 ${o.customer_name}</span>
+      <span class="oc-cust">👤 ${esc(o.customer_name)}</span>
       <span class="oc-total">${o.total} ${cur()}</span>
     </div>
-    <div class="oc-line"><span class="lbl">🚗 ${tt('supervisor.labels.driver')}:</span> ${isPickup(o) ? tt('supervisor.badges.pickup') : (o.driver_name || '—')}</div>
+    <div class="oc-line">
+      <span class="lbl">🚗 ${tt('supervisor.labels.driver')}:</span> 
+      ${isPickup(o) ? tt('supervisor.badges.pickup') : (o.driver_name ? esc(o.driver_name) : '—')}
+      <span class="oc-time" data-time="${o.delivered_at || o.updated_at || o.created_at}">${timeAgo(parseServerDate(o.delivered_at || o.updated_at || o.created_at))}</span>
+    </div>
     <div class="oc-actions">${photoBtn}</div>
   </div>`;
 }
 
-/* ─── تغيير حالة (v2.3: نوافذ branded) ─── */
+/* ─── العرض ─── */
+function render(first) {
+  const orders = LAST_ORDERS;
+  const news = orders.filter(o => o.status === 'pending');
+  const progs = orders.filter(o => ['accepted', 'preparing', 'ready'].includes(o.status));
+  const actives = orders.filter(o => ['driver_assigned', 'driver_at_restaurant', 'out_for_delivery'].includes(o.status));
+  const dones = orders.filter(o => o.status === 'delivered');
+
+  document.getElementById('listNew').innerHTML = news.length ? news.map(cardNew).join('') :
+    `<div class="order-card"><div style="text-align:center;color:var(--muted);font-weight:800;padding:1rem">${tt('supervisor.empty.newOrders')}</div></div>`;
+  document.getElementById('listProgress').innerHTML = progs.length ? progs.map(cardProgress).join('') :
+    `<div class="order-card"><div style="text-align:center;color:var(--muted);font-weight:800;padding:1rem">${tt('supervisor.empty.inProgress')}</div></div>`;
+  document.getElementById('listActive').innerHTML = actives.length ? actives.map(cardActive).join('') :
+    `<div class="order-card"><div style="text-align:center;color:var(--muted);font-weight:800;padding:1rem">${tt('supervisor.empty.activeDelivery')}</div></div>`;
+  document.getElementById('listDone').innerHTML = dones.length ? dones.slice(0, 20).map(cardDone).join('') :
+    `<div class="order-card"><div style="text-align:center;color:var(--muted);font-weight:800;padding:1rem">${tt('supervisor.empty.deliveredToday')}</div></div>`;
+
+  document.getElementById('cntNew').textContent = news.length;
+  document.getElementById('cntProg').textContent = progs.length;
+  document.getElementById('cntActive').textContent = actives.length;
+  document.getElementById('cntDone').textContent = dones.length;
+  document.getElementById('stToday').textContent = orders.length;
+  document.getElementById('stRev').textContent = dones.reduce((s, o) => s + o.total, 0);
+  document.getElementById('stDrv').textContent = DRIVERS.length;
+
+  const bell = document.getElementById('newCnt');
+  if (news.length) { bell.style.display = 'flex'; bell.textContent = news.length; }
+  else bell.style.display = 'none';
+
+  if (first) refreshTimeAgo();
+}
+
+/* ─── عرض الصورة ─── */
+function viewPhoto(id) {
+  const o = LAST_ORDERS.find(x => x.id === id);
+  if (!o) return;
+  const url = `${API}/api/orders/${id}/photo`;
+  fetch(url, { headers: { 'Authorization': 'Bearer ' + JWT } })
+    .then(r => {
+      if (!r.ok) throw new Error('no photo');
+      return r.blob();
+    })
+    .then(blob => {
+      const win = window.open('');
+      const u = URL.createObjectURL(blob);
+      win.document.write(`<html><head><title>${o.number}</title></head><body style="margin:0;background:#000;display:grid;place-items:center;min-height:100vh">
+        <img src="${u}" style="max-width:100%;max-height:100vh">
+        </body></html>`);
+    })
+    .catch(() => toast(isEn() ? '⚠️ No photo available' : '⚠️ لا توجد صورة', 'err'));
+}
+
+function togglePoolAssign(id) {
+  const w = document.getElementById('poolWrap-' + id);
+  if (w) w.classList.toggle('show');
+}
+
+/* ─── تغيير حالة ─── */
 async function act(id, status) {
   const o = LAST_ORDERS.find(x => x.id === id);
   if (status === 'cancelled') {
@@ -767,48 +706,59 @@ async function act(id, status) {
       method: 'PUT',
       body: JSON.stringify({ status }),
     });
-    toast(tt('supervisor.toast.statusUpdated'), 'ok');
+    toast('✓ ' + tt('supervisor.toast.statusUpdated'), 'ok');
     loadAll(false);
   } catch (e) {
     toast('⚠️ ' + e.message, 'err');
   }
 }
 
-/* ─── تعيين يدوي احتياطي ─── */
+/* ─── تعيين يدوي ─── */
 async function assign(id) {
   const sel = document.getElementById('drv-' + id);
   const driverId = sel ? sel.value : '';
-  if (!driverId) { toast(tt('supervisor.toast.chooseDriverFirst'), 'err'); return; }
+  if (!driverId) { toast('⚠️ ' + tt('supervisor.toast.chooseDriverFirst'), 'err'); return; }
   try {
     const r = await api(`/api/orders/${id}/assign`, {
       method: 'PUT',
       body: JSON.stringify({ driver_id: parseInt(driverId) }),
     });
-    toast(tt('supervisor.toast.driverAssigned') + ': ' + r.driver_name, 'ok');
+    toast('✓ ' + tt('supervisor.toast.driverAssigned') + ': ' + r.driver_name, 'ok');
     loadAll(false);
   } catch (e) {
     toast('⚠️ ' + e.message, 'err');
   }
 }
 
-/* ─── تفويض النقر لزر الصورة ─── */
-document.getElementById('listDone').addEventListener('click', function(e){
+/* ─── واتساب التأكيد ─── */
+function waConfirm(o) {
+  const msg = tt('messages.supConfirm', {
+    customer_name: o.customer_name,
+    supervisor_name: USER.name,
+    branch_name: branchName(),
+    order_number: o.number,
+    total: o.total,
+  });
+  const phone = o.customer_phone.replace(/[^0-9]/g, '');
+  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
+/* ─── تفويض النقر ─── */
+document.getElementById('listDone').addEventListener('click', function(e) {
   const b = e.target.closest('[data-act="photo"]');
-  if(!b) return;
+  if (!b) return;
   viewPhoto(+b.dataset.id);
 });
 
 /* ─── تقرير الطباعة ─── */
 function printReport() {
-  const orders = LAST_ORDERS;
-  const done = orders.filter(o => o.status === 'delivered');
+  const done = LAST_ORDERS.filter(o => o.status === 'delivered');
   const revenue = done.reduce((s, o) => s + o.total, 0);
   const fees = done.reduce((s, o) => s + o.delivery_fee, 0);
-
   document.getElementById('reportArea').innerHTML = `
-    <h2>🍝 ${tt('supervisor.report.title')} ${brDisplayName(orders[0] || {}) || USER.branchName || ''}</h2>
+    <h2>🍝 ${tt('supervisor.report.title')} ${branchName()}</h2>
     <p>${tt('supervisor.report.date')}: ${new Date().toLocaleString(isEn() ? 'en-GB' : 'ar-SA')}</p>
-    <p>${tt('supervisor.report.totalOrders')}: ${orders.length} | ${tt('supervisor.report.delivered')}: ${done.length} | ${tt('supervisor.report.revenue')}: ${revenue} ${cur()} | ${tt('supervisor.report.fees')}: ${fees} ${cur()}</p>
+    <p>${tt('supervisor.report.totalOrders')}: ${LAST_ORDERS.length} | ${tt('supervisor.report.delivered')}: ${done.length} | ${tt('supervisor.report.revenue')}: ${revenue} ${cur()} | ${tt('supervisor.report.fees')}: ${fees} ${cur()}</p>
     <table>
       <tr>
         <th>${tt('supervisor.report.columns.orderNum')}</th>
@@ -819,15 +769,15 @@ function printReport() {
         <th>${tt('supervisor.report.columns.status')}</th>
         <th>${tt('supervisor.report.columns.driver')}</th>
       </tr>
-      ${orders.map(o => `
+      ${LAST_ORDERS.map(o => `
         <tr>
           <td>${o.number}</td>
-          <td>${isPickup(o) ? (isEn()?'Pickup':'استلام') : (isEn()?'Delivery':'توصيل')}</td>
-          <td>${o.customer_name}</td>
-          <td>${o.customer_phone}</td>
+          <td>${isPickup(o) ? (isEn() ? 'Pickup' : 'استلام') : (isEn() ? 'Delivery' : 'توصيل')}</td>
+          <td>${esc(o.customer_name)}</td>
+          <td>${esc(o.customer_phone)}</td>
           <td>${o.total}</td>
           <td>${statusLbl(o)}</td>
-          <td>${isPickup(o) ? '🏪' : (o.driver_name || '—')}</td>
+          <td>${isPickup(o) ? '🏪' : (o.driver_name ? esc(o.driver_name) : '—')}</td>
         </tr>`).join('')}
     </table>
     <p style="margin-top:1rem">${tt('supervisor.report.savePdfHint')}</p>
@@ -851,14 +801,15 @@ async function logout() {
 /* ─── الإقلاع ─── */
 initStaffI18n({ autoLangToggle: false });
 syncLangUI();
-window.addEventListener('staff-lang-changed', function(){
+window.addEventListener('staff-lang-changed', function() {
   syncLangUI();
   render(false);
 });
-loadMenu().then(function(){
+loadMenu().then(function() {
   loadAll(true);
 });
 setInterval(() => loadAll(false), REFRESH_MS);
+setInterval(refreshTimeAgo, TIME_REFRESH_MS); // تحديث الوقت كل 5 ثوانٍ
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) loadAll(false);
 });
@@ -866,4 +817,4 @@ document.addEventListener('visibilitychange', () => {
 
 </body>
 </html>
-<!-- ===== END supervisor.html (v2.3) ===== -->
+<!-- ===== END supervisor.html (v2.4) ===== -->
