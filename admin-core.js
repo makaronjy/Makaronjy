@@ -1,5 +1,8 @@
-/* ===== admin-core.js — النواة: دخول + GitHub + نوافذ (v3.2) ===== */
-/* v3.2: حذف البانر الفعلي من GitHub + زر تنظيف الصور اليتيمة */
+/* ===== admin-core.js — النواة: دخول + GitHub + نوافذ (v3.4) ===== */
+/* v3.4: نشر صلب (4 محاولات + التقاط SHA من الخطأ)
+   + حذف البانر الفعلي من المستودع
+   + زر تنظيف الصور اليتيمة
+   كل ميزات v3.1 باقية */
 
 /* ===== إيقاف التكبير ===== */
 document.addEventListener(`touchstart`,
@@ -918,42 +921,78 @@ function settingsText(){
 return `window.APP_SETTINGS = ` +
 JSON.stringify(STATE.SETTINGS, null, 2) + `;\n`;
 }
-/* ===== نشر ذاتي الشفاء: بصمة حديثة قبل كل رفع + إعادة محاولة عند التعارض ===== */
-async function publishSettings(msg){
-try{
-var cur = await getFile(`settings.js`);
-STATE.shas.settings = cur.sha;
-var r = await putFile(`settings.js`,
-settingsText(), STATE.shas.settings, msg);
-STATE.shas.settings =
-r.content ? r.content.sha : r.sha;
-}catch(e){
-if(e.http !== 409 && e.http !== 412) throw e;
-var cur2 = await getFile(`settings.js`);
-STATE.shas.settings = cur2.sha;
-var r2 = await putFile(`settings.js`,
-settingsText(), STATE.shas.settings, msg);
-STATE.shas.settings =
-r2.content ? r2.content.sha : r2.sha;
+/* ===== v3.4: نشر صلب — 4 محاولات + التقاط SHA من الخطأ ===== */
+function isShaConflict(e){
+if(!e) return false;
+if(e.http === 409 || e.http === 412 || e.http === 422) return true;
+var m = (e.message || ``).toLowerCase();
+return m.includes(`does not match`) ||
+(m.includes(`sha`) && m.includes(`match`));
 }
+function shaFromError(e){
+var m = (e && e.message) ? e.message : ``;
+var hit = m.match(/[0-9a-f]{40}/);
+return hit ? hit[0] : null;
+}
+async function publishSettings(msg){
+var lastErr = null;
+for(var attempt = 0; attempt < 4; attempt++){
+try{
+var sha;
+var extracted = shaFromError(lastErr);
+if(lastErr && extracted && attempt >= 2){
+sha = extracted;
+}else{
+var cur = await getFile(`settings.js`);
+sha = cur.sha;
+}
+STATE.shas.settings = sha;
+var r = await putFile(`settings.js`,
+settingsText(), sha, msg);
+STATE.shas.settings =
+(r.content && r.content.sha) ? r.content.sha : sha;
+return;
+}catch(e){
+lastErr = e;
+if(!isShaConflict(e)) throw e;
+await new Promise(function(res){
+setTimeout(res, 350 * (attempt + 1));
+});
+}
+}
+lastErr.message = (lastErr.message || ``) +
+` — حل يدوي: اضغط «تحديث من المستودع» ثم أعد النشر`;
+throw lastErr;
 }
 async function publishMenu(msg){
+var lastErr = null;
+for(var attempt = 0; attempt < 4; attempt++){
 try{
+var sha;
+var extracted = shaFromError(lastErr);
+if(lastErr && extracted && attempt >= 2){
+sha = extracted;
+}else{
 var cur = await getFile(`menu.js`);
-STATE.shas.menu = cur.sha;
-var r = await putFile(`menu.js`,
-menuText(), STATE.shas.menu, msg);
-STATE.shas.menu =
-r.content ? r.content.sha : r.sha;
-}catch(e){
-if(e.http !== 409 && e.http !== 412) throw e;
-var cur2 = await getFile(`menu.js`);
-STATE.shas.menu = cur2.sha;
-var r2 = await putFile(`menu.js`,
-menuText(), STATE.shas.menu, msg);
-STATE.shas.menu =
-r2.content ? r2.content.sha : r2.sha;
+sha = cur.sha;
 }
+STATE.shas.menu = sha;
+var r = await putFile(`menu.js`,
+menuText(), sha, msg);
+STATE.shas.menu =
+(r.content && r.content.sha) ? r.content.sha : sha;
+return;
+}catch(e){
+lastErr = e;
+if(!isShaConflict(e)) throw e;
+await new Promise(function(res){
+setTimeout(res, 350 * (attempt + 1));
+});
+}
+}
+lastErr.message = (lastErr.message || ``) +
+` — حل يدوي: اضغط «تحديث من المستودع» ثم أعد النشر`;
+throw lastErr;
 }
 /* =====================================================
    ===== v15.4: السلايدر + أنظمة رسوم التوصيل =====
@@ -1143,27 +1182,31 @@ if(del){
 var k = +del.dataset.bndel;
 var bn = list[k];
 var ok = await askConfirm(
-`سيُحذف البانر من السلايدر ومن المستودع نهائياً.\n\nالملف: ${bn ? bn.img : `—`}`,
+`سيُحذف البانر من السلايدر ومن المستودع نهائياً.\n\nالملف: ` +
+(bn && bn.img ? bn.img : `—`),
 `حذف بانر`, `🗑`, `حذف`);
 if(!ok) return;
 list.splice(k, 1);
-/* v3.2: حذف الملف من GitHub فعلياً */
+/* v3.2: حذف الملف فعلياً من GitHub */
 if(bn && bn.img){
 try{
 toast(`جارٍ حذف الملف من المستودع...`, `info`);
-var f = await getFile(bn.img).catch(function(){ return null; });
+var f = await getFile(bn.img).catch(function(){
+return null;
+});
 if(f && f.sha){
-await ghDeleteFile(bn.img, f.sha, `حذف بانر غير مستخدم: ` + bn.img);
-toast(`✔ تم حذف الملف من GitHub`, `success`);
+await ghDeleteFile(bn.img, f.sha,
+`حذف بانر: ` + bn.img);
+toast(`✔ حُذف الملف من GitHub`, `success`);
 }else{
 toast(`الملف غير موجود بالمستودع أصلاً`, `info`);
 }
 }catch(err){
-toast(`⚠️ فشل حذف الملف: ` + err.message, `warn`);
+toast(`⚠️ تعذر حذف الملف: ` + err.message, `warn`);
 }
 }
 renderBannersAdmin();
-toast(`✔ تم الحذف من السلايدر — اضغط نشر`, `success`);
+toast(`✔ تم الحذف — اضغط نشر`, `success`);
 }
 });
 }
@@ -1344,4 +1387,4 @@ ensureV15Cards();
 renderBannersAdmin();
 return r;
 };
-/* ===== END admin-core.js (v3.2) ===== */
+/* ===== END admin-core.js (v3.4) ===== */
