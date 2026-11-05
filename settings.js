@@ -530,7 +530,7 @@ window.APP_SETTINGS = {
     "oncePerDay": true,
     "icon": "🍝",
     "titleAr": "افتتاح قريب",
-    "titleEn": "Coming Soon</label></div><div class=",
+    "titleEn": "Coming Soon</label></div><div class=</label></div><div class=",
     "textAr": "تابعونا على حساباتنا لمعرفة آخر العروض",
     "textEn": "Follow us on our accounts to stay updated on the latest offers",
     "btnAr": "حسناً 🍝",
@@ -549,13 +549,6 @@ window.APP_SETTINGS = {
       "id": "bn-1791995655463",
       "img": "img/banners/bn-1791995649509.png",
       "v": 1791995655463,
-      "titleAr": "",
-      "titleEn": ""
-    },
-    {
-      "id": "bn-1793837375872",
-      "img": "img/banners/bn-1793837372422.png",
-      "v": 1793837375873,
       "titleAr": "",
       "titleEn": ""
     }
