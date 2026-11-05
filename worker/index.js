@@ -1,13 +1,15 @@
 // ═══════════════════════════════════════════
 //  مكرونجي - Cloudflare Worker API (كامل)
-//  الإصدار: 1.7
-//  v1.7: حذف كسول فوري للطلبات المتوقفة ساعة
-//        (يعمل عند فتح أي صفحة — لا ينتظر Cron)
-//  يحتوي كل ميزات v1.6:
-//  • دفتر محاسبي دائم order_ledger
-//  • قاعدة الساعة + GET صورة الإثبات + accounting
-//  • حوض الطلبات + claim + login بالأسماء
-//  • أرقام عشوائية بدون # + مساران استلام/توصيل
+//  الإصدار: 1.8
+//  v1.8: إصلاح مسار التتبع:
+//        • رد /api/track يرسل إحداثيات العميل وعنوانه
+//          (كانت ناقصة ← كان المسار يُرسم للفرع بالخطأ)
+//        • موقع السائق = آخر إشارة GPS له مهما كان
+//          طلبه السابق (يدعم التسليم المتسلسل)
+//  يحتوي كل ميزات v1.7:
+//  • حذف كسول فوري للمهجور (ساعة) + دفتر محاسبي
+//  • GET صورة الإثبات + تقارير accounting
+//  • حوض الطلبات + claim + أرقام عشوائية بدون #
 // ═══════════════════════════════════════════
 
 const CORS_HEADERS = {
@@ -132,8 +134,7 @@ async function ledgerInsert(env, order, kind) {
 }
 
 // ═══════════════════════════════════════════
-//  v1.7: الحذف الكسول — أي طلب غير مسلّم توقف ساعة
-//  يُقيَّد في الدفتر (إن لم يُقيَّد بعد) ثم يُحذف نهائياً
+//  الحذف الكسول (طلب غير مسلّم متوقف ساعة)
 // ═══════════════════════════════════════════
 async function purgeStaleOrders(env) {
   try {
@@ -398,10 +399,11 @@ async function handleCreateOrder(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  5) تتبع الطلب (v1.7: + purge)
+//  5) تتبع الطلب
+//  v1.8: يرسل إحداثيات العميل + عنوانه
+//        + موقع السائق = آخر إشارة له (أي طلب)
 // ═══════════════════════════════════════════
 async function handleTrackOrder(orderNumber, env) {
-  await purgeStaleOrders(env);
   const order = await env.DB.prepare(`
     SELECT o.*, b.name_ar as branch_name, b.phone as branch_phone, b.lat as branch_lat, b.lng as branch_lng,
       u.name as driver_name, u.phone as driver_phone
@@ -412,22 +414,40 @@ async function handleTrackOrder(orderNumber, env) {
   if (!order) return error('الطلب غير موجود', 404);
   const trackingResult = await env.DB.prepare(`SELECT status, notes, created_at FROM order_tracking WHERE order_id = ? ORDER BY created_at ASC`).bind(order.id).all();
   const isPickup = order.order_type === 'pickup';
+
+  // v1.8: آخر إشارة GPS للسائق مهما كان طلبه السابق
   let driverLocation = null;
   if (!isPickup && order.driver_id && order.status !== 'delivered' && order.status !== 'cancelled') {
-    driverLocation = await env.DB.prepare(`SELECT lat, lng, created_at FROM driver_locations WHERE order_id = ? ORDER BY created_at DESC LIMIT 1`).bind(order.id).first();
+    driverLocation = await env.DB.prepare(`
+      SELECT lat, lng, created_at FROM driver_locations
+      WHERE driver_id = ? ORDER BY created_at DESC LIMIT 1
+    `).bind(order.driver_id).first();
   }
+
   return json({
     order: {
-      number: order.order_number, status: order.status, status_text: statusTextFor(order),
-      order_type: order.order_type || 'delivery', customer_name: order.customer_name,
-      subtotal: order.subtotal, delivery_fee: order.delivery_fee, total: order.total,
-      payment_method: order.payment_method, created_at: order.created_at,
-      items: JSON.parse(order.items_json), notes: order.notes,
+      number: order.order_number,
+      status: order.status,
+      status_text: statusTextFor(order),
+      order_type: order.order_type || 'delivery',
+      customer_name: order.customer_name,
+      // v1.8: وجهة العميل كاملة (كانت ناقصة!)
+      customer_address: order.customer_address || '',
+      customer_lat: order.customer_lat,
+      customer_lng: order.customer_lng,
+      subtotal: order.subtotal,
+      delivery_fee: order.delivery_fee,
+      total: order.total,
+      payment_method: order.payment_method,
+      created_at: order.created_at,
+      items: JSON.parse(order.items_json),
+      notes: order.notes,
     },
     branch: { name: order.branch_name, phone: order.branch_phone, lat: order.branch_lat, lng: order.branch_lng },
     driver: (!isPickup && order.driver_id) ? {
       name: order.driver_name, phone: order.driver_phone,
-      lat: driverLocation?.lat || order.driver_lat, lng: driverLocation?.lng || order.driver_lng,
+      lat: driverLocation?.lat || order.driver_lat,
+      lng: driverLocation?.lng || order.driver_lng,
       last_update: driverLocation?.created_at || null,
     } : null,
     tracking: trackingResult.results,
@@ -436,7 +456,7 @@ async function handleTrackOrder(orderNumber, env) {
 }
 
 // ═══════════════════════════════════════════
-//  6) طلبات المشرف (v1.7: + purge فوري)
+//  6) طلبات المشرف (+ purge فوري)
 // ═══════════════════════════════════════════
 async function handleSupervisorOrders(request, env) {
   const auth = await requireAuth(request, env, ['supervisor', 'super_admin']);
@@ -456,6 +476,7 @@ async function handleSupervisorOrders(request, env) {
     subtotal: o.subtotal, delivery_fee: o.delivery_fee, total: o.total, payment_method: o.payment_method,
     status: o.status, status_text: statusTextFor(o),
     driver_id: o.driver_id, driver_name: o.driver_name, driver_phone: o.driver_phone,
+    driver_lat: o.driver_lat, driver_lng: o.driver_lng,
     notes: o.notes, created_at: o.created_at,
   }));
   return json({ orders, count: orders.length, supervisor_name: auth.user.name, branch_name: orders[0]?.branch_name || null });
@@ -472,7 +493,7 @@ async function handleSupervisorDrivers(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  8) حوض طلبات الفرع (v1.7: + purge)
+//  8) حوض طلبات الفرع (+ purge)
 // ═══════════════════════════════════════════
 async function handleBranchPool(request, env) {
   const auth = await requireAuth(request, env, ['driver', 'supervisor', 'super_admin']);
@@ -528,7 +549,7 @@ async function handleClaim(orderId, request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  10) توصيلات السائق (v1.7: + purge)
+//  10) توصيلات السائق (+ purge)
 // ═══════════════════════════════════════════
 async function handleDriverOrders(request, env) {
   const auth = await requireAuth(request, env, ['driver']);
@@ -682,7 +703,7 @@ async function handleGetPhoto(orderId, request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  16) كل الطلبات (المالك) (v1.7: + purge)
+//  16) كل الطلبات (المالك) (+ purge)
 // ═══════════════════════════════════════════
 async function handleAdminOrders(request, env) {
   const auth = await requireAuth(request, env, ['super_admin']);
@@ -958,7 +979,7 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
     try {
-      if (path === '/api/health' && request.method === 'GET') return json({ status: 'ok', version: '1.7', live_mode: env.LIVE_MODE || 'polling' });
+      if (path === '/api/health' && request.method === 'GET') return json({ status: 'ok', version: '1.8', live_mode: env.LIVE_MODE || 'polling' });
       if (path === '/api/auth/login' && request.method === 'POST') return await handleLogin(request, env);
       if (path === '/api/auth/admin-bridge' && request.method === 'POST') return await handleAdminBridge(request, env);
       if (path === '/api/auth/change-password' && request.method === 'POST') return await handleChangePassword(request, env);
@@ -996,7 +1017,7 @@ export default {
   },
 
   // ═════════════════════════════════════════
-  //  المهام المجدولة (v1.7: أي cron غير الـ3 فجراً = purge)
+  //  المهام المجدولة
   // ═════════════════════════════════════════
   async scheduled(event, env, ctx) {
     try {
@@ -1048,7 +1069,7 @@ export default {
           await env.BACKUPS.delete(sorted.slice(0, list.objects.length - 30).map(o => o.key));
         }
       } else {
-        // أي cron آخر (مثلاً كل 10 دقائق) = purge فوري
+        // أي cron آخر (كل 10 دقائق): حذف كسول فوري
         await purgeStaleOrders(env);
       }
     } catch (e) { console.error('Cron error:', e); }
@@ -1056,5 +1077,5 @@ export default {
 };
 
 // ═══════════════════════════════════════════
-//  نهاية worker/index.js (v1.7)
+//  نهاية worker/index.js (v1.8)
 // ═══════════════════════════════════════════
