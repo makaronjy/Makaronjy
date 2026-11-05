@@ -27,18 +27,9 @@ header .nm{flex:1;min-width:0}
 header .nm b{display:block;font-size:.95rem;font-weight:900}
 header .nm small{color:var(--ok);font-size:.68rem;font-weight:800}
 header button.logout{border:1.5px solid var(--line);background:var(--card);color:var(--ink);border-radius:12px;padding:.5rem .9rem;font-family:inherit;font-weight:900;font-size:.78rem;cursor:pointer}
-.lang-toggle{
-  display:inline-flex;background:#ffffff10;border:1px solid var(--line);
-  border-radius:50px;padding:3px;gap:2px;
-}
-.lang-toggle button{
-  padding:.3rem .72rem;border-radius:50px;border:none;
-  background:transparent;color:var(--muted);
-  font-family:inherit;font-weight:900;font-size:.72rem;cursor:pointer;
-}
-.lang-toggle button.active{
-  background:linear-gradient(135deg,var(--gold2),var(--gold));color:#3b1d0a;
-}
+.lang-toggle{display:inline-flex;background:#ffffff10;border:1px solid var(--line);border-radius:50px;padding:3px;gap:2px}
+.lang-toggle button{padding:.3rem .72rem;border-radius:50px;border:none;background:transparent;color:var(--muted);font-family:inherit;font-weight:900;font-size:.72rem;cursor:pointer}
+.lang-toggle button.active{background:linear-gradient(135deg,var(--gold2),var(--gold));color:#3b1d0a}
 .wrap{max-width:560px;margin:0 auto;padding:1rem}
 .stats{display:grid;grid-template-columns:1fr 1fr;gap:.7rem;margin-bottom:1rem}
 .stat{background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:.9rem;text-align:center}
@@ -47,9 +38,17 @@ header button.logout{border:1.5px solid var(--line);background:var(--card);color
 h3.sec{font-size:.95rem;font-weight:900;color:var(--gold);margin:.4rem 0 .6rem}
 h3.sec .cnt{background:var(--maroon);color:var(--gold);border-radius:50px;padding:.1rem .6rem;font-size:.72rem;font-weight:900;margin-inline-start:.4rem}
 .active{background:var(--card);border:2px solid var(--ok);border-radius:20px;padding:1rem;box-shadow:0 0 24px rgba(34,197,94,.25);margin-bottom:1rem}
-.active .top{display:flex;gap:.5rem;justify-content:flex-end;flex-wrap:wrap;margin-bottom:.8rem}
+.active .top{display:flex;gap:.5rem;justify-content:flex-end;flex-wrap:wrap;margin-bottom:.8rem;align-items:center}
 .badge-num{background:var(--maroon);color:var(--gold);border-radius:12px;padding:.35rem .9rem;font-weight:900;font-size:1rem;direction:ltr}
 .badge-fee{background:var(--gold2);color:#3b1d0a;border-radius:12px;padding:.35rem .9rem;font-weight:900;font-size:.85rem}
+/* ═══ شارة الوقت النسبي + الألوان الذكية ═══ */
+.tm{display:inline-flex;align-items:center;font-size:.68rem;font-weight:900;border-radius:50px;padding:.2rem .7rem;background:var(--card2);border:1px solid var(--line);color:var(--muted);direction:ltr;transition:background .4s,color .4s,border-color .4s}
+/* 🟢 جديد: أقل من 5 دقائق */
+.tm.fresh{background:var(--okbg);border-color:var(--ok);color:#bbf7d0}
+/* 🔴 متأخر: أكثر من 30 دقيقة */
+.tm.late{background:var(--errbg);border-color:var(--err);color:#fecaca;animation:latePulse 2s infinite}
+@keyframes latePulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.4)}50%{box-shadow:0 0 0 6px rgba(239,68,68,0)}}
+/* ⚪ عادي: 5-30 دقيقة = الشكل الافتراضي بدون كلاس */
 .steps3{display:flex;align-items:center;justify-content:space-between;margin:.6rem .2rem 1rem;direction:ltr}
 .st3{display:flex;flex-direction:column;align-items:center;gap:.3rem;flex:0 0 auto;width:64px}
 .st3 .ic{width:44px;height:44px;border-radius:50%;background:var(--card2);border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:1.15rem;color:var(--muted)}
@@ -87,7 +86,7 @@ h3.sec .cnt{background:var(--maroon);color:var(--gold);border-radius:50px;paddin
 .done-card b{flex:1;font-size:.85rem;font-weight:900}
 .done-card button{border:none;border-radius:10px;background:var(--wa);color:#fff;padding:.55rem .9rem;font-family:inherit;font-weight:900;font-size:.78rem;cursor:pointer}
 .hist{background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:.8rem;margin-top:.6rem}
-.hist .row{display:flex;justify-content:space-between;gap:.5rem;font-size:.78rem;font-weight:800;padding:.45rem 0;border-bottom:1px dashed var(--line)}
+.hist .row{display:flex;justify-content:space-between;gap:.5rem;font-size:.78rem;font-weight:800;padding:.45rem 0;border-bottom:1px dashed var(--line);align-items:center;flex-wrap:wrap}
 .hist .row:last-child{border-bottom:none}
 .hist .row .n{color:var(--gold);direction:ltr}
 .hist .row .m{color:var(--muted)}
@@ -95,47 +94,21 @@ h3.sec .cnt{background:var(--maroon);color:var(--gold);border-radius:50px;paddin
 #toast{position:fixed;bottom:1rem;inset-inline:0;display:flex;flex-direction:column;align-items:center;gap:.4rem;z-index:99;pointer-events:none}
 .tst{background:var(--errbg);color:#fecaca;border-radius:50px;padding:.65rem 1.3rem;font-weight:900;font-size:.8rem;box-shadow:0 8px 24px rgba(0,0,0,.4);max-width:92vw;text-align:center}
 .tst.ok{background:var(--okbg);color:#bbf7d0}
-
-/* v2.4: نوافذ التأكيد branded */
-.mk-confirm{
-  position:fixed;inset:0;z-index:5200;
-  background:rgba(11,18,32,.82);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-  display:none;align-items:center;justify-content:center;padding:1rem;
-  animation:mkFade .2s ease;
-}
-.mk-confirm.show{display:flex}
+/* النافذة branded */
+.mk-confirm{position:fixed;inset:0;z-index:5200;background:rgba(11,18,32,.82);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;padding:1rem}
+.mk-confirm.show{display:flex;animation:mkFade .2s ease}
 @keyframes mkFade{from{opacity:0}to{opacity:1}}
-.mk-confirm .box{
-  background:linear-gradient(180deg,#1a243a 0%, #111a2e 100%);
-  border:2px solid var(--gold2);border-radius:22px;
-  padding:1.5rem 1.2rem;max-width:360px;width:100%;
-  box-shadow:0 20px 60px rgba(0,0,0,.6);
-  animation:mkPop .25s cubic-bezier(.2,.9,.3,1.3);
-}
+.mk-confirm .box{background:linear-gradient(180deg,#1a243a 0%,#111a2e 100%);border:2px solid var(--gold2);border-radius:22px;padding:1.5rem 1.2rem;max-width:360px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.6);animation:mkPop .25s cubic-bezier(.2,.9,.3,1.3)}
 @keyframes mkPop{from{transform:scale(.9);opacity:0}to{transform:scale(1);opacity:1}}
 .mk-confirm .ico{font-size:2.4rem;text-align:center;margin-bottom:.3rem}
-.mk-confirm h3{
-  text-align:center;color:var(--gold);
-  font-size:1.05rem;font-weight:900;margin-bottom:.6rem;
-}
-.mk-confirm .msg{
-  background:rgba(255,255,255,.04);border:1px solid var(--line);
-  border-radius:12px;padding:.8rem .9rem;margin-bottom:1rem;
-  font-size:.85rem;font-weight:700;color:var(--ink);line-height:1.7;text-align:center;
-}
+.mk-confirm h3{text-align:center;color:var(--gold);font-size:1.05rem;font-weight:900;margin-bottom:.6rem}
+.mk-confirm .msg{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:12px;padding:.8rem .9rem;margin-bottom:.6rem;font-size:.85rem;font-weight:700;color:var(--ink);line-height:1.7;text-align:center}
+.mk-confirm .meta{padding:.5rem .7rem;background:rgba(242,185,95,.1);border:1px dashed var(--gold2);border-radius:10px;font-size:.72rem;color:var(--gold2);text-align:center;font-weight:800;margin-bottom:.9rem;direction:ltr}
 .mk-confirm .acts{display:flex;gap:.5rem}
-.mk-confirm .acts button{
-  flex:1;border:none;border-radius:12px;padding:.8rem;
-  font-family:inherit;font-weight:900;font-size:.88rem;cursor:pointer;
-}
+.mk-confirm .acts button{flex:1;border:none;border-radius:12px;padding:.8rem;font-family:inherit;font-weight:900;font-size:.88rem;cursor:pointer}
 .mk-confirm .btn-yes{background:linear-gradient(135deg,var(--gold2),var(--gold));color:#3b1d0a}
 .mk-confirm .btn-no{background:var(--card);color:var(--ink);border:1.5px solid var(--line) !important}
 .mk-confirm .btn-err{background:var(--err);color:#fff}
-.mk-confirm .meta{
-  margin-top:.6rem;padding:.5rem .7rem;background:rgba(242,185,95,.1);
-  border:1px dashed var(--gold2);border-radius:10px;
-  font-size:.72rem;color:var(--gold2);text-align:center;font-weight:800;
-}
 </style>
 </head>
 <body>
@@ -180,7 +153,6 @@ h3.sec .cnt{background:var(--maroon);color:var(--gold);border-radius:50px;paddin
   </div>
 </div>
 
-<!-- نافذة التأكيد branded -->
 <div class="mk-confirm" id="mkConfirm">
   <div class="box">
     <div class="ico" id="mkCfIco">⚠️</div>
@@ -201,7 +173,17 @@ h3.sec .cnt{background:var(--maroon);color:var(--gold);border-radius:50px;paddin
 <script src="i18n-staff.js"></script>
 
 <script>
+/* ═══════════════════════════════════════════
+   مكرونجي — بوابة السائق (v2.5.1)
+   الثوابت الصحيحة:
+   • REFRESH_MS = 10000  ← بيانات كل 10 ثوانٍ (توفير حصة Worker)
+   • TIME_REFRESH_MS = 5000 ← وقت نسبي كل 5 ثوانٍ (محلي مجاني)
+   الألوان الذكية: 🟢 <5د | ⚪ 5-30د | 🔴 >30د
+   ═══════════════════════════════════════════ */
 const API = 'https://makaronjy-api.makaronjy.workers.dev';
+const REFRESH_MS = 10000;      // 10 ثوانٍ للتحديث الدوري (بيانات من Worker)
+const TIME_REFRESH_MS = 5000;  // 5 ثوانٍ للوقت النسبي (محلي مجاني 100%)
+
 let JWT = localStorage.getItem('mk_driver_jwt') || '';
 let ME = null;
 try { ME = JSON.parse(localStorage.getItem('mk_driver_me') || 'null'); } catch(e){}
@@ -214,7 +196,65 @@ let MENU_DATA = null;
 let MENU_LOADING = null;
 
 /* ═══════════════════════════════════════════
-   v2.4: جلب المنيو لترجمة الأصناف القديمة
+   الزمن النسبي + الألوان الذكية (توقيت الرياض)
+   ═══════════════════════════════════════════ */
+function parseServerDate(str){
+  if(!str) return null;
+  let s = String(str);
+  if(!s.includes('T') && !s.includes('Z')) s = s.replace(' ', 'T') + 'Z';
+  return new Date(s);
+}
+function timeAgo(date){
+  if(!date) return '—';
+  const sec = Math.floor((Date.now() - date.getTime()) / 1000);
+  const en = isEn();
+  if(sec < 5) return en ? 'just now' : 'الآن';
+  if(sec < 60) return en ? sec + 's ago' : 'قبل ' + sec + ' ثانية';
+  const min = Math.floor(sec / 60);
+  if(min < 60){
+    if(en) return min + ' min ago';
+    if(min === 1) return 'قبل دقيقة';
+    if(min === 2) return 'قبل دقيقتين';
+    if(min <= 10) return 'قبل ' + min + ' دقائق';
+    return 'قبل ' + min + ' دقيقة';
+  }
+  const hr = Math.floor(min / 60);
+  if(hr < 24){
+    if(en) return hr + (hr === 1 ? ' hour ago' : ' hours ago');
+    if(hr === 1) return 'قبل ساعة';
+    if(hr === 2) return 'قبل ساعتين';
+    if(hr <= 10) return 'قبل ' + hr + ' ساعات';
+    return 'قبل ' + hr + ' ساعة';
+  }
+  const day = Math.floor(hr / 24);
+  if(day === 1) return en ? 'yesterday' : 'أمس';
+  if(day < 7) return en ? day + ' days ago' : 'قبل ' + day + ' أيام';
+  return date.toLocaleDateString(en ? 'en-GB' : 'ar-SA', {day:'2-digit', month:'short'});
+}
+/* 🟢 fresh: <5 دقائق | ⚪ '': 5-30 دقيقة | 🔴 late: >30 دقيقة */
+function timeClass(date){
+  if(!date) return '';
+  const sec = (Date.now() - date.getTime()) / 1000;
+  if(sec < 300) return 'fresh';
+  if(sec < 1800) return '';
+  return 'late';
+}
+function refreshTimeAgo(){
+  document.querySelectorAll('.tm[data-time]').forEach(function(elx){
+    const dt = parseServerDate(elx.dataset.time);
+    if(dt){
+      elx.textContent = timeAgo(dt);
+      elx.className = 'tm ' + timeClass(dt);
+    }
+  });
+}
+function tmBadge(ts){
+  const dt = parseServerDate(ts);
+  return '<span class="tm ' + timeClass(dt) + '" data-time="' + esc(ts) + '">' + timeAgo(dt) + '</span>';
+}
+
+/* ═══════════════════════════════════════════
+   ترجمة المنيو (الأصناف القديمة)
    ═══════════════════════════════════════════ */
 async function loadMenu(){
   if(MENU_DATA) return MENU_DATA;
@@ -256,26 +296,24 @@ function itemNameL(i){
 }
 
 /* ═══════════════════════════════════════════
-   v2.4: نافذة التأكيد branded
+   نافذة التأكيد branded
    ═══════════════════════════════════════════ */
 let _cfResolve = null;
 function confirmModal(msg, opts){
   opts = opts || {};
   return new Promise(function(resolve){
     _cfResolve = resolve;
-    const el = document.getElementById('mkConfirm');
     document.getElementById('mkCfIco').textContent = opts.icon || '⚠️';
     document.getElementById('mkCfTitle').textContent = opts.title || tt('common.confirm');
     document.getElementById('mkCfMsg').textContent = msg;
     const meta = document.getElementById('mkCfMeta');
     if(opts.meta){ meta.textContent = opts.meta; meta.style.display = ''; }
-    else { meta.style.display = 'none'; }
+    else meta.style.display = 'none';
     const yesBtn = document.getElementById('mkCfYes');
-    const noBtn = document.getElementById('mkCfNo');
+    document.getElementById('mkCfNo').textContent = opts.no || tt('common.cancel');
     yesBtn.textContent = opts.yes || tt('common.confirm');
-    noBtn.textContent = opts.no || tt('common.cancel');
     yesBtn.className = opts.danger ? 'btn-err' : 'btn-yes';
-    el.classList.add('show');
+    document.getElementById('mkConfirm').classList.add('show');
   });
 }
 document.getElementById('mkCfYes').addEventListener('click', function(){
@@ -288,7 +326,7 @@ document.getElementById('mkCfNo').addEventListener('click', function(){
 });
 
 /* ═══════════════════════════════════════════
-   v2.4: ضغط الصورة داخلياً قبل الإرسال
+   ضغط الصور داخلياً قبل الإرسال
    ═══════════════════════════════════════════ */
 async function compressImage(file, maxDim, quality){
   maxDim = maxDim || 1000;
@@ -304,8 +342,7 @@ async function compressImage(file, maxDim, quality){
         else { w = Math.round(w * maxDim / h); h = maxDim; }
       }
       const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
+      canvas.width = w; canvas.height = h;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, w, h);
       canvas.toBlob(function(blob){
@@ -313,10 +350,7 @@ async function compressImage(file, maxDim, quality){
         resolve(blob);
       }, 'image/jpeg', quality);
     };
-    img.onerror = function(){
-      URL.revokeObjectURL(url);
-      reject(new Error('image load failed'));
-    };
+    img.onerror = function(){ URL.revokeObjectURL(url); reject(new Error('image load failed')); };
     img.src = url;
   });
 }
@@ -351,7 +385,6 @@ function brDisplayName(nameAr){
   }
   return nameAr || '';
 }
-
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function toast(m, ok){
   const d = document.createElement('div');
@@ -422,6 +455,7 @@ function logout(){
   document.getElementById('loginScr').classList.remove('hidden');
 }
 
+/* ===== الدخول ===== */
 document.getElementById('btnLogin').addEventListener('click', async function(){
   const u = document.getElementById('inUser').value.trim();
   const p = document.getElementById('inPass').value;
@@ -442,10 +476,8 @@ document.getElementById('btnLogin').addEventListener('click', async function(){
 });
 document.getElementById('btnLogout').addEventListener('click', async function(){
   const ok = await confirmModal(tt('driver.confirmLogout'), {
-    icon: '🚪',
-    title: tt('common.logout'),
-    yes: tt('common.confirm'),
-    no: tt('common.cancel')
+    icon: '🚪', title: tt('common.logout'),
+    yes: tt('common.confirm'), no: tt('common.cancel')
   });
   if(ok) logout();
 });
@@ -457,6 +489,7 @@ function enterApp(){
   load();
 }
 
+/* ===== التحميل ===== */
 async function load(){
   try{
     const [d, p] = await Promise.all([
@@ -475,18 +508,19 @@ function renderAll(){
   renderActive();
   renderPool();
   renderHist();
+  refreshTimeAgo();
 }
 
 function activeOrder(){
   return ORDERS.find(o => ['driver_assigned','driver_at_restaurant','out_for_delivery'].includes(o.status)) || null;
 }
 
-/* قائمة الأصناف مترجمة */
 function itemsLine(items){
   if(!items || !items.length) return '—';
   return items.map(i => (i.qty||1) + '× ' + esc(itemNameL(i)) + (i.size ? ' ('+esc(i.size)+')' : '')).join(' • ');
 }
 
+/* ===== بطاقة التوصيل الحالي ===== */
 function renderActive(){
   const box = document.getElementById('activeBox');
   const o = activeOrder();
@@ -524,7 +558,7 @@ function renderActive(){
   }
   box.innerHTML =
     '<div class="active">' +
-      '<div class="top"><span class="badge-fee">' + tt('driver.info.deliveryFee') + ' ' + (o.delivery_fee || 0) + ' ' + cur() + '</span><span class="badge-num">' + esc(o.number) + '</span></div>' +
+      '<div class="top"><span class="badge-fee">' + tt('driver.info.deliveryFee') + ' ' + (o.delivery_fee || 0) + ' ' + cur() + '</span>' + tmBadge(o.created_at) + '<span class="badge-num">' + esc(o.number) + '</span></div>' +
       stepsHtml +
       '<div class="info">👤 <span class="lb">' + tt('driver.info.customer') + ':</span> ' + esc(o.customer_name) + ' — <a href="tel:' + esc(o.customer_phone) + '">📞 ' + tt('driver.actions.call').replace('📞 ','') + '</a></div>' +
       '<div class="info">📍 <span class="lb">' + tt('driver.info.address') + ':</span> ' + (esc(o.customer_address) || '—') + ' — ' + navLink + '</div>' +
@@ -534,6 +568,7 @@ function renderActive(){
     '</div>';
 }
 
+/* ===== الحوض (الأقرب أولاً) ===== */
 function sortPool(){
   const ref = MY_LOC;
   POOL.forEach(function(o, i){
@@ -567,7 +602,7 @@ function renderPool(){
       ? ''
       : '<button class="pca-wa" data-act="wa-nogps" data-id="' + o.id + '">' + tt('driver.actions.wa') + '</button>';
     return '<div class="pool-card' + (o._hasGps ? '' : ' nogps') + '">' +
-      '<div class="pc-head"><span class="badge-num">' + esc(o.number) + '</span><span class="badge-fee">💵 ' + o.total + ' ' + cur() + '</span>' + distBadge + '</div>' +
+      '<div class="pc-head"><span class="badge-num">' + esc(o.number) + '</span><span class="badge-fee">💵 ' + o.total + ' ' + cur() + '</span>' + distBadge + tmBadge(o.created_at) + '</div>' +
       '<div class="pc-line">👤 <span class="lb">' + tt('driver.info.customer') + ':</span> ' + esc(o.customer_name) + '</div>' +
       '<div class="pc-line">📍 <span class="lb">' + tt('driver.info.address') + ':</span> ' + (esc(o.customer_address) || '—') + '</div>' +
       '<div class="pc-line">🧾 <span class="lb">' + tt('track.items.title') + ':</span> ' + itemsLine(o.items) + '</div>' +
@@ -582,6 +617,7 @@ function renderPool(){
   }).join('');
 }
 
+/* ===== السجل + بطاقة آخر تسليم ===== */
 function renderHist(){
   const box = document.getElementById('histBox');
   let extra = '';
@@ -590,17 +626,19 @@ function renderHist(){
       '<div class="done-card">' +
         '<span class="n">' + esc(LAST_DELIVERED.number) + '</span>' +
         '<b>🎉 ' + tt('driver.lastDelivery.title') + ' — ' + esc(LAST_DELIVERED.customer_name) + '</b>' +
+        tmBadge(LAST_DELIVERED.created_at) +
         '<button data-act="wa-thanks">' + tt('driver.lastDelivery.thanks') + '</button>' +
       '</div>';
   }
   const done = ORDERS.filter(o => o.status === 'delivered').slice(0, 15);
   box.innerHTML = extra + (done.length
     ? '<div class="hist">' + done.map(function(o){
-        return '<div class="row"><span class="n">' + esc(o.number) + '</span><span>' + esc(brDisplayName(o.branch_name)) + '</span><span class="m">' + o.total + ' ' + cur() + '</span></div>';
+        return '<div class="row"><span class="n">' + esc(o.number) + '</span><span>' + esc(brDisplayName(o.branch_name)) + '</span>' + tmBadge(o.created_at) + '<span class="m">' + o.total + ' ' + cur() + '</span></div>';
       }).join('') + '</div>'
     : (extra ? '' : '<div class="empty">' + tt('driver.empty.noHistory') + '</div>'));
 }
 
+/* ===== الإجراءات ===== */
 async function onAction(e){
   const b = e.target.closest('[data-act]');
   if(!b) return;
@@ -670,7 +708,7 @@ document.getElementById('activeBox').addEventListener('click', onAction);
 document.getElementById('histBox').addEventListener('click', onAction);
 document.getElementById('poolBox').addEventListener('click', onAction);
 
-/* v2.4: ضغط الصورة ثم الإرسال */
+/* صورة مضغوطة ثم تسليم */
 document.getElementById('photoInput').addEventListener('change', async function(){
   const f = this.files && this.files[0];
   this.value = '';
@@ -679,10 +717,8 @@ document.getElementById('photoInput').addEventListener('change', async function(
   let finalBlob = f;
   try{
     finalBlob = await compressImage(f, 1000, 0.65);
-    /* لو الضغط أنجح من الأصل (أكبر منه)، استرجع الأصل */
     if(finalBlob.size > f.size) finalBlob = f;
   }catch(e){
-    console.warn('compress failed, using original', e);
     finalBlob = f;
   }
   try{
@@ -690,7 +726,6 @@ document.getElementById('photoInput').addEventListener('change', async function(
     await api('/api/orders/' + photoForOrder + '/photo', { method:'POST', body: JSON.stringify({photo_base64: b64}) });
     await api('/api/orders/' + photoForOrder + '/status', { method:'PUT', body: JSON.stringify({status:'delivered'}) });
     LAST_DELIVERED = o;
-    const origKB = Math.round(f.size / 1024);
     const compKB = Math.round(finalBlob.size / 1024);
     toast(tt('driver.actions.deliveredWithPhoto') + ' (' + compKB + 'KB)', true);
     photoForOrder = null;
@@ -715,7 +750,10 @@ function sendLocation(){
   }, function(){}, {enableHighAccuracy:true, timeout:8000, maximumAge:15000});
 }
 setInterval(sendLocation, 30000);
-setInterval(function(){ if(JWT) load(); }, 20000);
+
+/* المؤقتات: بيانات 10 ثوانٍ (مع إيقاف بالخلفية) + وقت نسبي 5 ثوانٍ */
+setInterval(function(){ if(JWT && !document.hidden) load(); }, REFRESH_MS);
+setInterval(function(){ if(!document.hidden) refreshTimeAgo(); }, TIME_REFRESH_MS);
 
 window.addEventListener('staff-lang-changed', function(){
   syncLangUI();
@@ -725,7 +763,6 @@ window.addEventListener('staff-lang-changed', function(){
 initStaffI18n({ autoLangToggle: false });
 syncLangUI();
 
-/* v2.4: جلب المنيو ثم الدخول */
 (async function(){
   await loadMenu();
   if(JWT && ME){ enterApp(); } else { logout(); }
@@ -733,4 +770,4 @@ syncLangUI();
 </script>
 </body>
 </html>
-<!-- ===== END driver.html (v2.4) ===== -->
+<!-- ===== END driver.html (v2.5.1) ===== -->
