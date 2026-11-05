@@ -80,11 +80,11 @@ window.APP_SETTINGS = {
         },
         {
           "o": {
-            "h": 7,
+            "h": 15,
             "m": 0
           },
           "c": {
-            "h": 14,
+            "h": 3,
             "m": 0
           },
           "closed": false
