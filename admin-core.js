@@ -1,8 +1,9 @@
-/* ===== admin-core.js — النواة: دخول + GitHub + نوافذ (v3.4) ===== */
-/* v3.4: نشر صلب (4 محاولات + التقاط SHA من الخطأ)
-   + حذف البانر الفعلي من المستودع
-   + زر تنظيف الصور اليتيمة
-   كل ميزات v3.1 باقية */
+/* ===== admin-core.js — النواة: دخول + GitHub + نوافذ (v3.5) ===== */
+/* v3.5: كسر كاش المتصفح/Service Worker في قراءات GitHub
+   (حل نهائي لخطأ "does not match" عند النشر المتتالي)
+   v3.4: نشر صلب 4 محاولات + التقاط SHA
+   v3.2: حذف البانر الفعلي + تنظيف اليتيمة
+   v3.1: try-catch شامل + هجرات */
 
 /* ===== إيقاف التكبير ===== */
 document.addEventListener(`touchstart`,
@@ -365,7 +366,7 @@ btn.disabled = false;
 btn.textContent = label;
 }
 }
-/* ===== طبقة GitHub ===== */
+/* ===== طبقة GitHub (v3.5: بلا كاش أبداً) ===== */
 const GH_API = `https://api.github.com`;
 async function gh(path, opts){
 opts = opts || {};
@@ -377,8 +378,10 @@ var headers = {
 if(opts.headers){
 Object.assign(headers, opts.headers);
 }
-var init = Object.assign({}, opts,
-{ headers: headers });
+var init = Object.assign({}, opts, {
+headers: headers,
+cache: `no-store`
+});
 var r = await fetch(GH_API + path, init);
 if(!r.ok){
 var e = new Error(`HTTP ` + r.status);
@@ -408,9 +411,11 @@ return new TextDecoder(`utf-8`).decode(bytes);
 }
 return decodeURIComponent(escape(bin));
 }
+/* v3.5: بصمة زمنية تكسر كاش المتصفح والـ Service Worker */
 async function getFile(path){
 var q = `/repos/` + CFG.owner + `/` + CFG.repo +
-`/contents/` + path + `?ref=` + CFG.branch;
+`/contents/` + path + `?ref=` + CFG.branch +
+`&_cb=` + Date.now();
 var r = await gh(q);
 return { text: b64ToUtf8(r.content), sha: r.sha };
 }
@@ -429,7 +434,7 @@ headers:{ [`Content-Type`]:`application/json` },
 body: JSON.stringify(body)
 });
 }
-/* v3.2: حذف ملف من GitHub */
+/* حذف ملف من GitHub */
 async function ghDeleteFile(path, sha, msg){
 var body = {
 message: msg || (`حذف ملف: ` + path),
@@ -444,10 +449,11 @@ headers:{ [`Content-Type`]:`application/json` },
 body: JSON.stringify(body)
 });
 }
-/* v3.2: جلب قائمة ملفات مجلد */
+/* v3.5: سرد مجلد بلا كاش */
 async function listDir(dirPath){
 var q = `/repos/` + CFG.owner + `/` + CFG.repo +
-`/contents/` + dirPath + `?ref=` + CFG.branch;
+`/contents/` + dirPath + `?ref=` + CFG.branch +
+`&_cb=` + Date.now();
 try{
 var r = await gh(q);
 if(!Array.isArray(r)) return [];
@@ -473,10 +479,11 @@ return btoa(bytes);
 });
 }
 async function uploadItemImgById(id, file){
-var path = `img/items/` + id + `.png`;
-var cur = await getFile(path).catch(function(){
+var cur = await getFile(path0(id)).catch(function(){
 return { sha:null };
 });
+function path0(x){ return `img/items/` + x + `.png`; }
+var path = path0(id);
 var body = {
 message:`رفع صورة صنف: ` + id,
 content: await b64OfFile(file),
@@ -511,7 +518,7 @@ body: JSON.stringify(body)
 });
 return path;
 }
-/* v3.1: parseJs محمي من النصوص الفارغة أو المكسورة */
+/* parseJs محمي من النصوص الفارغة أو المكسورة */
 function parseJs(text){
 if(!text || typeof text !== `string`){
 throw new Error(`الملف فارغ أو غير صالح`);
@@ -558,7 +565,6 @@ var n = 1;
 while(used.includes(n)) n++;
 return n;
 }
-/* الترقيم الآلي: الموضع في المصفوفة = رقم الفرع */
 function renumberBranches(){
 branches().forEach(function(b, i){
 b.num = i + 1;
@@ -604,7 +610,6 @@ if(STATE.SETTINGS.social === undefined){
 STATE.SETTINGS.social = [];
 }
 }
-/* v3.1: هجرة أنظمة الدفع (جاهز للمستقبل) */
 function migratePayments(){
 var s = STATE.SETTINGS;
 if(!s.payments){
@@ -696,7 +701,7 @@ function(s){ s.classList.add(`hidden`); });
 el(`tab-` + t.dataset.tab).classList.remove(`hidden`);
 });
 });
-/* ===== الخروج (تأكيد عادي بدون delete) ===== */
+/* ===== الخروج ===== */
 el(`btnLogout`).addEventListener(`click`,
 async function(){
 var ok = await askConfirm(
@@ -705,11 +710,9 @@ if(!ok) return;
 sessionStorage.removeItem(`mk_admin`);
 location.reload();
 });
-/* ===== تحميل البيانات (v3.1: try-catch شامل) ===== */
+/* ===== تحميل البيانات ===== */
 async function loadAll(){
 var menuText, settingsText;
-
-/* الخطوة 1: جلب الملفات من GitHub */
 try{
 var both = await Promise.all([
 getFile(`menu.js`),
@@ -724,8 +727,6 @@ L(cls.key) +
 (cls.detail ? ` — ` + cls.detail : ``)
 );
 }
-
-/* الخطوة 2: تحليل JavaScript */
 var mw, sw;
 try{
 mw = parseJs(menuText);
@@ -741,8 +742,6 @@ throw new Error(
 `ملف settings.js غير صالح: ` + e.message
 );
 }
-
-/* الخطوة 3: التحقق من البنية الأساسية */
 if(!mw.MENU || !Array.isArray(mw.MENU)){
 throw new Error(
 `ملف menu.js لا يحتوي على مصفوفة MENU`
@@ -753,16 +752,12 @@ throw new Error(
 `ملف settings.js لا يحتوي على APP_SETTINGS`
 );
 }
-
-/* الخطوة 4: بناء الحالة الجديدة (فقط بعد النجاح الكامل) */
 var newState = {
 MENU: mw.MENU,
 SETTINGS: sw.APP_SETTINGS,
 shas: { menu: both[0].sha, settings: both[1].sha }
 };
 var S0 = newState.SETTINGS;
-
-/* ضمان وجود الحقول الأساسية */
 if(!S0.ad) S0.ad = {};
 if(!S0.ad.icon) S0.ad.icon = `🍝`;
 if(!S0.delivery) S0.delivery = [];
@@ -774,22 +769,18 @@ mode:`grid`, showDesc:true, showCal:true
 };
 }
 if(S0.bgs) delete S0.bgs;
-
-/* تطبيق الهجرات */
 STATE = newState;
 migrateBranchNums();
 migrateHours();
 migrateBestSellers();
 migrateSocial();
 migratePayments();
-
-/* الخطوة 5: إظهار التطبيق */
 el(`renewScreen`).classList.add(`hidden`);
 el(`loginScreen`).classList.add(`hidden`);
 el(`app`).classList.remove(`hidden`);
 renderAll();
 }
-/* ===== الدخول: ثلاث طرق قبول ===== */
+/* ===== الدخول ===== */
 el(`btnLogin`).addEventListener(`click`,
 async function(){
 var owner = el(`inOwner`).value.trim();
@@ -836,7 +827,6 @@ await loadAll();
 applyAdminLang();
 toast(L(`loggedIn`), `success`, L(`loggedSub`));
 }catch(e){
-/* v3.1: عرض الخطأ بوضوح للمستخدم */
 var errMsg = (e && e.message) ? e.message : String(e);
 showBanner(`loginErr`,
 L(`errPublish`),
@@ -921,7 +911,7 @@ function settingsText(){
 return `window.APP_SETTINGS = ` +
 JSON.stringify(STATE.SETTINGS, null, 2) + `;\n`;
 }
-/* ===== v3.4: نشر صلب — 4 محاولات + التقاط SHA من الخطأ ===== */
+/* ===== v3.4: نشر صلب — 4 محاولات + التقاط SHA ===== */
 function isShaConflict(e){
 if(!e) return false;
 if(e.http === 409 || e.http === 412 || e.http === 422) return true;
@@ -1005,7 +995,6 @@ if(!b || typeof b !== `object`) return;
 if(!b.id) b.id = `bn-` + (i + 1);
 if(typeof b.v !== `number`) b.v = 0;
 });
-/* أنظمة الرسوم: مجاني / ثابت / لكل فرع */
 if(S0.deliveryFeeMode !== `free` &&
    S0.deliveryFeeMode !== `fixed` &&
    S0.deliveryFeeMode !== `perBranch`){
@@ -1187,7 +1176,6 @@ var ok = await askConfirm(
 `حذف بانر`, `🗑`, `حذف`);
 if(!ok) return;
 list.splice(k, 1);
-/* v3.2: حذف الملف فعلياً من GitHub */
 if(bn && bn.img){
 try{
 toast(`جارٍ حذف الملف من المستودع...`, `info`);
@@ -1312,9 +1300,7 @@ return;
 btn.disabled = false;
 btn.textContent = old;
 }
-/* ═══════════════════════════════════════════
-   v3.2: تنظيف الصور اليتيمة
-   ═══════════════════════════════════════════ */
+/* ===== تنظيف الصور اليتيمة ===== */
 async function cleanOrphanBanners(){
 if(!STATE || !CFG){
 toast(`سجّل الدخول أولاً`, `error`);
@@ -1325,14 +1311,11 @@ var old = btn.textContent;
 btn.disabled = true;
 btn.textContent = `... جاري الفحص ...`;
 try{
-/* 1) قائمة ملفات المجلد من GitHub */
 var files = await listDir(`img/banners`);
-/* 2) قائمة الملفات المستخدمة في settings.js */
 var used = {};
 (STATE.SETTINGS.banners || []).forEach(function(b){
 if(b && b.img) used[b.img] = true;
 });
-/* 3) تحديد اليتيمة */
 var orphans = files.filter(function(f){
 return !used[f.path];
 });
@@ -1342,7 +1325,6 @@ btn.disabled = false;
 btn.textContent = old;
 return;
 }
-/* 4) تأكيد */
 var list = orphans.map(function(f){ return `• ${f.name}`; }).join(`\n`);
 var msg = `يوجد ${orphans.length} صورة يتيمة في المستودع:\n\n${list}\n\nهل تريد حذفها نهائياً من GitHub؟`;
 var ok = await askConfirm(msg, `تنظيف اليتيمة`, `🧹`, `حذف الكل`, true);
@@ -1351,7 +1333,6 @@ btn.disabled = false;
 btn.textContent = old;
 return;
 }
-/* 5) حذف متتابع */
 var successCount = 0;
 var failCount = 0;
 for(var i=0; i<orphans.length; i++){
@@ -1387,4 +1368,4 @@ ensureV15Cards();
 renderBannersAdmin();
 return r;
 };
-/* ===== END admin-core.js (v3.4) ===== */
+/* ===== END admin-core.js (v3.5) ===== */
