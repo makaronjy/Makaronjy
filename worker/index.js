@@ -1,13 +1,13 @@
 // ═══════════════════════════════════════════
 //  مكرونجي - Cloudflare Worker API (كامل)
-//  الإصدار: 1.6
-//  v1.6: قاعدة الساعة (حذف غير المسلّم المتوقف 60 دقيقة)
-//        + دفتر محاسبي دائم order_ledger
-//        + GET صورة الإثبات + تقرير accounting
-//  يحتوي كل ميزات v1.5:
-//  • حوض طلبات الفرع + claim + login بالأسماء
+//  الإصدار: 1.7
+//  v1.7: حذف كسول فوري للطلبات المتوقفة ساعة
+//        (يعمل عند فتح أي صفحة — لا ينتظر Cron)
+//  يحتوي كل ميزات v1.6:
+//  • دفتر محاسبي دائم order_ledger
+//  • قاعدة الساعة + GET صورة الإثبات + accounting
+//  • حوض الطلبات + claim + login بالأسماء
 //  • أرقام عشوائية بدون # + مساران استلام/توصيل
-//  • حذف موظفين + حمايات المالك + صلاحيات كاملة
 // ═══════════════════════════════════════════
 
 const CORS_HEADERS = {
@@ -115,7 +115,7 @@ async function checkRateLimit(env, key, limit = 100, ttl = 60) {
 }
 
 // ═══════════════════════════════════════════
-//  v1.6: الدفتر المحاسبي
+//  الدفتر المحاسبي
 // ═══════════════════════════════════════════
 async function ledgerInsert(env, order, kind) {
   try {
@@ -129,6 +129,34 @@ async function ledgerInsert(env, order, kind) {
       order.created_at, (kind === 'delivered' ? order.delivered_at : order.updated_at) || null
     ).run();
   } catch (e) { console.error('ledger error:', e); }
+}
+
+// ═══════════════════════════════════════════
+//  v1.7: الحذف الكسول — أي طلب غير مسلّم توقف ساعة
+//  يُقيَّد في الدفتر (إن لم يُقيَّد بعد) ثم يُحذف نهائياً
+// ═══════════════════════════════════════════
+async function purgeStaleOrders(env) {
+  try {
+    const stale = await env.DB.prepare(`
+      SELECT * FROM orders
+      WHERE status NOT IN ('delivered','archived')
+        AND updated_at < datetime('now', '-1 hour')
+    `).all();
+    if (!stale.results.length) return 0;
+    for (const o of stale.results) {
+      const already = await env.DB.prepare(
+        'SELECT 1 FROM order_ledger WHERE order_number = ?'
+      ).bind(o.order_number).first();
+      if (!already) await ledgerInsert(env, o, 'abandoned');
+      await env.DB.prepare('DELETE FROM orders WHERE id = ?').bind(o.id).run();
+    }
+    await env.DB.prepare('DELETE FROM order_tracking WHERE order_id NOT IN (SELECT id FROM orders)').run();
+    await env.DB.prepare('DELETE FROM driver_locations WHERE order_id NOT IN (SELECT id FROM orders)').run();
+    return stale.results.length;
+  } catch (e) {
+    console.error('purge error:', e);
+    return 0;
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -154,7 +182,7 @@ async function generateOrderNumber(db) {
 }
 
 // ═══════════════════════════════════════════
-//  تشفير + JWT + Auth (كما v1.5)
+//  تشفير + JWT + Auth
 // ═══════════════════════════════════════════
 function generateSalt() {
   const array = new Uint8Array(16);
@@ -216,7 +244,7 @@ async function requireAuth(request, env, allowedRoles) {
 }
 
 // ═══════════════════════════════════════════
-//  1) تسجيل الدخول (يرجع name + branchName)
+//  1) تسجيل الدخول
 // ═══════════════════════════════════════════
 async function handleLogin(request, env) {
   const ip = getIP(request);
@@ -355,11 +383,11 @@ async function handleCreateOrder(request, env) {
   const customerAddress = orderType === 'delivery' ? sanitize(body.customer_address || '') : '';
   const result = await env.DB.prepare(`
     INSERT INTO orders (
-      order_number, branch_id, customer_name, customer_phone, customer_address,
+      order_number, branch_id, order_type, customer_name, customer_phone, customer_address,
       customer_lat, customer_lng, items_json, subtotal,
-      delivery_fee, total, payment_method, status, notes, order_type
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'cod', 'pending', ?, ?)
-  `).bind(orderNumber, branchId, customerName, customerPhone, customerAddress, customerLat, customerLng, JSON.stringify(cleanItems), subtotal, deliveryFee, total, notes, orderType).run();
+      delivery_fee, total, payment_method, status, notes
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'cod', 'pending', ?)
+  `).bind(orderNumber, branchId, orderType, customerName, customerPhone, customerAddress, customerLat, customerLng, JSON.stringify(cleanItems), subtotal, deliveryFee, total, notes).run();
   const orderId = result.meta.last_row_id;
   await env.DB.prepare(`INSERT INTO order_tracking (order_id, status, notes) VALUES (?, 'pending', ?)`).bind(orderId, orderType === 'pickup' ? 'تم استلام الطلب — استلام من الفرع 🏪' : 'تم استلام الطلب 🛵').run();
   return json({
@@ -370,9 +398,10 @@ async function handleCreateOrder(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  5) تتبع الطلب
+//  5) تتبع الطلب (v1.7: + purge)
 // ═══════════════════════════════════════════
 async function handleTrackOrder(orderNumber, env) {
+  await purgeStaleOrders(env);
   const order = await env.DB.prepare(`
     SELECT o.*, b.name_ar as branch_name, b.phone as branch_phone, b.lat as branch_lat, b.lng as branch_lng,
       u.name as driver_name, u.phone as driver_phone
@@ -407,11 +436,12 @@ async function handleTrackOrder(orderNumber, env) {
 }
 
 // ═══════════════════════════════════════════
-//  6) طلبات المشرف
+//  6) طلبات المشرف (v1.7: + purge فوري)
 // ═══════════════════════════════════════════
 async function handleSupervisorOrders(request, env) {
   const auth = await requireAuth(request, env, ['supervisor', 'super_admin']);
   if (auth.error) return auth.error;
+  await purgeStaleOrders(env);
   const url = new URL(request.url);
   const statusFilter = url.searchParams.get('status');
   let query = `SELECT o.*, u.name as driver_name, u.phone as driver_phone, b.name_ar as branch_name FROM orders o LEFT JOIN users u ON o.driver_id = u.id JOIN branches b ON o.branch_id = b.id WHERE o.branch_id = ?`;
@@ -442,11 +472,12 @@ async function handleSupervisorDrivers(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  8) حوض طلبات الفرع
+//  8) حوض طلبات الفرع (v1.7: + purge)
 // ═══════════════════════════════════════════
 async function handleBranchPool(request, env) {
   const auth = await requireAuth(request, env, ['driver', 'supervisor', 'super_admin']);
   if (auth.error) return auth.error;
+  await purgeStaleOrders(env);
   let branchId = auth.user.branch_id;
   if (auth.user.role === 'super_admin') {
     const q = new URL(request.url).searchParams.get('branch_id');
@@ -497,11 +528,12 @@ async function handleClaim(orderId, request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  10) توصيلات السائق
+//  10) توصيلات السائق (v1.7: + purge)
 // ═══════════════════════════════════════════
 async function handleDriverOrders(request, env) {
   const auth = await requireAuth(request, env, ['driver']);
   if (auth.error) return auth.error;
+  await purgeStaleOrders(env);
   const result = await env.DB.prepare(`
     SELECT o.*, b.name_ar as branch_name FROM orders o JOIN branches b ON o.branch_id = b.id
     WHERE o.driver_id = ? AND o.order_type = 'delivery'
@@ -519,7 +551,7 @@ async function handleDriverOrders(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  11) تغيير الحالة (+ تسجيل الدفتر)
+//  11) تغيير الحالة (+ دفتر)
 // ═══════════════════════════════════════════
 async function handleUpdateStatus(orderId, request, env) {
   const auth = await requireAuth(request, env, null);
@@ -632,7 +664,7 @@ async function handleUploadPhoto(orderId, request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  15) v1.6: عرض صورة التسليم
+//  15) عرض صورة التسليم
 // ═══════════════════════════════════════════
 async function handleGetPhoto(orderId, request, env) {
   const auth = await requireAuth(request, env, ['supervisor', 'super_admin', 'driver']);
@@ -645,20 +677,17 @@ async function handleGetPhoto(orderId, request, env) {
   const obj = await env.IMAGES.get(order.delivery_photo);
   if (!obj) return error('الصورة غير موجودة في التخزين', 404);
   return new Response(obj.body, {
-    headers: {
-      'Content-Type': 'image/jpeg',
-      'Cache-Control': 'private, max-age=3600',
-      ...CORS_HEADERS,
-    },
+    headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, max-age=3600', ...CORS_HEADERS },
   });
 }
 
 // ═══════════════════════════════════════════
-//  16) كل الطلبات (المالك)
+//  16) كل الطلبات (المالك) (v1.7: + purge)
 // ═══════════════════════════════════════════
 async function handleAdminOrders(request, env) {
   const auth = await requireAuth(request, env, ['super_admin']);
   if (auth.error) return auth.error;
+  await purgeStaleOrders(env);
   const url = new URL(request.url);
   const branchId = url.searchParams.get('branch_id');
   const status = url.searchParams.get('status');
@@ -762,7 +791,7 @@ async function handleAdminUsersReset(userId, request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  18) التقرير التشغيلي القديم (كما v1.5)
+//  18) التقرير التشغيلي
 // ═══════════════════════════════════════════
 async function handleReportsSummary(request, env) {
   const auth = await requireAuth(request, env, ['super_admin', 'supervisor']);
@@ -829,7 +858,7 @@ async function handleReportsSummary(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  19) v1.6: التقرير المحاسبي (من الدفتر)
+//  19) التقرير المحاسبي
 // ═══════════════════════════════════════════
 async function handleReportsAccounting(request, env) {
   const auth = await requireAuth(request, env, ['super_admin', 'supervisor']);
@@ -841,7 +870,6 @@ async function handleReportsAccounting(request, env) {
   const ym = now.toISOString().slice(0, 7);
   const from = url.searchParams.get('from') || (ym + '-01');
   const to = url.searchParams.get('to') || now.toISOString().slice(0, 10);
-
   const rows = await env.DB.prepare(`
     SELECT substr(closed_at,1,7) AS ym, kind, order_type, branch_id, driver_id,
            COUNT(*) AS n, SUM(gross) AS gross, SUM(fees) AS fees
@@ -851,7 +879,6 @@ async function handleReportsAccounting(request, env) {
     GROUP BY ym, kind, order_type, branch_id, driver_id
     ORDER BY ym
   `).bind(from, to, branchId, branchId).all();
-
   const totals = { orders: 0, delivered: 0, cancelled: 0, abandoned: 0, gross: 0, fees: 0, pickup_gross: 0, delivery_gross: 0 };
   const monthsMap = {};
   const branchesMap = {};
@@ -883,8 +910,6 @@ async function handleReportsAccounting(request, env) {
   totals.fees = Math.round(totals.fees * 100) / 100;
   totals.avg = totals.delivered ? Math.round(totals.gross / totals.delivered) : 0;
   totals.cancel_rate = totals.orders ? Math.round(((totals.cancelled + totals.abandoned) / totals.orders) * 100) : 0;
-
-  /* أسماء الفروع */
   const branches = [];
   if (Object.keys(branchesMap).length) {
     const brs = await env.DB.prepare('SELECT id, name_ar, name_en FROM branches').all();
@@ -896,7 +921,6 @@ async function handleReportsAccounting(request, env) {
     }
     branches.sort((a, b) => b.gross - a.gross);
   }
-  /* أسماء السائقين */
   const drivers = [];
   if (Object.keys(driversMap).length) {
     const usrs = await env.DB.prepare('SELECT id, name FROM users WHERE role = ?').bind('driver').all();
@@ -908,7 +932,6 @@ async function handleReportsAccounting(request, env) {
     }
     drivers.sort((a, b) => b.deliveries - a.deliveries);
   }
-  /* الأكثر مبيعاً من جدول الطلبات (المسلّمون لا يُحذفون) */
   let topItems = [];
   try {
     const ti = await env.DB.prepare(`
@@ -923,7 +946,6 @@ async function handleReportsAccounting(request, env) {
     `).bind(from, to, branchId, branchId).all();
     topItems = ti.results;
   } catch (e) { topItems = []; }
-
   return json({ from, to, totals, months, branches, drivers, top_items: topItems });
 }
 
@@ -936,7 +958,7 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
     try {
-      if (path === '/api/health' && request.method === 'GET') return json({ status: 'ok', version: '1.6', live_mode: env.LIVE_MODE || 'polling' });
+      if (path === '/api/health' && request.method === 'GET') return json({ status: 'ok', version: '1.7', live_mode: env.LIVE_MODE || 'polling' });
       if (path === '/api/auth/login' && request.method === 'POST') return await handleLogin(request, env);
       if (path === '/api/auth/admin-bridge' && request.method === 'POST') return await handleAdminBridge(request, env);
       if (path === '/api/auth/change-password' && request.method === 'POST') return await handleChangePassword(request, env);
@@ -974,43 +996,23 @@ export default {
   },
 
   // ═════════════════════════════════════════
-  //  المهام المجدولة
+  //  المهام المجدولة (v1.7: أي cron غير الـ3 فجراً = purge)
   // ═════════════════════════════════════════
   async scheduled(event, env, ctx) {
     try {
-      // كل ساعة: قاعدة الساعة (حذف غير المسلّم المتوقف 60 دقيقة)
-      if (event.cron === '0 * * * *') {
-        const stale = await env.DB.prepare(`
-          SELECT * FROM orders
-          WHERE status NOT IN ('delivered','archived')
-            AND updated_at < datetime('now', '-1 hour')
-        `).all();
-        for (const o of stale.results) {
-          await ledgerInsert(env, o, 'abandoned');
-          await env.DB.prepare('DELETE FROM orders WHERE id = ?').bind(o.id).run();
-        }
-        if (stale.results.length) {
-          await env.DB.prepare('DELETE FROM order_tracking WHERE order_id NOT IN (SELECT id FROM orders)').run();
-          await env.DB.prepare('DELETE FROM driver_locations WHERE order_id NOT IN (SELECT id FROM orders)').run();
-        }
-      }
-
-      // 3 فجراً: تنظيف + backfill + نسخ احتياطي
       if (event.cron === '0 3 * * *') {
         await env.DB.prepare("DELETE FROM used_order_numbers WHERE expires_at < date('now')").run();
         await env.DB.prepare("DELETE FROM sessions WHERE expires_at < datetime('now')").run();
         await env.DB.prepare("DELETE FROM driver_locations WHERE created_at < datetime('now', '-7 days')").run();
         await env.DB.prepare(`DELETE FROM order_tracking WHERE order_id IN (SELECT id FROM orders WHERE status = 'archived' AND updated_at < datetime('now', '-90 days'))`).run();
-        // backstop: غير المسلّم الأقدم من 30 يوماً
         const old = await env.DB.prepare(`SELECT * FROM orders WHERE status NOT IN ('delivered','archived') AND created_at < datetime('now', '-30 days')`).all();
         for (const o of old.results) {
-          await ledgerInsert(env, o, 'abandoned');
+          const already = await env.DB.prepare('SELECT 1 FROM order_ledger WHERE order_number = ?').bind(o.order_number).first();
+          if (!already) await ledgerInsert(env, o, 'abandoned');
           await env.DB.prepare('DELETE FROM orders WHERE id = ?').bind(o.id).run();
         }
         await env.DB.prepare('DELETE FROM order_tracking WHERE order_id NOT IN (SELECT id FROM orders)').run();
         await env.DB.prepare('DELETE FROM driver_locations WHERE order_id NOT IN (SELECT id FROM orders)').run();
-
-        // v1.6: backfill الدفتر من الطلبات الموجودة
         await env.DB.prepare(`
           INSERT OR IGNORE INTO order_ledger
             (order_number, branch_id, order_type, kind, gross, fees, driver_id, created_at, closed_at)
@@ -1025,8 +1027,6 @@ export default {
           FROM orders o WHERE o.status = 'cancelled'
             AND NOT EXISTS (SELECT 1 FROM order_ledger l WHERE l.order_number = o.order_number AND l.kind = 'cancelled')
         `).run();
-
-        // نسخ احتياطي (يشمل الدفتر)
         const [orders, users, branches, tracking, ledger] = await Promise.all([
           env.DB.prepare('SELECT * FROM orders').all(),
           env.DB.prepare('SELECT id, name, phone, username, role, branch_id, is_active FROM users').all(),
@@ -1047,11 +1047,14 @@ export default {
           const sorted = list.objects.sort((a, b) => a.key.localeCompare(b.key));
           await env.BACKUPS.delete(sorted.slice(0, list.objects.length - 30).map(o => o.key));
         }
+      } else {
+        // أي cron آخر (مثلاً كل 10 دقائق) = purge فوري
+        await purgeStaleOrders(env);
       }
     } catch (e) { console.error('Cron error:', e); }
   },
 };
 
 // ═══════════════════════════════════════════
-//  نهاية worker/index.js (v1.6)
+//  نهاية worker/index.js (v1.7)
 // ═══════════════════════════════════════════
