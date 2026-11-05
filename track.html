@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
-:root{--brown:#8e2a4a;--dark:#5a1830;--gold:#e0912f;--gold2:#f2b95f;--cream:#faf3ea;--card:#fffdf9;--ink:#2b1a15;--muted:#8a6f63;--line:#eadfd2;--ok:#1e5b4f;--okbg:#dcf5e8;--err:#b91c1c;--errbg:#fee2e2;--warn:#a06b1c;--warnbg:#fff6e6;}
+:root{--brown:#8e2a4a;--dark:#5a1830;--gold:#e0912f;--gold2:#f2b95f;--cream:#faf3ea;--card:#fffdf9;--ink:#2b1a15;--muted:#8a6f63;--line:#eadfd2;--ok:#1e5b4f;--okbg:#dcf5e8;--err:#b91c1c;--errbg:#fee2e2;--warn:#a06b1c;--warnbg:#fff6e6;--blue:#38bdf8;}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 body{font-family:'Cairo',sans-serif;background:var(--cream);color:var(--ink);min-height:100vh;padding-bottom:2rem}
 .top{background:linear-gradient(135deg,var(--dark),var(--brown));color:#fff;padding:1rem 1rem}
@@ -45,19 +45,16 @@ body{font-family:'Cairo',sans-serif;background:var(--cream);color:var(--ink);min
 .pill.info{background:#e3f2fd;color:#1565c0}
 .note{margin-top:.6rem;background:var(--warnbg);border-radius:10px;padding:.55rem .7rem;font-size:.78rem;font-weight:800;color:var(--warn);line-height:1.8}
 .note.err{background:var(--errbg);color:var(--err)}
-
-/* v2.5: قلب المفضلة */
+/* قلب المفضلة */
 .favBtn{
   position:absolute;top:0;inset-inline-end:0;
   background:#fff;border:1.5px solid var(--line);border-radius:50%;
   width:44px;height:44px;display:flex;align-items:center;justify-content:center;
-  font-size:1.4rem;cursor:pointer;transition:.2s;
-  color:var(--line);
+  font-size:1.4rem;cursor:pointer;transition:.2s;color:var(--line);
 }
 .favBtn:hover{transform:scale(1.1);border-color:var(--gold)}
 .favBtn.saved{color:var(--gold);border-color:var(--gold);background:#fff6e6}
-
-/* v2.5: modal اختيار خانة المفضلة */
+/* modal المفضلة */
 .favModal{position:fixed;inset:0;z-index:5150;background:rgba(40,12,24,.72);display:none;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 .favModal.show{display:flex}
 .favModal .card{background:#fffdf9;border:2px solid var(--gold);border-radius:22px;padding:1.4rem 1.2rem;max-width:360px;width:100%}
@@ -77,7 +74,7 @@ body{font-family:'Cairo',sans-serif;background:var(--cream);color:var(--ink);min
 .favCancel{display:block;width:100%;border:none;border-radius:12px;padding:.75rem;background:transparent;color:var(--muted);font-family:inherit;font-weight:800;cursor:pointer;margin-top:.5rem;font-size:.85rem}
 .favToast{position:fixed;bottom:1.5rem;inset-inline:0;display:flex;justify-content:center;z-index:5200;pointer-events:none}
 .favToast .msg{background:var(--okbg);color:var(--ok);padding:.7rem 1.2rem;border-radius:50px;font-weight:900;font-size:.85rem;box-shadow:0 8px 24px rgba(0,0,0,.2);animation:pop2 .3s ease}
-
+/* الخطوات */
 .steps{display:flex;flex-direction:column;gap:0;margin-top:.4rem}
 .step{display:flex;gap:.8rem;position:relative;padding-bottom:1.15rem}
 .step:last-child{padding-bottom:0}
@@ -90,6 +87,7 @@ body{font-family:'Cairo',sans-serif;background:var(--cream);color:var(--ink);min
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(224,145,47,.45)}50%{box-shadow:0 0 0 9px rgba(224,145,47,0)}}
 .step .txt b{display:block;font-size:.86rem;font-weight:900;color:var(--muted)}
 .step.done .txt b,.step.now .txt b{color:var(--ink)}
+/* بطاقات */
 .row{display:flex;align-items:center;gap:.7rem;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:.7rem .8rem;margin-top:.6rem}
 .row .ic{width:40px;height:40px;flex:0 0 40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;background:var(--cream)}
 .row .inf{flex:1;min-width:0}
@@ -98,10 +96,13 @@ body{font-family:'Cairo',sans-serif;background:var(--cream);color:var(--ink);min
 .row a.btn{border:none;border-radius:10px;padding:.5rem .8rem;font-family:inherit;font-size:.75rem;font-weight:900;text-decoration:none;white-space:nowrap}
 .btn.gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--dark)}
 .btn.green{background:var(--ok);color:#fff}
+/* الخريطة */
 #mapBox{height:250px;border-radius:14px;overflow:hidden;border:1.5px solid var(--line);margin-top:.6rem;z-index:1}
 .routeinfo{margin-top:.5rem;background:var(--warnbg);border:1px dashed var(--gold);border-radius:10px;padding:.45rem .7rem;font-size:.75rem;font-weight:900;color:var(--warn);text-align:center}
+.routeinfo.wait{background:#e0f2fe;border-color:var(--blue);color:#075985}
 .maplegend{display:flex;gap:.8rem;justify-content:center;font-size:.68rem;font-weight:800;color:var(--muted);margin-top:.5rem;flex-wrap:wrap}
 .mk-pin-ico{font-size:26px;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))}
+/* الشاشة الختامية */
 .final{text-align:center;padding:.6rem 0}
 .final .big{font-size:4rem;animation:pop2 .5s cubic-bezier(.2,.9,.3,1.4)}
 @keyframes pop2{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
@@ -110,6 +111,7 @@ body{font-family:'Cairo',sans-serif;background:var(--cream);color:var(--ink);min
 .final h2.err{color:var(--err)}
 .final p{color:var(--muted);font-size:.85rem;font-weight:800;line-height:1.8;margin:.2rem 0}
 .final .closeBtn{display:block;width:100%;border:none;border-radius:14px;padding:.95rem;background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--dark);font-family:inherit;font-weight:900;font-size:1rem;cursor:pointer;margin-top:1rem}
+/* الإيصال */
 .items h4{font-size:.85rem;font-weight:900;color:var(--brown);margin-bottom:.5rem}
 .it{display:flex;justify-content:space-between;gap:.5rem;font-size:.8rem;font-weight:800;padding:.35rem 0;border-bottom:1px dashed var(--line)}
 .it:last-of-type{border-bottom:none}
@@ -139,6 +141,7 @@ body{font-family:'Cairo',sans-serif;background:var(--cream);color:var(--ink);min
 
 <div class="wrap">
   <div id="box" class="card"><div class="load"><span class="spin"></span><br><span data-t="track.loading">جارٍ تحميل طلبك...</span></div></div>
+
   <div id="mapCard" class="card hidden">
     <b style="font-size:.9rem;font-weight:900;color:var(--brown)" data-t="track.map.title">🗺️ خريطة التتبع المباشر</b>
     <div id="mapBox"></div>
@@ -151,7 +154,7 @@ body{font-family:'Cairo',sans-serif;background:var(--cream);color:var(--ink);min
   </div>
 </div>
 
-<!-- modal اختيار خانة المفضلة -->
+<!-- modal المفضلة -->
 <div class="favModal" id="favModal">
   <div class="card">
     <h3>♡ <span id="favTitle">حفظ الوجبة المفضلة</span></h3>
@@ -176,11 +179,59 @@ const DELIVERY_KEYS = ['pending','accepted','preparing','ready','out_for_deliver
 const PICKUP_KEYS   = ['pending','accepted','preparing','ready','delivered'];
 
 let LAST_DATA = null;
-let MENU_DATA = null; /* v2.5: المنيو للترجمة */
+let MENU_DATA = null;
 let MENU_LOADING = null;
 
 /* ═══════════════════════════════════════════
-   v2.5: جلب المنيو لترجمة الأصناف القديمة
+   اللغة والأدوات
+   ═══════════════════════════════════════════ */
+function pickLang(lang){ setStaffLang(lang); }
+function syncLangUI(){
+  const lang = getStaffLang();
+  document.getElementById('langAr').classList.toggle('active', lang === 'ar');
+  document.getElementById('langEn').classList.toggle('active', lang === 'en');
+  if (typeof applyStaffI18n === 'function') applyStaffI18n();
+  updateSlotLabels();
+}
+function isEn(){ return getStaffLang() === 'en'; }
+function cur(){ return tt('common.riyal'); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function orderNum(){
+  const q = new URLSearchParams(location.search).get('order');
+  return q ? decodeURIComponent(q) : '';
+}
+function mapsLink(lat, lng){ return 'https://maps.google.com/?q=' + lat + ',' + lng; }
+function fmtTime(t){
+  if(!t) return '';
+  try{
+    const d = new Date(String(t).replace(' ', 'T') + 'Z');
+    return d.toLocaleString(isEn() ? 'en-GB' : 'ar-SA',
+      {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', timeZone:'Asia/Riyadh'});
+  }catch(e){ return String(t).slice(0,16); }
+}
+function statusLabel(o){
+  let key = o.status;
+  if(o.order_type === 'pickup'){
+    if(o.status === 'ready') key = 'ready_pickup';
+    if(o.status === 'delivered') key = 'delivered_pickup';
+  }
+  const t = tt('admin.statuses.' + key);
+  return (t && t !== ('admin.statuses.' + key)) ? t : (o.status_text || o.status);
+}
+function brDisplayName(br){
+  if(!br) return '';
+  if(isEn()){
+    try{
+      const list = (window.APP_SETTINGS && APP_SETTINGS.branches) || [];
+      const b = list.find(x => x.nameAr === br.name);
+      if(b && b.nameEn) return b.nameEn;
+    }catch(e){}
+  }
+  return br.name || '';
+}
+
+/* ═══════════════════════════════════════════
+   ترجمة المنيو (الأصناف القديمة)
    ═══════════════════════════════════════════ */
 async function loadMenu(){
   if(MENU_DATA) return MENU_DATA;
@@ -190,7 +241,6 @@ async function loadMenu(){
       const r = await fetch('menu.js', { cache:'no-store' });
       if(!r.ok) return [];
       const text = await r.text();
-      /* استخراج window.MENU = [...]; */
       const match = text.match(/window\.MENU\s*=\s*(\[[\s\S]*?\]);/);
       if(!match) return [];
       try{ return JSON.parse(match[1]); }catch(e){ return []; }
@@ -199,7 +249,6 @@ async function loadMenu(){
   MENU_DATA = await MENU_LOADING;
   return MENU_DATA;
 }
-/* البحث عن صنف في المنيو حسب id */
 function findMenuById(id){
   if(!MENU_DATA || !id) return null;
   for(const sec of MENU_DATA){
@@ -209,13 +258,10 @@ function findMenuById(id){
   }
   return null;
 }
-/* اسم الصنف حسب اللغة — مع دعم المنيو للطلبات القديمة */
 function itemNameL(i){
   const isEnNow = isEn();
-  /* أولوية 1: اسم محفوظ ثنائي اللغة في الطلب نفسه (v17.6+) */
   if(isEnNow && i && i.name_en) return i.name_en;
   if(!isEnNow && i && i.name_ar) return i.name_ar;
-  /* أولوية 2: الترجمة من المنيو الحالي (يغطي الطلبات القديمة) */
   if(i && i.id){
     const live = findMenuById(i.id);
     if(live){
@@ -223,17 +269,15 @@ function itemNameL(i){
       if(!isEnNow && live.ar) return live.ar;
     }
   }
-  /* أولوية 3: الاسم القديم كما هو */
   return (i ? i.name : '');
 }
 
 /* ═══════════════════════════════════════════
-   v2.5: نظام المفضلة (نفس منطق app.js)
+   المفضلة (نفس منطق التطبيق)
    ═══════════════════════════════════════════ */
 const FAV_KEY = 'mk_favorites_v1';
 const SLOT_NAMES_AR = ['فطور','غداء','عشاء'];
 const SLOT_NAMES_EN = ['Breakfast','Lunch','Dinner'];
-
 function getFavorites(){
   try{ return JSON.parse(localStorage.getItem(FAV_KEY)) || [[],[],[]]; }
   catch(e){ return [[],[],[]]; }
@@ -241,7 +285,6 @@ function getFavorites(){
 function setFavorites(f){
   try{ localStorage.setItem(FAV_KEY, JSON.stringify(f)); }catch(e){}
 }
-/* هل هذه الوجبة محفوظة مسبقاً؟ */
 function isMealSaved(items){
   if(!items || !items.length) return false;
   const ids = items.map(i => i.id).filter(Boolean).sort().join(',');
@@ -254,23 +297,19 @@ function isMealSaved(items){
   }
   return false;
 }
-
 function updateSlotLabels(){
   const names = isEn() ? SLOT_NAMES_EN : SLOT_NAMES_AR;
   names.forEach(function(n, i){
-    const el = document.getElementById('slotName' + i);
-    if(el) el.textContent = n;
+    const elx = document.getElementById('slotName' + i);
+    if(elx) elx.textContent = n;
   });
   const t = document.getElementById('favTitle');
   if(t) t.textContent = isEn() ? '♡ Save as favorite meal' : '♡ حفظ الوجبة المفضلة';
   const s = document.getElementById('favSub');
-  if(s) s.textContent = isEn()
-    ? 'Choose which meal slot to save this order in'
-    : 'اختر الخانة التي تريد حفظ هذه الوجبة فيها';
+  if(s) s.textContent = isEn() ? 'Choose which meal slot to save this order in' : 'اختر الخانة التي تريد حفظ هذه الوجبة فيها';
   const c = document.getElementById('favCancel');
   if(c) c.textContent = isEn() ? 'Cancel' : 'إلغاء';
 }
-
 function openFavModal(items){
   const m = document.getElementById('favModal');
   updateSlotLabels();
@@ -278,8 +317,7 @@ function openFavModal(items){
   const handler = function(e){
     const slot = e.target.closest('.favSlot');
     if(slot){
-      const idx = +slot.dataset.slot;
-      saveToFavSlot(idx, items);
+      saveToFavSlot(+slot.dataset.slot, items);
       m.classList.remove('show');
       m.removeEventListener('click', handler);
       return;
@@ -296,21 +334,20 @@ function saveToFavSlot(slot, items){
   const meal = {
     items: items.map(function(i){
       return {
-        id: i.id, qty: i.qty, sizeIdx: (i.size ? (['صغير','وسط','كبير'].indexOf(i.size)) : -1),
+        id: i.id, qty: i.qty,
+        sizeIdx: (i.size ? (['صغير','وسط','كبير'].indexOf(i.size)) : -1),
         name_ar: i.name_ar || i.name,
-        name_en: i.name_en || findMenuById(i.id)?.en || i.name,
+        name_en: i.name_en || (findMenuById(i.id) || {}).en || i.name,
         price: i.price
       };
     })
   };
-  /* حذف أي تكرار في نفس الخانة */
   const ids = meal.items.map(x => x.id).filter(Boolean).sort().join(',');
   favs[slot] = (favs[slot] || []).filter(function(m){
     const mIds = (m.items || []).map(x => x.id).filter(Boolean).sort().join(',');
     return mIds !== ids;
   });
   favs[slot].unshift(meal);
-  /* حد أقصى 10 وجبات لكل خانة */
   if(favs[slot].length > 10) favs[slot] = favs[slot].slice(0, 10);
   setFavorites(favs);
   showFavToast(slot);
@@ -326,55 +363,8 @@ function showFavToast(slot){
 }
 
 /* ═══════════════════════════════════════════
-   الأدوات العامة
+   الخطوات
    ═══════════════════════════════════════════ */
-function pickLang(lang){ setStaffLang(lang); }
-function syncLangUI(){
-  const lang = getStaffLang();
-  document.getElementById('langAr').classList.toggle('active', lang === 'ar');
-  document.getElementById('langEn').classList.toggle('active', lang === 'en');
-  if (typeof applyStaffI18n === 'function') applyStaffI18n();
-  updateSlotLabels();
-}
-function isEn(){ return getStaffLang() === 'en'; }
-function cur(){ return tt('common.riyal'); }
-
-function brDisplayName(br){
-  if(!br) return '';
-  if(isEn()){
-    try{
-      const list = (window.APP_SETTINGS && APP_SETTINGS.branches) || [];
-      const b = list.find(x => x.nameAr === br.name);
-      if(b && b.nameEn) return b.nameEn;
-    }catch(e){}
-  }
-  return br.name || '';
-}
-function fmtTime(t){
-  if(!t) return '';
-  try{
-    const d = new Date(String(t).replace(' ', 'T'));
-    return d.toLocaleString(isEn() ? 'en-GB' : 'ar-SA',
-      {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
-  }catch(e){ return String(t).slice(0,16); }
-}
-function statusLabel(o){
-  let key = o.status;
-  if(o.order_type === 'pickup'){
-    if(o.status === 'ready') key = 'ready_pickup';
-    if(o.status === 'delivered') key = 'delivered_pickup';
-  }
-  const t = tt('admin.statuses.' + key);
-  return (t && t !== ('admin.statuses.' + key)) ? t : (o.status_text || o.status);
-}
-
-function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-function orderNum(){
-  const q = new URLSearchParams(location.search).get('order');
-  return q ? decodeURIComponent(q) : '';
-}
-function mapsLink(lat, lng){ return 'https://maps.google.com/?q=' + lat + ',' + lng; }
-
 function stepsHtml(keys, dictPrefix, status){
   const displayStatus = (status === 'driver_assigned') ? 'out_for_delivery' : status;
   const orderIdx = keys.indexOf(displayStatus);
@@ -393,7 +383,7 @@ function stepsHtml(keys, dictPrefix, status){
 }
 
 /* ═══════════════════════════════════════════
-   الخريطة
+   v2.6: الخريطة + المسار الذكي الثلاثي
    ═══════════════════════════════════════════ */
 const OSRM_HOSTS = [
   'https://routing.openstreetmap.de/routed-car',
@@ -433,7 +423,7 @@ async function fetchRoute(a, b){
 }
 
 let map = null, mkDriver = null, mkTarget = null, mkBranch = null;
-let routeLayer = null, straightLayer = null, mapFitted = false;
+let pathLayer = null, mapFitted = false;
 
 function pinIcon(emoji){
   return L.divIcon({
@@ -453,27 +443,39 @@ function initMap(){
     }).addTo(map);
   }catch(e){ map = null; }
 }
-function clearRouteLayers(){
-  if(!map) return;
-  if(routeLayer){ map.removeLayer(routeLayer); routeLayer = null; }
-  if(straightLayer){ map.removeLayer(straightLayer); straightLayer = null; }
+function clearPath(){
+  if(pathLayer && map){ map.removeLayer(pathLayer); pathLayer = null; }
 }
 function clearMarkers(){
   if(!map) return;
   [mkDriver, mkTarget, mkBranch].forEach(function(mk){ if(mk){ map.removeLayer(mk); } });
   mkDriver = mkTarget = mkBranch = null;
-  clearRouteLayers();
+  clearPath();
 }
-async function drawRoute(a, b){
+
+/* v2.6: رسم المسار بثلاثة أوضاع:
+   live   = سائق ← عميل عبر OSRM (ذهبي متصل)
+   expect = فرع ← عميل متوقع (أزرق متقطع) قبل أول إشارة GPS
+   straight = سائق ← عميل خط مباشر (ذهبي متقطع) عند تعذر OSRM */
+async function drawRoute(a, b, mode){
   const info = document.getElementById('routeInfo');
-  const rc = await fetchRoute(a, b);
-  if(rc && rc.coords && rc.coords.length > 1){
-    if(straightLayer){ map.removeLayer(straightLayer); straightLayer = null; }
-    if(!routeLayer){
-      routeLayer = L.polyline(rc.coords, { color:'#e0912f', weight:5, opacity:.9 }).addTo(map);
-    } else {
-      routeLayer.setLatLngs(rc.coords);
+  if(mode === 'expect'){
+    clearPath();
+    pathLayer = L.polyline([a, b], { color:'#38bdf8', weight:4, dashArray:'6 8', opacity:.85 }).addTo(map);
+    if(info){
+      info.classList.remove('hidden');
+      info.classList.add('wait');
+      info.innerHTML = isEn()
+        ? '🛰️ Waiting for driver GPS — expected route from branch'
+        : '🛰️ بانتظار أول إشارة GPS من السائق — المسار المتوقع من الفرع';
     }
+    return;
+  }
+  const rc = await fetchRoute(a, b);
+  clearPath();
+  info.classList.remove('wait');
+  if(rc && rc.coords && rc.coords.length > 1){
+    pathLayer = L.polyline(rc.coords, { color:'#e0912f', weight:5, opacity:.9 }).addTo(map);
     if(info){
       info.classList.remove('hidden');
       info.innerHTML = tt('track.map.routeInfo.remaining') + ': ' +
@@ -482,12 +484,7 @@ async function drawRoute(a, b){
         ' (' + tt('track.map.routeInfo.fastest') + ')';
     }
   } else {
-    if(routeLayer){ map.removeLayer(routeLayer); routeLayer = null; }
-    if(!straightLayer){
-      straightLayer = L.polyline([a, b], { color:'#e0912f', weight:4, dashArray:'10 8', opacity:.85 }).addTo(map);
-    } else {
-      straightLayer.setLatLngs([a, b]);
-    }
+    pathLayer = L.polyline([a, b], { color:'#e0912f', weight:4, dashArray:'10 8', opacity:.85 }).addTo(map);
     if(info){
       info.classList.remove('hidden');
       info.innerHTML = tt('track.map.routeInfo.fallback');
@@ -544,10 +541,14 @@ function updateMap(d){
     mkBranch = L.marker(branchPt, { icon: pinIcon('🏪') }).addTo(map).bindPopup(esc(brName));
   }
 
+  /* v2.6: تسلسل المسار الذكي */
+  const driverOnWay = ['driver_assigned','driver_at_restaurant','out_for_delivery'].includes(o.status);
   if(driverPt && targetPt){
-    drawRoute(driverPt, targetPt);
+    drawRoute(driverPt, targetPt, 'live');
+  } else if(driverOnWay && branchPt && targetPt){
+    drawRoute(branchPt, targetPt, 'expect');
   } else {
-    clearRouteLayers();
+    clearPath();
     if(info) info.classList.add('hidden');
   }
 
@@ -556,7 +557,7 @@ function updateMap(d){
 }
 
 /* ═══════════════════════════════════════════
-   v2.5: إغلاق سريع
+   إغلاق سريع
    ═══════════════════════════════════════════ */
 function tryClosePage(){
   try{ window.close(); }catch(e){}
@@ -588,25 +589,22 @@ function render(d){
   const box = document.getElementById('box');
   const brName = brDisplayName(br);
 
-  /* ─── v2.5: نهاية التتبع — بطاقة محايدة بلا بيانات ─── */
+  /* نهاية التتبع — بطاقة محايدة بلا بيانات */
   if(finalState || cancelled){
     stopPolling();
     hideMap();
-    const isCancel = cancelled;
     box.innerHTML =
       '<div class="final">' +
-        '<div class="big">' + (isCancel ? '🌙' : '🌙') + '</div>' +
-        '<h2 class="' + (isCancel ? 'err' : 'ok') + '">' +
-          (isCancel
-            ? (isEn() ? 'Tracking session ended' : 'انتهت جلسة التتبع')
-            : (isEn() ? 'Tracking session ended' : 'انتهت جلسة التتبع')) +
+        '<div class="big">🌙</div>' +
+        '<h2 class="' + (cancelled ? 'err' : 'ok') + '">' +
+          (isEn() ? 'Tracking session ended' : 'انتهت جلسة التتبع') +
         '</h2>' +
         '<p>' +
-          (isCancel
+          (cancelled
             ? (isEn() ? 'This order was cancelled. Thank you for choosing Makaronjy.' : 'تم إلغاء هذا الطلب. شكراً لاختيارك مكرونجي.')
             : (isEn() ? 'Thank you for choosing Makaronjy 🍝' : 'شكراً لاختيارك مكرونجي 🍝')) +
         '</p>' +
-        '<button class="closeBtn" onclick="location.href=\'index.html\'">' +
+        '<button class="closeBtn" onclick="tryClosePage()">' +
           (isEn() ? '🏠 Back to Home' : '🏠 العودة للرئيسية') +
         '</button>' +
       '</div>';
@@ -614,11 +612,10 @@ function render(d){
     return;
   }
 
-  /* ─── الحالة الحية ─── */
+  /* الحالة الحية */
   let pillCls = 'info';
   if(o.status === 'ready' || o.status === 'out_for_delivery' || o.status === 'driver_assigned') pillCls = 'warn';
 
-  /* v2.5: قلب المفضلة (يظهر فقط أثناء التتبع الحي) */
   const saved = isMealSaved(o.items);
   const favBtn =
     '<button class="favBtn' + (saved ? ' saved' : '') + '" id="favBtn" title="' +
@@ -669,7 +666,6 @@ function render(d){
   box.innerHTML = html;
   box.dataset.filled = '1';
 
-  /* ربط قلب المفضلة */
   const fb = document.getElementById('favBtn');
   if(fb){
     fb.addEventListener('click', function(){
@@ -717,12 +713,10 @@ window.addEventListener('staff-lang-changed', function(){
 
 initStaffI18n({ autoLangToggle: false });
 syncLangUI();
-
 document.addEventListener('DOMContentLoaded', function(){
-  /* v2.5: جلب المنيو أولاً ثم تحميل الطلب (للترجمة) */
   loadMenu().then(function(){ load(); });
 });
 </script>
 </body>
 </html>
-<!-- ===== END track.html (v2.5) ===== -->
+<!-- ===== END track.html (v2.6) ===== -->
