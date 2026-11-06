@@ -1,6 +1,5 @@
-/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v9.5) ===== */
-/* v9.5: تقارير: لغة فورية + Excel مصمم + PDF رسمي
-   v9.4: التبويب المحاسبي (دفتر + ضريبة 15%) */
+/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v9.6) ===== */
+/* v9.6: تقارير بمفاتيح L() + xlsx حقيقي + PDF محسّن (بدون "رسمي") */
 
 function nmOf(x){
 return (ALANG===`ar`) ? x.ar : (x.en || x.ar);
@@ -1892,11 +1891,10 @@ async function loadOrdersTab(){
 }
 
 /* =====================================================
-   v9.5: التبويب المحاسبي — لغة فورية + Excel مصمم + PDF رسمي
+   v9.6: التبويب المحاسبي — مفاتيح L() + xlsx حقيقي + PDF محسّن
    ===================================================== */
 let LAST_ACCT = null;
 
-function arEn(ar, en){ return (ALANG===`ar`) ? ar : en; }
 function money(v){ return Math.round((+v||0)*100)/100; }
 function stat(v, label){ return `<div class="cl-stat"><b>` + v + `</b><small>` + label + `</small></div>`; }
 function table(title, heads, rows){
@@ -1904,12 +1902,20 @@ function table(title, heads, rows){
     `<table class="cl-tbl"><tr>` + heads.map(h=>`<th>`+h+`</th>`).join(``) + `</tr>` +
     rows.map(r=>`<tr>` + r.map(c=>`<td>`+c+`</td>`).join(``) + `</tr>`).join(``) + `</table>`;
 }
-/* أعمدة بيانية نصية ███ لملف Excel */
 function barBlocks(v, max, len){
   const n = max > 0 ? Math.round((+v||0)/max*(len||18)) : 0;
   let s = ``;
   for(let i=0;i<n;i++) s += `█`;
   return s;
+}
+function brandNameNow(){
+  var b = STATE && STATE.SETTINGS && STATE.SETTINGS.brand;
+  if(!b) return `Makaronjy`;
+  return (ALANG===`ar`) ? (b.nameAr||b.nameEn) : (b.nameEn||b.nameAr);
+}
+function acctRef(){
+  if(!LAST_ACCT) return ``;
+  return `MK-` + LAST_ACCT.from.replace(/-/g,``) + `-` + LAST_ACCT.to.replace(/-/g,``);
 }
 function computeRange(){
   const preset = el(`crPreset`).value;
@@ -1926,10 +1932,10 @@ function computeRange(){
   }
   if(preset===`thisYear`) return {from: now.getFullYear()+`-01-01`, to: today};
   if(preset===`month`){
-    const mv = el(`crMonth`).value || today.slice(0,7);
-    const y = +mv.slice(0,4), mo = +mv.slice(5,7);
+    const mvv = el(`crMonth`).value || today.slice(0,7);
+    const y = +mvv.slice(0,4), mo = +mvv.slice(5,7);
     const last = new Date(y, mo, 0).getDate();
-    return {from: mv+`-01`, to: mv+`-`+p2(last)};
+    return {from: mvv+`-01`, to: mvv+`-`+p2(last)};
   }
   if(preset===`year`){
     const y = el(`crYear`).value || now.getFullYear();
@@ -1953,25 +1959,25 @@ function buildReportsTab(){
     brs.map(function(b){ return `<option value="` + esc(b.id) + `">` + esc(brName(b)) + `</option>`; }).join(``);
   sec.innerHTML =
     `<div class="cl-card">` +
-      `<h3>📊 ` + arEn(`التقارير المحاسبية`,`Accounting Reports`) + `</h3>` +
+      `<h3>` + L(`acctTitle`) + `</h3>` +
       `<div class="cl-row">` +
-        `<div class="cl-f"><label>` + arEn(`الفترة`,`Period`) + `</label><select id="crPreset">` +
-          `<option value="thisMonth">` + arEn(`هذا الشهر`,`This month`) + `</option>` +
-          `<option value="lastMonth">` + arEn(`الشهر الماضي`,`Last month`) + `</option>` +
-          `<option value="thisYear">` + arEn(`هذه السنة`,`This year`) + `</option>` +
-          `<option value="today">` + arEn(`اليوم`,`Today`) + `</option>` +
-          `<option value="month">` + arEn(`شهر محدد`,`Specific month`) + `</option>` +
-          `<option value="year">` + arEn(`سنة محددة`,`Specific year`) + `</option>` +
-          `<option value="custom">` + arEn(`مدى مخصص`,`Custom range`) + `</option>` +
+        `<div class="cl-f"><label>` + L(`acctPeriod`) + `</label><select id="crPreset">` +
+          `<option value="thisMonth">` + L(`acctThisMonth`) + `</option>` +
+          `<option value="lastMonth">` + L(`acctLastMonth`) + `</option>` +
+          `<option value="thisYear">` + L(`acctThisYear`) + `</option>` +
+          `<option value="today">` + L(`acctToday`) + `</option>` +
+          `<option value="month">` + L(`acctMonthPick`) + `</option>` +
+          `<option value="year">` + L(`acctYearPick`) + `</option>` +
+          `<option value="custom">` + L(`acctCustom`) + `</option>` +
         `</select></div>` +
-        `<div class="cl-f" id="crMonthWrap" style="display:none"><label>` + arEn(`الشهر`,`Month`) + `</label><input type="month" id="crMonth"></div>` +
-        `<div class="cl-f" id="crYearWrap" style="display:none"><label>` + arEn(`السنة`,`Year`) + `</label><input type="number" id="crYear" min="2020" max="2040" value="` + new Date().getFullYear() + `"></div>` +
-        `<div class="cl-f" id="crFromWrap" style="display:none"><label>` + arEn(`من`,`From`) + `</label><input type="date" id="crFrom"></div>` +
-        `<div class="cl-f" id="crToWrap" style="display:none"><label>` + arEn(`إلى`,`To`) + `</label><input type="date" id="crTo"></div>` +
+        `<div class="cl-f" id="crMonthWrap" style="display:none"><label>` + L(`acctMonthLbl`) + `</label><input type="month" id="crMonth"></div>` +
+        `<div class="cl-f" id="crYearWrap" style="display:none"><label>` + L(`acctYearLbl`) + `</label><input type="number" id="crYear" min="2020" max="2040" value="` + new Date().getFullYear() + `"></div>` +
+        `<div class="cl-f" id="crFromWrap" style="display:none"><label>` + L(`acctFrom`) + `</label><input type="date" id="crFrom"></div>` +
+        `<div class="cl-f" id="crToWrap" style="display:none"><label>` + L(`acctTo`) + `</label><input type="date" id="crTo"></div>` +
         `<div class="cl-f"><label>` + L(`ordersBranch`) + `</label><select id="crBranch2">` + brOpts + `</select></div>` +
-        `<button class="cl-btn cl-add" id="crGo" style="align-self:flex-end">` + arEn(`📊 عرض`,`📊 Show`) + `</button>` +
-        `<button class="cl-btn cl-plain" id="crXls" style="align-self:flex-end">⬇ ` + arEn(`Excel مصمم`,`Styled Excel`) + `</button>` +
-        `<button class="cl-btn cl-plain" id="crPrint" style="align-self:flex-end">🖨 ` + arEn(`PDF رسمي`,`Official PDF`) + `</button>` +
+        `<button class="cl-btn cl-add" id="crGo" style="align-self:flex-end">` + L(`acctShow`) + `</button>` +
+        `<button class="cl-btn cl-plain" id="crXls" style="align-self:flex-end">` + L(`acctXls`) + `</button>` +
+        `<button class="cl-btn cl-plain" id="crPrint" style="align-self:flex-end">` + L(`acctPdf`) + `</button>` +
       `</div>` +
       `<div id="crBox" style="margin-top:.9rem"></div>` +
     `</div>`;
@@ -2003,23 +2009,23 @@ function renderAcct(d, box){
   const gross = money(t.gross), fees = money(t.fees);
   const net = money(gross / 1.15), vat = money(gross - net);
   let html = `<div class="cl-stats">` +
-    stat(t.orders||0,        arEn(`إجمالي الطلبات`,`Total orders`)) +
-    stat(t.delivered||0,     arEn(`مسلّمة ✅`,`Delivered ✅`)) +
-    stat(t.cancelled||0,     arEn(`ملغية ❌`,`Cancelled ❌`)) +
-    stat(t.abandoned||0,     arEn(`مهجورة 🌙`,`Abandoned 🌙`)) +
-    stat(gross,              arEn(`الإيراد شامل الضريبة`,`Gross revenue`)) +
-    stat(net,                arEn(`الصافي قبل الضريبة`,`Net (excl. VAT)`)) +
-    stat(vat,                arEn(`ضريبة القيمة 15%`,`VAT 15%`)) +
-    stat(fees,               arEn(`رسوم توصيل`,`Delivery fees`)) +
-    stat(t.avg||0,           arEn(`متوسط الطلب`,`Avg order`)) +
-    stat((t.cancel_rate||0)+`%`, arEn(`معدل الإلغاء`,`Cancel rate`)) +
-    stat(money(t.pickup_gross),  arEn(`إيراد استلام 🏪`,`Pickup revenue`)) +
-    stat(money(t.delivery_gross),arEn(`إيراد توصيل 🛵`,`Delivery revenue`)) +
+    stat(t.orders||0,        L(`acctOrders`)) +
+    stat(t.delivered||0,     L(`acctDelivered`)) +
+    stat(t.cancelled||0,     L(`acctCancelled`)) +
+    stat(t.abandoned||0,     L(`acctAbandoned`)) +
+    stat(gross,              L(`acctGross`)) +
+    stat(net,                L(`acctNet`)) +
+    stat(vat,                L(`acctVat`)) +
+    stat(fees,               L(`acctFees`)) +
+    stat(t.avg||0,           L(`acctAvg`)) +
+    stat((t.cancel_rate||0)+`%`, L(`acctCancelRate`)) +
+    stat(money(t.pickup_gross),  L(`acctPickupRev`)) +
+    stat(money(t.delivery_gross),L(`acctDeliveryRev`)) +
   `</div>`;
   const months = d.months || [];
   if(months.length){
     const max = Math.max.apply(null, months.map(m=>+m.gross||0).concat([1]));
-    html += `<h4 style="margin:1rem 0 .5rem;color:var(--brown);font-weight:900">` + arEn(`📊 الإيراد الشهري`,`📊 Monthly revenue`) + `</h4>` +
+    html += `<h4 style="margin:1rem 0 .5rem;color:var(--brown);font-weight:900">` + L(`acctMonthlyRev`) + `</h4>` +
       `<div style="display:flex;gap:.4rem;align-items:flex-end;height:160px;background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:.6rem">` +
       months.map(function(m){
         const h = Math.max(6, Math.round((+m.gross||0)/max*115));
@@ -2029,55 +2035,171 @@ function renderAcct(d, box){
           `<small style="font-size:.58rem;font-weight:800;color:var(--muted)">` + m.ym.slice(5) + `/` + m.ym.slice(2,4) + `</small>` +
         `</div>`;
       }).join(``) + `</div>`;
-    html += table(arEn(`📅 تفاصيل الأشهر`,`📅 Month details`),
-      [arEn(`الشهر`,`Month`), arEn(`طلبات`,`Orders`), arEn(`مسلّمة`,`Delivered`), arEn(`ملغية`,`Cancelled`), arEn(`مهجورة`,`Abandoned`), arEn(`الإيراد`,`Gross`), arEn(`الضريبة`,`VAT`)],
+    html += table(L(`acctMonthsTbl`),
+      [L(`acctColMonth`), L(`acctColOrders`), L(`acctColDelivered`), L(`acctColCancelled`), L(`acctColAbandoned`), L(`acctColGross`), L(`acctColVat`)],
       months.map(function(m){
         const g = money(m.gross);
         return [m.ym, m.orders, m.delivered, m.cancelled, m.abandoned, g, money(g - g/1.15)];
       }));
   }
   if((d.drivers||[]).length){
-    html += table(arEn(`🚗 أداء السائقين`,`🚗 Driver performance`),
-      [arEn(`السائق`,`Driver`), arEn(`توصيلات`,`Deliveries`), arEn(`أرباح`,`Earnings`)],
+    html += table(L(`acctDriversTbl`),
+      [L(`acctColDriver`), L(`acctColDeliveries`), L(`acctColEarnings`)],
       d.drivers.map(function(x){ return [esc(x.driver_name), x.deliveries, money(x.earnings)]; }));
   }
   if((d.branches||[]).length){
-    html += table(arEn(`🏪 أداء الفروع`,`🏪 Branch performance`),
-      [arEn(`الفرع`,`Branch`), arEn(`طلبات`,`Orders`), arEn(`مسلّمة`,`Delivered`), arEn(`الإيراد`,`Gross`)],
+    html += table(L(`acctBranchesTbl`),
+      [L(`acctColBranch`), L(`acctColOrders`), L(`acctColDelivered`), L(`acctColGross`)],
       d.branches.map(function(x){ return [esc(ALANG===`ar` ? x.branch_name : x.branch_name_en), x.orders, x.delivered, money(x.gross)]; }));
   }
   if((d.top_items||[]).length){
-    html += table(arEn(`🍝 الأكثر مبيعاً`,`🍝 Top items`),
-      [arEn(`الصنف`,`Item`), arEn(`كمية`,`Qty`), arEn(`إيراد`,`Revenue`)],
+    html += table(L(`acctItemsTbl`),
+      [L(`acctColItem`), L(`acctColQty`), L(`acctColRevenue`)],
       d.top_items.map(function(x){ return [esc(ALANG===`ar` ? (x.name_ar||x.name_en) : (x.name_en||x.name_ar)), x.qty, money(x.revenue)]; }));
   }
   html += `<div style="text-align:center;color:var(--muted);font-size:.68rem;font-weight:800;margin-top:.8rem">` +
-    arEn(`الفترة: `,`Period: `) + d.from + ` → ` + d.to + ` • ` +
-    arEn(`الإيراد يُحتسب بتاريخ التسليم (المسلّم فقط)`,`Revenue recognized on delivery date (delivered only)`) + `</div>`;
+    L(`acctPeriodLbl`) + `: ` + d.from + ` → ` + d.to + ` • ` + L(`acctNote`) + `</div>`;
   box.innerHTML = html;
 }
 
 /* ═══════════════════════════════════════════
-   v9.5: Excel مصمم (SpreadsheetML: 5 أوراق + ألوان + رسوم)
+   v9.6: منشئ ملفات Excel الحقيقية (.xlsx)
+   ZIP + OOXML داخل المتصفح — بدون مكتبات خارجية
    ═══════════════════════════════════════════ */
+let CRC_TABLE = null;
+function crc32(bytes){
+  if(!CRC_TABLE){
+    CRC_TABLE = new Int32Array(256);
+    for(let n=0;n<256;n++){
+      let c = n;
+      for(let k=0;k<8;k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      CRC_TABLE[n] = c;
+    }
+  }
+  let crc = -1;
+  for(let i=0;i<bytes.length;i++) crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ bytes[i]) & 0xFF];
+  return (crc ^ -1) >>> 0;
+}
+function zipBuild(files){
+  const enc = new TextEncoder();
+  const chunks = [];
+  const central = [];
+  let offset = 0;
+  files.forEach(function(f){
+    const nameB = enc.encode(f.name);
+    const crc = crc32(f.data);
+    const loc = new Uint8Array(30 + nameB.length);
+    const dv = new DataView(loc.buffer);
+    dv.setUint32(0, 0x04034b50, true);
+    dv.setUint16(4, 20, true);
+    dv.setUint32(14, crc, true);
+    dv.setUint32(18, f.data.length, true);
+    dv.setUint32(22, f.data.length, true);
+    dv.setUint16(26, nameB.length, true);
+    loc.set(nameB, 30);
+    chunks.push(loc, f.data);
+    const cen = new Uint8Array(46 + nameB.length);
+    const cv = new DataView(cen.buffer);
+    cv.setUint32(0, 0x02014b50, true);
+    cv.setUint16(4, 20, true);
+    cv.setUint16(6, 20, true);
+    cv.setUint32(16, crc, true);
+    cv.setUint32(20, f.data.length, true);
+    cv.setUint32(24, f.data.length, true);
+    cv.setUint16(28, nameB.length, true);
+    cv.setUint32(42, offset, true);
+    cen.set(nameB, 46);
+    central.push(cen);
+    offset += loc.length + f.data.length;
+  });
+  const cenSize = central.reduce((s,c)=>s+c.length,0);
+  const end = new Uint8Array(22);
+  const ev = new DataView(end.buffer);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(8, files.length, true);
+  ev.setUint16(10, files.length, true);
+  ev.setUint32(12, cenSize, true);
+  ev.setUint32(16, offset, true);
+  return new Blob(chunks.concat(central, [end]),
+    {type:`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`});
+}
 function escXml(s){
   return String(s==null?``:s)
     .replace(/&/g,`&amp;`).replace(/</g,`&lt;`)
     .replace(/>/g,`&gt;`).replace(/"/g,`&quot;`);
 }
-function xCell(v, style, type){
-  const t = type || (typeof v === `number` ? `Number` : `String`);
-  return `<Cell` + (style ? ` ss:StyleID="` + style + `"` : ``) +
-    `><Data ss:Type="` + t + `">` + escXml(v) + `</Data></Cell>`;
+function colName(i){
+  let s = ``; i++;
+  while(i>0){ const m=(i-1)%26; s=String.fromCharCode(65+m)+s; i=Math.floor((i-1)/26); }
+  return s;
 }
-function xRow(cells){ return `<Row>` + cells.join(``) + `</Row>`; }
-function xSheet(name, tableHtml){
-  return `<Worksheet ss:Name="` + escXml(name) + `">` + tableHtml +
-    `<WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel"><DisplayRightToLeft/></WorksheetOptions>` +
-    `</Worksheet>`;
+/* أنماط الخلايا: فهرس ثابت */
+const XS = { def:0, title:1, sub:2, sec:3, hdr:4, goldN:5, goldS:6, cell:7, num:8, int:9, bar:10 };
+function xlsxStyles(){
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+  `<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
+  `<numFmts count="2">` +
+    `<numFmt numFmtId="164" formatCode="#,##0.00"/>` +
+    `<numFmt numFmtId="165" formatCode="#,##0"/>` +
+  `</numFmts>` +
+  `<fonts count="7">` +
+    `<font><sz val="11"/><name val="Calibri"/></font>` +
+    `<font><b/><sz val="18"/><color rgb="FF5A1830"/><name val="Calibri"/></font>` +
+    `<font><sz val="10"/><color rgb="FF8A6F63"/><name val="Calibri"/></font>` +
+    `<font><b/><sz val="12"/><color rgb="FF8E2A4A"/><name val="Calibri"/></font>` +
+    `<font><b/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>` +
+    `<font><b/><color rgb="FFE0912F"/><name val="Calibri"/></font>` +
+    `<font><b/><color rgb="FF5A1830"/><name val="Calibri"/></font>` +
+  `</fonts>` +
+  `<fills count="6">` +
+    `<fill><patternFill patternType="none"/></fill>` +
+    `<fill><patternFill patternType="gray125"/></fill>` +
+    `<fill><patternFill patternType="solid"><fgColor rgb="FFF3E7D7"/><bgColor indexed="64"/></patternFill></fill>` +
+    `<fill><patternFill patternType="solid"><fgColor rgb="FF5A1830"/><bgColor indexed="64"/></patternFill></fill>` +
+    `<fill><patternFill patternType="solid"><fgColor rgb="FFF2B95F"/><bgColor indexed="64"/></patternFill></fill>` +
+    `<fill><patternFill patternType="solid"><fgColor rgb="FFFFF6E6"/><bgColor indexed="64"/></patternFill></fill>` +
+  `</fills>` +
+  `<borders count="2">` +
+    `<border><left/><right/><top/><bottom/><diagonal/></border>` +
+    `<border><left/><right/><top style="thin"><color rgb="FFEADFD2"/></top><bottom style="thin"><color rgb="FFEADFD2"/></bottom><diagonal/></border>` +
+  `</borders>` +
+  `<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>` +
+  `<cellXfs count="11">` +
+    `<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>` +
+    `<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>` +
+    `<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>` +
+    `<xf numFmtId="0" fontId="3" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>` +
+    `<xf numFmtId="0" fontId="4" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1"/>` +
+    `<xf numFmtId="164" fontId="6" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"/>` +
+    `<xf numFmtId="0" fontId="6" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>` +
+    `<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>` +
+    `<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/>` +
+    `<xf numFmtId="165" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/>` +
+    `<xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1"/>` +
+  `</cellXfs>` +
+  `</styleSheet>`;
+}
+function xlsxSheet(rows, cols){
+  let xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+   `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
+   `<sheetViews><sheetView rightToLeft="1" workbookViewId="0"/></sheetViews>` +
+   (cols ? `<cols>` + cols.map(function(w){
+     return `<col min="` + w.i + `" max="` + w.i + `" width="` + w.w + `" customWidth="1"/>`;
+   }).join(``) + `</cols>` : ``) +
+   `<sheetData>` +
+   rows.map(function(r, ri){
+     return `<row r="` + (ri+1) + `">` + r.map(function(c, ci){
+       const ref = colName(ci) + (ri+1);
+       const st = (c.s === undefined) ? 0 : c.s;
+       if(c.n === true) return `<c r="` + ref + `" s="` + st + `"><v>` + c.v + `</v></c>`;
+       return `<c r="` + ref + `" s="` + st + `" t="inlineStr"><is><t xml:space="preserve">` + escXml(c.v) + `</t></is></c>`;
+     }).join(``) + `</row>`;
+   }).join(``) +
+   `</sheetData></worksheet>`;
+  return xml;
 }
 function exportExcel(){
-  if(!LAST_ACCT){ toast(arEn(`اعرض التقرير أولاً`,`Show a report first`), `warn`); return; }
+  if(!LAST_ACCT){ toast(L(`acctShowFirst`), `warn`); return; }
   const d = LAST_ACCT.data, t = d.totals || {};
   const gross = money(t.gross), net = money(gross/1.15), vat = money(gross-net);
   const months = d.months || [], drivers = d.drivers || [],
@@ -2086,157 +2208,190 @@ function exportExcel(){
   const maxD = Math.max.apply(null, drivers.map(x=>+x.deliveries||0).concat([1]));
   const maxB = Math.max.apply(null, branchesR.map(x=>+x.gross||0).concat([1]));
   const maxI = Math.max.apply(null, items.map(x=>+x.qty||0).concat([1]));
+  const S = XS;
+  const N = function(v, s){ return { v: v, s: s, n: true }; };
+  const T = function(v, s){ return { v: v, s: s }; };
 
-  const styles =
-   `<Styles>` +
-   `<Style ss:ID="Default" ss:Name="Normal"><Alignment ss:Vertical="Center"/><Font ss:FontName="Calibri" ss:Size="11"/></Style>` +
-   `<Style ss:ID="title"><Font ss:Bold="1" ss:Size="18" ss:Color="#5A1830"/></Style>` +
-   `<Style ss:ID="sub"><Font ss:Size="10" ss:Color="#8A6F63"/></Style>` +
-   `<Style ss:ID="sec"><Interior ss:Color="#F3E7D7" ss:Pattern="Solid"/><Font ss:Bold="1" ss:Size="12" ss:Color="#8E2A4A"/></Style>` +
-   `<Style ss:ID="hdr"><Interior ss:Color="#5A1830" ss:Pattern="Solid"/><Font ss:Bold="1" ss:Color="#FFFFFF"/></Style>` +
-   `<Style ss:ID="gold"><Interior ss:Color="#F2B95F" ss:Pattern="Solid"/><Font ss:Bold="1" ss:Color="#5A1830"/></Style>` +
-   `<Style ss:ID="cell"><Borders><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#EADFD2"/><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#EADFD2"/></Borders></Style>` +
-   `<Style ss:ID="num" ss:Parent="cell"><NumberFormat ss:Format="#,##0.00"/></Style>` +
-   `<Style ss:ID="int" ss:Parent="cell"><NumberFormat ss:Format="#,##0"/></Style>` +
-   `<Style ss:ID="bar"><Font ss:Bold="1" ss:Color="#E0912F"/></Style>` +
-   `</Styles>`;
+  const sumRows = [
+    [T(`🍝 ` + brandNameNow() + ` — ` + L(`acctDocTitle`), S.title)],
+    [T(L(`acctPeriodLbl`) + `: ` + LAST_ACCT.from + ` → ` + LAST_ACCT.to, S.sub)],
+    [T(L(`acctRef`) + `: ` + acctRef() + `  |  ` + L(`acctIssued`) + `: ` + new Date().toLocaleString(), S.sub)],
+    [T(L(`acctScope`) + `: ` + (el(`crBranch2`) && el(`crBranch2`).value ? (brName(branches().find(b=>b.id===el(`crBranch2`).value)||{}) ) : L(`ordersAllBranches`)), S.sub)],
+    [],
+    [T(L(`acctOrders`), S.cell), N(t.orders||0, S.int)],
+    [T(L(`acctDelivered`), S.cell), N(t.delivered||0, S.int)],
+    [T(L(`acctCancelled`), S.cell), N(t.cancelled||0, S.int)],
+    [T(L(`acctAbandoned`), S.cell), N(t.abandoned||0, S.int)],
+    [T(L(`acctGross`), S.goldS), N(gross, S.goldN)],
+    [T(L(`acctNet`), S.cell), N(net, S.num)],
+    [T(L(`acctVat`), S.cell), N(vat, S.num)],
+    [T(L(`acctFees`), S.cell), N(money(t.fees), S.num)],
+    [T(L(`acctAvg`), S.cell), N(t.avg||0, S.num)],
+    [T(L(`acctCancelRate`) + ` %`, S.cell), N(t.cancel_rate||0, S.int)],
+    [T(L(`acctPickupRev`), S.cell), N(money(t.pickup_gross), S.num)],
+    [T(L(`acctDeliveryRev`), S.cell), N(money(t.delivery_gross), S.num)]
+  ];
+  const monRows = [
+    [T(L(`acctMonthlyRev`), S.sec)],
+    [T(L(`acctColMonth`),S.hdr), T(L(`acctColOrders`),S.hdr), T(L(`acctColDelivered`),S.hdr), T(L(`acctColCancelled`),S.hdr), T(L(`acctColAbandoned`),S.hdr), T(L(`acctColGross`),S.hdr), T(L(`acctColVat`),S.hdr), T(L(`acctColFees`),S.hdr), T(L(`acctColChart`),S.hdr)]
+  ].concat(months.map(function(m){
+    const g = money(m.gross);
+    return [T(m.ym,S.cell), N(m.orders,S.int), N(m.delivered,S.int), N(m.cancelled,S.int), N(m.abandoned,S.int), N(g,S.num), N(money(g-g/1.15),S.num), N(money(m.fees),S.num), T(barBlocks(m.gross,maxM),S.bar)];
+  }));
+  const drvRows = [
+    [T(L(`acctDriversTbl`), S.sec)],
+    [T(L(`acctColDriver`),S.hdr), T(L(`acctColDeliveries`),S.hdr), T(L(`acctColEarnings`),S.hdr), T(L(`acctColChart`),S.hdr)]
+  ].concat(drivers.map(function(x){
+    return [T(x.driver_name,S.cell), N(x.deliveries,S.int), N(money(x.earnings),S.num), T(barBlocks(x.deliveries,maxD),S.bar)];
+  }));
+  const brRows = [
+    [T(L(`acctBranchesTbl`), S.sec)],
+    [T(L(`acctColBranch`),S.hdr), T(L(`acctColOrders`),S.hdr), T(L(`acctColDelivered`),S.hdr), T(L(`acctColGross`),S.hdr), T(L(`acctColChart`),S.hdr)]
+  ].concat(branchesR.map(function(x){
+    return [T(ALANG===`ar`?x.branch_name:x.branch_name_en,S.cell), N(x.orders,S.int), N(x.delivered,S.int), N(money(x.gross),S.num), T(barBlocks(x.gross,maxB),S.bar)];
+  }));
+  const itRows = [
+    [T(L(`acctItemsTbl`), S.sec)],
+    [T(L(`acctColItem`),S.hdr), T(L(`acctColQty`),S.hdr), T(L(`acctColRevenue`),S.hdr), T(L(`acctColChart`),S.hdr)]
+  ].concat(items.map(function(x){
+    const nm = ALANG===`ar` ? (x.name_ar||x.name_en) : (x.name_en||x.name_ar);
+    return [T(nm,S.cell), N(x.qty,S.int), N(money(x.revenue),S.num), T(barBlocks(x.qty,maxI),S.bar)];
+  }));
 
-  const sSummary = xSheet(arEn(`الملخص`,`Summary`),
-    `<Table ss:DefaultColumnWidth="150">` +
-    xRow([xCell(arEn(`🍝 مكرونجي — تقرير محاسبي رسمي`,`🍝 Makaronjy — Official Accounting Report`), `title`)]) +
-    xRow([xCell(arEn(`الفترة`,`Period`) + `: ` + LAST_ACCT.from + ` → ` + LAST_ACCT.to, `sub`)]) +
-    xRow([xCell(arEn(`تاريخ الإصدار`,`Issued`) + `: ` + new Date().toLocaleString(), `sub`)]) +
-    xRow([]) +
-    xRow([xCell(arEn(`المؤشر`,`Metric`), `hdr`), xCell(arEn(`القيمة`,`Value`), `hdr`)]) +
-    xRow([xCell(arEn(`إجمالي الطلبات`,`Total orders`), `cell`), xCell(t.orders||0, `int`)]) +
-    xRow([xCell(arEn(`مسلّمة ✅`,`Delivered ✅`), `cell`), xCell(t.delivered||0, `int`)]) +
-    xRow([xCell(arEn(`ملغية ❌`,`Cancelled ❌`), `cell`), xCell(t.cancelled||0, `int`)]) +
-    xRow([xCell(arEn(`مهجورة 🌙`,`Abandoned 🌙`), `cell`), xCell(t.abandoned||0, `int`)]) +
-    xRow([xCell(arEn(`الإيراد شامل الضريبة`,`Gross revenue (incl. VAT)`), `gold`), xCell(gross, `gold`)]) +
-    xRow([xCell(arEn(`الصافي قبل الضريبة`,`Net (excl. VAT)`), `cell`), xCell(net, `num`)]) +
-    xRow([xCell(arEn(`ضريبة القيمة المضافة 15%`,`VAT 15%`), `cell`), xCell(vat, `num`)]) +
-    xRow([xCell(arEn(`رسوم التوصيل`,`Delivery fees`), `cell`), xCell(money(t.fees), `num`)]) +
-    xRow([xCell(arEn(`متوسط الطلب`,`Avg order`), `cell`), xCell(t.avg||0, `num`)]) +
-    xRow([xCell(arEn(`معدل الإلغاء %`,`Cancel rate %`), `cell`), xCell(t.cancel_rate||0, `int`)]) +
-    xRow([xCell(arEn(`إيراد الاستلام 🏪`,`Pickup revenue 🏪`), `cell`), xCell(money(t.pickup_gross), `num`)]) +
-    xRow([xCell(arEn(`إيراد التوصيل 🛵`,`Delivery revenue 🛵`), `cell`), xCell(money(t.delivery_gross), `num`)]) +
-    `</Table>`);
-
-  const sMonths = months.length ? xSheet(arEn(`الأشهر`,`Months`),
-    `<Table ss:DefaultColumnWidth="85">` +
-    xRow([xCell(arEn(`📅 الإيراد الشهري`,`📅 Monthly revenue`), `sec`)]) +
-    xRow([xCell(arEn(`الشهر`,`Month`),`hdr`), xCell(arEn(`طلبات`,`Orders`),`hdr`), xCell(arEn(`مسلّمة`,`Delivered`),`hdr`), xCell(arEn(`ملغية`,`Cancelled`),`hdr`), xCell(arEn(`مهجورة`,`Abandoned`),`hdr`), xCell(arEn(`الإيراد`,`Gross`),`hdr`), xCell(arEn(`الضريبة`,`VAT`),`hdr`), xCell(arEn(`الرسوم`,`Fees`),`hdr`), xCell(arEn(`📊 الرسم البياني`,`📊 Chart`),`hdr`)]) +
-    months.map(function(m){
-      const g = money(m.gross);
-      return xRow([
-        xCell(m.ym, `cell`), xCell(m.orders, `int`), xCell(m.delivered, `int`),
-        xCell(m.cancelled, `int`), xCell(m.abandoned, `int`),
-        xCell(g, `num`), xCell(money(g - g/1.15), `num`), xCell(money(m.fees), `num`),
-        xCell(barBlocks(m.gross, maxM), `bar`)
-      ]);
-    }).join(``) +
-    `</Table>`) : ``;
-
-  const sDrivers = drivers.length ? xSheet(arEn(`السائقون`,`Drivers`),
-    `<Table ss:DefaultColumnWidth="110">` +
-    xRow([xCell(arEn(`🚗 أداء السائقين`,`🚗 Driver performance`), `sec`)]) +
-    xRow([xCell(arEn(`السائق`,`Driver`),`hdr`), xCell(arEn(`توصيلات`,`Deliveries`),`hdr`), xCell(arEn(`أرباح`,`Earnings`),`hdr`), xCell(arEn(`📊 الرسم`,`📊 Chart`),`hdr`)]) +
-    drivers.map(function(x){
-      return xRow([xCell(x.driver_name,`cell`), xCell(x.deliveries,`int`), xCell(money(x.earnings),`num`), xCell(barBlocks(x.deliveries, maxD),`bar`)]);
-    }).join(``) +
-    `</Table>`) : ``;
-
-  const sBranches = branchesR.length ? xSheet(arEn(`الفروع`,`Branches`),
-    `<Table ss:DefaultColumnWidth="110">` +
-    xRow([xCell(arEn(`🏪 أداء الفروع`,`🏪 Branch performance`), `sec`)]) +
-    xRow([xCell(arEn(`الفرع`,`Branch`),`hdr`), xCell(arEn(`طلبات`,`Orders`),`hdr`), xCell(arEn(`مسلّمة`,`Delivered`),`hdr`), xCell(arEn(`الإيراد`,`Gross`),`hdr`), xCell(arEn(`📊 الرسم`,` Chart`),`hdr`)]) +
-    branchesR.map(function(x){
-      return xRow([xCell(ALANG===`ar`?x.branch_name:x.branch_name_en,`cell`), xCell(x.orders,`int`), xCell(x.delivered,`int`), xCell(money(x.gross),`num`), xCell(barBlocks(x.gross, maxB),`bar`)]);
-    }).join(``) +
-    `</Table>`) : ``;
-
-  const sItems = items.length ? xSheet(arEn(`الأصناف`,`Items`),
-    `<Table ss:DefaultColumnWidth="110">` +
-    xRow([xCell(arEn(`🍝 الأكثر مبيعاً`,`🍝 Top items`), `sec`)]) +
-    xRow([xCell(arEn(`الصنف`,`Item`),`hdr`), xCell(arEn(`كمية`,`Qty`),`hdr`), xCell(arEn(`إيراد`,`Revenue`),`hdr`), xCell(arEn(`📊 الرسم`,`📊 Chart`),`hdr`)]) +
-    items.map(function(x){
-      const nm = ALANG===`ar` ? (x.name_ar||x.name_en) : (x.name_en||x.name_ar);
-      return xRow([xCell(nm,`cell`), xCell(x.qty,`int`), xCell(money(x.revenue),`num`), xCell(barBlocks(x.qty, maxI),`bar`)]);
-    }).join(``) +
-    `</Table>`) : ``;
-
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>` +
-    `<?mso-application progid="Excel.Sheet"?>` +
-    `<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">` +
-    styles + sSummary + sMonths + sDrivers + sBranches + sItems +
-    `</Workbook>`;
-  const blob = new Blob([xml], {type:`application/vnd.ms-excel;charset=utf-8`});
+  const sheetNames = [
+    L(`acctSecSummary`).replace(/^[0-9]+\)\s*/,``),
+    L(`acctMonthlyRev`).replace(/[📊]/g,``).trim(),
+    L(`acctDriversTbl`).replace(/[🚗]/g,``).trim(),
+    L(`acctBranchesTbl`).replace(/[🏪]/g,``).trim(),
+    L(`acctItemsTbl`).replace(/[🍝]/g,``).trim()
+  ];
+  const sheetsXml = [
+    xlsxSheet(sumRows, [{i:1,w:34},{i:2,w:16}]),
+    xlsxSheet(monRows, [{i:1,w:12},{i:9,w:24}]),
+    xlsxSheet(drvRows, [{i:1,w:22},{i:4,w:24}]),
+    xlsxSheet(brRows, [{i:1,w:24},{i:5,w:24}]),
+    xlsxSheet(itRows, [{i:1,w:30},{i:4,w:24}])
+  ];
+  const enc = new TextEncoder();
+  const files = [
+    { name:`[Content_Types].xml`, data: enc.encode(
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+      `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">` +
+      `<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>` +
+      `<Default Extension="xml" ContentType="application/xml"/>` +
+      `<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>` +
+      sheetsXml.map(function(_,i){ return `<Override PartName="/xl/worksheets/sheet` + (i+1) + `.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`; }).join(``) +
+      `<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>` +
+      `</Types>`) },
+    { name:`_rels/.rels`, data: enc.encode(
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+      `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+      `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>` +
+      `</Relationships>`) },
+    { name:`xl/workbook.xml`, data: enc.encode(
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+      `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">` +
+      `<sheets>` + sheetNames.map(function(nm,i){
+        return `<sheet name="` + escXml(nm).slice(0,31) + `" sheetId="` + (i+1) + `" r:id="rId` + (i+1) + `"/>`;
+      }).join(``) + `</sheets></workbook>`) },
+    { name:`xl/_rels/workbook.xml.rels`, data: enc.encode(
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+      `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+      sheetNames.map(function(_,i){ return `<Relationship Id="rId` + (i+1) + `" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet` + (i+1) + `.xml"/>`; }).join(``) +
+      `<Relationship Id="rId9" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>` +
+      `</Relationships>`) },
+    { name:`xl/styles.xml`, data: enc.encode(xlsxStyles()) }
+  ];
+  sheetsXml.forEach(function(x, i){
+    files.push({ name:`xl/worksheets/sheet` + (i+1) + `.xml`, data: enc.encode(x) });
+  });
+  const blob = zipBuild(files);
   const a = document.createElement(`a`);
   a.href = URL.createObjectURL(blob);
-  a.download = `Makaronjy-Report-` + LAST_ACCT.from + `_` + LAST_ACCT.to + `.xls`;
+  a.download = `Makaronjy-` + acctRef() + `.xlsx`;
   a.click();
   URL.revokeObjectURL(a.href);
-  toast(arEn(`✔ ملف Excel مصمم: 5 أوراق + ألوان + رسوم بيانية`,`✔ Styled Excel: 5 sheets + colors + charts`), `success`);
+  toast(L(`acctXlsDone`), `success`);
 }
 
 /* ═══════════════════════════════════════════
-   v9.5: PDF رسمي بهوية مكرونجي
+   v9.6: PDF محسّن — بدون كلمة "رسمي" + أقسام مرقمة
    ═══════════════════════════════════════════ */
 function printAcct(){
-  if(!LAST_ACCT){ toast(arEn(`اعرض التقرير أولاً`,`Show a report first`), `warn`); return; }
+  if(!LAST_ACCT){ toast(L(`acctShowFirst`), `warn`); return; }
   const d = LAST_ACCT.data, t = d.totals||{};
   const gross = money(t.gross), net = money(gross/1.15), vat = money(gross-net);
   const months = d.months||[];
   const maxM = Math.max.apply(null, months.map(m=>+m.gross||0).concat([1]));
+  const scope = (el(`crBranch2`) && el(`crBranch2`).value)
+    ? brName(branches().find(b=>b.id===el(`crBranch2`).value)||{})
+    : L(`ordersAllBranches`);
   const kpi = function(v,l){
-    return `<div style="border:1.5px solid #EADFD2;border-radius:12px;padding:8px;text-align:center;background:#FFFDF9"><b style="display:block;font-size:15px;color:#8E2A4A">` + v + `</b><small style="color:#8A6F63;font-weight:700;font-size:9px">` + l + `</small></div>`;
+    return `<div style="border:1.5px solid #EADFD2;border-radius:12px;padding:9px 6px;text-align:center;background:#FFFDF9"><b style="display:block;font-size:15px;color:#8E2A4A">` + v + `</b><small style="color:#8A6F63;font-weight:700;font-size:8.5px">` + l + `</small></div>`;
+  };
+  const secTitle = function(txt){
+    return `<div style="margin:14px 0 6px;padding:4px 10px;border-inline-start:4px solid #E0912F;background:#FAF3EA;border-radius:6px;font-size:12px;font-weight:900;color:#8E2A4A">` + txt + `</div>`;
   };
   const tbl = function(heads, rows){
-    return `<table style="width:100%;border-collapse:collapse;margin:8px 0;font-size:11px"><tr>` +
-      heads.map(h=>`<th style="background:#5A1830;color:#fff;padding:6px;border:1px solid #ddd;text-align:right">`+h+`</th>`).join(``) + `</tr>` +
-      rows.map(r=>`<tr>` + r.map(c=>`<td style="padding:5px 6px;border:1px solid #EADFD2;text-align:right;font-weight:600">`+c+`</td>`).join(``) + `</tr>`).join(``) + `</table>`;
+    return `<table style="width:100%;border-collapse:collapse;margin:6px 0;font-size:10.5px">` +
+      `<tr>` + heads.map(h=>`<th style="background:#5A1830;color:#fff;padding:6px;border:1px solid #D9C9BC;text-align:right;font-weight:800">`+h+`</th>`).join(``) + `</tr>` +
+      rows.map(function(r, i){
+        const bg = (i % 2 === 1) ? `background:#FAF3EA;` : ``;
+        return `<tr style="` + bg + `">` + r.map(c=>`<td style="padding:5px 6px;border:1px solid #EADFD2;text-align:right;font-weight:600">`+c+`</td>`).join(``) + `</tr>`;
+      }).join(``) + `</table>`;
   };
   const bars = months.map(function(m){
-    const h = Math.max(6, Math.round((+m.gross||0)/maxM*110));
-    return `<div style="flex:1;text-align:center"><div style="background:linear-gradient(180deg,#E0912F,#F2B95F);height:` + h + `px;border-radius:6px 6px 0 0"></div><small style="font-size:9px;color:#8A6F63;font-weight:700">` + m.ym.slice(5) + `/` + m.ym.slice(2,4) + `</small><small style="display:block;font-size:9px;font-weight:800;color:#8E2A4A">` + money(m.gross) + `</small></div>`;
+    const h = Math.max(6, Math.round((+m.gross||0)/maxM*105));
+    return `<div style="flex:1;text-align:center"><div style="background:linear-gradient(180deg,#E0912F,#F2B95F);height:` + h + `px;border-radius:6px 6px 0 0"></div><small style="font-size:8px;color:#8A6F63;font-weight:700">` + m.ym.slice(5) + `/` + m.ym.slice(2,4) + `</small><small style="display:block;font-size:8px;font-weight:800;color:#8E2A4A">` + money(m.gross) + `</small></div>`;
   }).join(``);
-  const html = `<html dir="rtl"><head><meta charset="utf-8"><title>Makaronjy Report</title><style>
-    @page{size:A4;margin:12mm}
+  const html = `<html dir="rtl"><head><meta charset="utf-8"><title>` + brandNameNow() + ` — ` + L(`acctDocTitle`) + `</title><style>
+    @page{size:A4;margin:11mm}
     *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-    body{font-family:Cairo,'Segoe UI',Tahoma,sans-serif;color:#2B1A15;margin:0;padding:18px}
+    body{font-family:Cairo,'Segoe UI',Tahoma,sans-serif;color:#2B1A15;margin:0;padding:16px}
   </style></head><body>
-  <div style="background:#5A1830;color:#fff;border-radius:16px;padding:16px 18px;display:flex;justify-content:space-between;align-items:center">
-    <div><b style="font-size:20px">🍝 ` + arEn(`مكرونجي`,`Makaronjy`) + `</b>
-    <div style="font-size:11px;color:#F2B95F;font-weight:700">` + arEn(`تقرير محاسبي رسمي`,`Official Accounting Report`) + `</div></div>
-    <div style="text-align:left;font-size:10px;line-height:1.7"><b>` + LAST_ACCT.from + ` → ` + LAST_ACCT.to + `</b><br>` + arEn(`أصدر`,`Issued`) + `: ` + new Date().toLocaleString() + `</div>
+  <div style="background:#5A1830;color:#fff;border-radius:16px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;gap:10px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="width:46px;height:46px;border-radius:50%;background:#F2B95F;display:flex;align-items:center;justify-content:center;font-size:24px">🍝</div>
+      <div><b style="font-size:19px">` + brandNameNow() + `</b>
+      <div style="font-size:11px;color:#F2B95F;font-weight:800">` + L(`acctDocTitle`) + `</div></div>
+    </div>
+    <div style="text-align:left;font-size:9px;line-height:1.8;color:#F5E9DC">
+      <b style="color:#F2B95F">` + L(`acctRef`) + `:</b> ` + acctRef() + `<br>
+      <b style="color:#F2B95F">` + L(`acctPeriodLbl`) + `:</b> ` + LAST_ACCT.from + ` → ` + LAST_ACCT.to + `<br>
+      <b style="color:#F2B95F">` + L(`acctScope`) + `:</b> ` + escXml(scope) + `<br>
+      <b style="color:#F2B95F">` + L(`acctIssued`) + `:</b> ` + new Date().toLocaleString() + `
+    </div>
   </div>
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0">
-    ` + kpi(gross, arEn(`الإيراد شامل الضريبة`,`Gross incl. VAT`)) +
-    kpi(net, arEn(`الصافي قبل الضريبة`,`Net excl. VAT`)) +
-    kpi(vat, arEn(`ضريبة القيمة 15%`,`VAT 15%`)) +
-    kpi(money(t.fees), arEn(`رسوم التوصيل`,`Delivery fees`)) +
-    kpi(t.orders||0, arEn(`إجمالي الطلبات`,`Total orders`)) +
-    kpi(t.delivered||0, arEn(`مسلّمة ✅`,`Delivered ✅`)) +
-    kpi(t.cancelled||0, arEn(`ملغية ❌`,`Cancelled `)) +
-    kpi((t.cancel_rate||0)+`%`, arEn(`معدل الإلغاء`,`Cancel rate`)) + `
+  ` + secTitle(L(`acctSecSummary`)) + `
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px">
+    ` + kpi(gross, L(`acctGross`)) + kpi(net, L(`acctNet`)) + kpi(vat, L(`acctVat`)) + kpi(money(t.fees), L(`acctFees`)) +
+    kpi(t.orders||0, L(`acctOrders`)) + kpi(t.delivered||0, L(`acctDelivered`)) +
+    kpi(t.cancelled||0, L(`acctCancelled`)) + kpi((t.cancel_rate||0)+`%`, L(`acctCancelRate`)) + `
   </div>` +
-  (months.length ? `<div style="border:1.5px solid #EADFD2;border-radius:14px;padding:10px;background:#fff"><b style="font-size:11px;color:#8E2A4A">📊 ` + arEn(`الإيراد الشهري`,`Monthly revenue`) + `</b><div style="display:flex;gap:6px;align-items:flex-end;height:150px;margin-top:8px">` + bars + `</div></div>` : ``) +
-  `<div style="background:#FFF6E6;border:1.5px dashed #E0912F;border-radius:12px;padding:10px;margin:12px 0;font-size:12px;font-weight:800;color:#A06B1C;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">
-     <span>` + arEn(`الإجمالي شامل الضريبة`,`Total incl. VAT`) + `: ` + gross + `</span>
-     <span>` + arEn(`الضريبة 15%`,`VAT 15%`) + `: ` + vat + `</span>
-     <span>` + arEn(`الصافي`,`Net`) + `: ` + net + `</span>
-   </div>` +
-  (months.length ? `<b style="font-size:12px;color:#8E2A4A">📅 ` + arEn(`تفاصيل الأشهر`,`Month details`) + `</b>` + tbl([arEn(`الشهر`,`Month`),arEn(`طلبات`,`Orders`),arEn(`مسلّمة`,`Delivered`),arEn(`ملغية`,`Cancelled`),arEn(`مهجورة`,`Abandoned`),arEn(`الإيراد`,`Gross`),arEn(`الضريبة`,`VAT`)], months.map(function(m){ const g=money(m.gross); return [m.ym, m.orders, m.delivered, m.cancelled, m.abandoned, g, money(g-g/1.15)]; })) : ``) +
-  ((d.drivers||[]).length ? `<b style="font-size:12px;color:#8E2A4A">🚗 ` + arEn(`أداء السائقين`,`Drivers`) + `</b>` + tbl([arEn(`السائق`,`Driver`),arEn(`توصيلات`,`Deliveries`),arEn(`أرباح`,`Earnings`)], d.drivers.map(function(x){ return [esc(x.driver_name), x.deliveries, money(x.earnings)]; })) : ``) +
-  ((d.branches||[]).length ? `<b style="font-size:12px;color:#8E2A4A">🏪 ` + arEn(`أداء الفروع`,`Branches`) + `</b>` + tbl([arEn(`الفرع`,`Branch`),arEn(`طلبات`,`Orders`),arEn(`مسلّمة`,`Delivered`),arEn(`الإيراد`,`Gross`)], d.branches.map(function(x){ return [esc(ALANG===`ar`?x.branch_name:x.branch_name_en), x.orders, x.delivered, money(x.gross)]; })) : ``) +
-  ((d.top_items||[]).length ? `<b style="font-size:12px;color:#8E2A4A">🍝 ` + arEn(`الأكثر مبيعاً`,`Top items`) + `</b>` + tbl([arEn(`الصنف`,`Item`),arEn(`كمية`,`Qty`),arEn(`إيراد`,`Revenue`)], d.top_items.map(function(x){ return [esc(ALANG===`ar`?(x.name_ar||x.name_en):(x.name_en||x.name_ar)), x.qty, money(x.revenue)]; })) : ``) +
-  `<div style="margin-top:16px;border-top:1.5px solid #EADFD2;padding-top:8px;font-size:9px;color:#8A6F63;display:flex;justify-content:space-between">
-     <span>` + arEn(`الأسعار شاملة ضريبة القيمة المضافة 15%`,`Prices include 15% VAT`) + `</span>
-     <span>` + arEn(`نظام مكرونجي السحابي`,`Makaronjy Cloud System`) + `</span>
+  (months.length ? secTitle(L(`acctSecMonths`)) +
+    `<div style="border:1.5px solid #EADFD2;border-radius:14px;padding:10px;background:#fff"><div style="display:flex;gap:5px;align-items:flex-end;height:140px">` + bars + `</div></div>` +
+    tbl([L(`acctColMonth`),L(`acctColOrders`),L(`acctColDelivered`),L(`acctColCancelled`),L(`acctColAbandoned`),L(`acctColGross`),L(`acctColVat`)],
+        months.map(function(m){ const g=money(m.gross); return [m.ym, m.orders, m.delivered, m.cancelled, m.abandoned, g, money(g-g/1.15)]; }))
+  : ``) +
+  secTitle(L(`acctSecVat`)) +
+  `<div style="background:#FFF6E6;border:1.5px dashed #E0912F;border-radius:12px;padding:10px">` +
+    tbl([L(`acctVatBoxTotal`), L(`acctVatBoxVat`), L(`acctVatBoxNet`)],
+        [[gross, vat, net]]) +
+    `<div style="font-size:9px;color:#A06B1C;font-weight:800;margin-top:4px">` + L(`acctVatNote`) + `</div>
+  </div>` +
+  ((d.drivers||[]).length || (d.branches||[]).length || (d.top_items||[]).length
+    ? secTitle(L(`acctSecTables`)) +
+      ((d.drivers||[]).length ? tbl([L(`acctColDriver`),L(`acctColDeliveries`),L(`acctColEarnings`)], d.drivers.map(function(x){ return [esc(x.driver_name), x.deliveries, money(x.earnings)]; })) : ``) +
+      ((d.branches||[]).length ? tbl([L(`acctColBranch`),L(`acctColOrders`),L(`acctColDelivered`),L(`acctColGross`)], d.branches.map(function(x){ return [esc(ALANG===`ar`?x.branch_name:x.branch_name_en), x.orders, x.delivered, money(x.gross)]; })) : ``) +
+      ((d.top_items||[]).length ? tbl([L(`acctColItem`),L(`acctColQty`),L(`acctColRevenue`)], d.top_items.map(function(x){ return [esc(ALANG===`ar`?(x.name_ar||x.name_en):(x.name_en||x.name_ar)), x.qty, money(x.revenue)]; })) : ``)
+    : ``) +
+  `<div style="margin-top:14px;border-top:1.5px solid #EADFD2;padding-top:8px;font-size:8.5px;color:#8A6F63;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+     <span>` + L(`acctPreparedBy`) + ` • ` + L(`acctNote`) + `</span>
+     <span>` + L(`acctSystem`) + ` • ` + acctRef() + `</span>
    </div>
   </body></html>`;
   const w = window.open(``, `_blank`);
-  if(!w){ toast(arEn(`اسمح بالنوافذ المنبثقة للطباعة`,`Allow popups for printing`), `warn`); return; }
+  if(!w){ toast(L(`acctPopupWarn`), `warn`); return; }
   w.document.write(html);
   w.document.close();
   setTimeout(function(){ w.print(); }, 500);
@@ -2343,4 +2498,4 @@ return;
 applyAdminLang();
 })();
 window.__ADMIN_BOOTED = true;
-/* ===== END admin-tabs.js (v9.5) ===== */
+/* ===== END admin-tabs.js (v9.6) ===== */
