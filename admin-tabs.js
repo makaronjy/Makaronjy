@@ -1,6 +1,5 @@
-/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v9.6) ===== */
-/* v9.6: تقارير بمفاتيح L() + xlsx حقيقي + PDF محسّن (بدون "رسمي") */
-
+/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v9.7) ===== */
+/* v9.7: Excel احترافي (دمج/تجميد/فلاتر/Zebra/DataBars) بلا شعار + PDF بلا شعار */
 function nmOf(x){
 return (ALANG===`ar`) ? x.ar : (x.en || x.ar);
 }
@@ -16,86 +15,78 @@ const SQ_STYLE =
 function disSt(on){
 return on ? ` disabled style="opacity:.35;pointer-events:none"` : ``;
 }
-
-/* =====================================================
-   v9: الطبقة السحابية — API للـ Worker
-   ===================================================== */
+/* ===== v9: الطبقة السحابية ===== */
 const CLOUD_API = 'https://makaronjy-api.makaronjy.workers.dev';
 let CLOUD_JWT = sessionStorage.getItem('mk_cloud_jwt') || '';
-
 async function cloudBridge(){
-  try{
-    var c = JSON.parse(sessionStorage.getItem('mk_admin') || 'null');
-    if(!c || !c.token) throw new Error('سجّل الدخول في لوحة التحكم أولاً');
-    var r = await fetch(CLOUD_API + '/api/auth/admin-bridge', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ github_token: c.token })
-    });
-    var d = await r.json().catch(function(){ return {}; });
-    if(!r.ok) throw new Error(d.error || ('فشل الجسر HTTP ' + r.status));
-    CLOUD_JWT = d.token;
-    sessionStorage.setItem('mk_cloud_jwt', CLOUD_JWT);
-    return CLOUD_JWT;
-  }catch(e){ throw e; }
+try{
+var c = JSON.parse(sessionStorage.getItem('mk_admin') || 'null');
+if(!c || !c.token) throw new Error('سجّل الدخول في لوحة التحكم أولاً');
+var r = await fetch(CLOUD_API + '/api/auth/admin-bridge', {
+method:'POST',
+headers:{'Content-Type':'application/json'},
+body: JSON.stringify({ github_token: c.token })
+});
+var d = await r.json().catch(function(){ return {}; });
+if(!r.ok) throw new Error(d.error || ('فشل الجسر HTTP ' + r.status));
+CLOUD_JWT = d.token;
+sessionStorage.setItem('mk_cloud_jwt', CLOUD_JWT);
+return CLOUD_JWT;
+}catch(e){ throw e; }
 }
-
 async function capi(path, opts){
-  opts = opts || {};
-  var headers = {'Content-Type':'application/json'};
-  if(CLOUD_JWT) headers['Authorization'] = 'Bearer ' + CLOUD_JWT;
-  var r = await fetch(CLOUD_API + path, Object.assign({}, opts, {headers:headers}));
-  if(r.status === 401){
-    try{
-      await cloudBridge();
-      headers['Authorization'] = 'Bearer ' + CLOUD_JWT;
-      r = await fetch(CLOUD_API + path, Object.assign({}, opts, {headers:headers}));
-    }catch(e){}
-  }
-  var d = await r.json().catch(function(){ return {}; });
-  if(!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
-  return d;
+opts = opts || {};
+var headers = {'Content-Type':'application/json'};
+if(CLOUD_JWT) headers['Authorization'] = 'Bearer ' + CLOUD_JWT;
+var r = await fetch(CLOUD_API + path, Object.assign({}, opts, {headers:headers}));
+if(r.status === 401){
+try{
+await cloudBridge();
+headers['Authorization'] = 'Bearer ' + CLOUD_JWT;
+r = await fetch(CLOUD_API + path, Object.assign({}, opts, {headers:headers}));
+}catch(e){}
 }
-
-/* v9: تنسيقات تبويبات السحابة */
+var d = await r.json().catch(function(){ return {}; });
+if(!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+return d;
+}
 (function injectCloudStyles(){
-  if(el('v9CloudStyles')) return;
-  var st = document.createElement('style');
-  st.id = 'v9CloudStyles';
-  st.textContent =
-  '.cl-card{background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:1rem;margin:0 0 1rem}' +
-  '.cl-card h3{font-size:1rem;font-weight:900;color:var(--ink);margin:0 0 .7rem}' +
-  '.cl-row{display:flex;gap:.6rem;flex-wrap:wrap;align-items:flex-end}' +
-  '.cl-f{display:flex;flex-direction:column;gap:.25rem;flex:1;min-width:130px}' +
-  '.cl-f label{font-size:.72rem;font-weight:900;color:var(--brown)}' +
-  '.cl-f input,.cl-f select{border:1.5px solid var(--line);border-radius:10px;padding:.55rem .6rem;font-family:inherit;font-weight:800;background:#fff;font-size:.88rem}' +
-  '.cl-btn{border:none;border-radius:10px;padding:.6rem 1.1rem;font-family:inherit;font-weight:900;cursor:pointer;font-size:.85rem}' +
-  '.cl-add{background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--dark)}' +
-  '.cl-plain{background:#f3e7d7;color:var(--brown)}' +
-  '.cl-err{background:#fee2e2;color:#b91c1c}' +
-  '.cl-ok{background:#1e5b4f;color:#fff}' +
-  '.cl-res{margin-top:.8rem;background:#dcf5e8;border:1.5px solid #128c5e44;border-radius:12px;padding:.8rem;font-size:.82rem;font-weight:800;line-height:1.9;display:none}' +
-  '.cl-res.show{display:block}' +
-  '.cl-res .pass{direction:ltr;display:inline-block;background:#5a1830;color:#f2b95f;border-radius:8px;padding:.15rem .7rem;font-weight:900;font-family:monospace}' +
-  '.cl-tbl{width:100%;border-collapse:collapse;font-size:.78rem;margin-top:.8rem}' +
-  '.cl-tbl th,.cl-tbl td{border:1px solid var(--line);padding:.45rem .4rem;text-align:center;font-weight:800}' +
-  '.cl-tbl th{background:#f3e7d7;color:var(--brown)}' +
-  '.cl-tbl tr:hover{background:#faf3ea}' +
-  '.cl-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.6rem;margin-top:.8rem}' +
-  '.cl-stat{background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:.7rem;text-align:center}' +
-  '.cl-stat b{display:block;font-size:1.4rem;color:var(--brown);margin-bottom:.15rem}' +
-  '.cl-stat small{color:var(--muted);font-weight:800;font-size:.68rem}' +
-  '.cl-badge-off{background:#fee2e2;color:#b91c1c;border-radius:50px;padding:.1rem .5rem;font-size:.66rem;font-weight:800}' +
-  '.cl-badge-on{background:#dcf5e8;color:#1e5b4f;border-radius:50px;padding:.1rem .5rem;font-size:.66rem;font-weight:800}' +
-  '.cl-badge-pickup{background:#fff6e6;color:#b45309;border-radius:50px;padding:.1rem .5rem;font-size:.66rem;font-weight:800}' +
-  '.cl-badge-delivery{background:#dbeafe;color:#1e40af;border-radius:50px;padding:.1rem .5rem;font-size:.66rem;font-weight:800}' +
-  '.cl-locked{display:inline-flex;align-items:center;justify-content:center;font-size:1rem}' +
-  '.cl-btn-sm{padding:.3rem .6rem;font-size:.72rem;border-radius:8px;border:none;font-weight:900;cursor:pointer;font-family:inherit;margin:0 .1rem}' +
-  '.cl-empty{padding:2rem;text-align:center;color:var(--muted);font-weight:800;border:1.5px dashed var(--line);border-radius:12px;margin-top:.8rem}' +
-  '.cl-actions{display:flex;gap:.3rem;justify-content:center;flex-wrap:wrap}';
-  document.head.appendChild(st);
+if(el('v9CloudStyles')) return;
+var st = document.createElement('style');
+st.id = 'v9CloudStyles';
+st.textContent =
+'.cl-card{background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:1rem;margin:0 0 1rem}' +
+'.cl-card h3{font-size:1rem;font-weight:900;color:var(--ink);margin:0 0 .7rem}' +
+'.cl-row{display:flex;gap:.6rem;flex-wrap:wrap;align-items:flex-end}' +
+'.cl-f{display:flex;flex-direction:column;gap:.25rem;flex:1;min-width:130px}' +
+'.cl-f label{font-size:.72rem;font-weight:900;color:var(--brown)}' +
+'.cl-f input,.cl-f select{border:1.5px solid var(--line);border-radius:10px;padding:.55rem .6rem;font-family:inherit;font-weight:800;background:#fff;font-size:.88rem}' +
+'.cl-btn{border:none;border-radius:10px;padding:.6rem 1.1rem;font-family:inherit;font-weight:900;cursor:pointer;font-size:.85rem}' +
+'.cl-add{background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--dark)}' +
+'.cl-plain{background:#f3e7d7;color:var(--brown)}' +
+'.cl-err{background:#fee2e2;color:#b91c1c}' +
+'.cl-ok{background:#1e5b4f;color:#fff}' +
+'.cl-res{margin-top:.8rem;background:#dcf5e8;border:1.5px solid #128c5e44;border-radius:12px;padding:.8rem;font-size:.82rem;font-weight:800;line-height:1.9;display:none}' +
+'.cl-res.show{display:block}' +
+'.cl-res .pass{direction:ltr;display:inline-block;background:#5a1830;color:#f2b95f;border-radius:8px;padding:.15rem .7rem;font-weight:900;font-family:monospace}' +
+'.cl-tbl{width:100%;border-collapse:collapse;font-size:.78rem;margin-top:.8rem}' +
+'.cl-tbl th,.cl-tbl td{border:1px solid var(--line);padding:.45rem .4rem;text-align:center;font-weight:800}' +
+'.cl-tbl th{background:#f3e7d7;color:var(--brown)}' +
+'.cl-tbl tr:hover{background:#faf3ea}' +
+'.cl-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.6rem;margin-top:.8rem}' +
+'.cl-stat{background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:.7rem;text-align:center}' +
+'.cl-stat b{display:block;font-size:1.4rem;color:var(--brown);margin-bottom:.15rem}' +
+'.cl-stat small{color:var(--muted);font-weight:800;font-size:.68rem}' +
+'.cl-badge-off{background:#fee2e2;color:#b91c1c;border-radius:50px;padding:.1rem .5rem;font-size:.66rem;font-weight:800}' +
+'.cl-badge-on{background:#dcf5e8;color:#1e5b4f;border-radius:50px;padding:.1rem .5rem;font-size:.66rem;font-weight:800}' +
+'.cl-badge-pickup{background:#fff6e6;color:#b45309;border-radius:50px;padding:.1rem .5rem;font-size:.66rem;font-weight:800}' +
+'.cl-badge-delivery{background:#dbeafe;color:#1e40af;border-radius:50px;padding:.1rem .5rem;font-size:.66rem;font-weight:800}' +
+'.cl-locked{display:inline-flex;align-items:center;justify-content:center;font-size:1rem}' +
+'.cl-btn-sm{padding:.3rem .6rem;font-size:.72rem;border-radius:8px;border:none;font-weight:900;cursor:pointer;font-family:inherit;margin:0 .1rem}' +
+'.cl-empty{padding:2rem;text-align:center;color:var(--muted);font-weight:800;border:1.5px dashed var(--line);border-radius:12px;margin-top:.8rem}' +
+'.cl-actions{display:flex;gap:.3rem;justify-content:center;flex-wrap:wrap}';
+document.head.appendChild(st);
 })();
-
 /* ===== المنيو ===== */
 function renderMenu(){
 var wrap = el(`menuWrap`);
@@ -1613,842 +1604,844 @@ btn.textContent = label;
 handlePublishError(e, btn, label);
 }
 });
-
-/* =====================================================
-   v9.2: تبويب الموظفون
-   ===================================================== */
+/* ===== v9.2: تبويب الموظفون ===== */
 function buildUsersTab(){
-  var sec = el(`tab-cloud-users`);
-  if(!sec) return;
-  if(!STATE) return;
-  var brs = branches();
-  var brOpts = brs.map(function(b){
-    return `<option value="` + esc(b.id) + `">` + esc(brName(b)) + `</option>`;
-  }).join(``);
-  sec.innerHTML =
-    `<div class="cl-card">` +
-      `<h3>` + L(`usersAddTitle`) + `</h3>` +
-      `<form id="cuForm" class="cl-row">` +
-        `<div class="cl-f"><label>` + L(`usersName`) + `</label><input id="cuName" required></div>` +
-        `<div class="cl-f"><label>` + L(`usersPhone`) + `</label><input id="cuPhone" class="ltr" placeholder="9665xxxxxxxx"></div>` +
-        `<div class="cl-f"><label>` + L(`usersUsername`) + `</label><input id="cuUser" class="ltr" required></div>` +
-        `<div class="cl-f"><label>` + L(`usersRole`) + `</label><select id="cuRole">` +
-          `<option value="supervisor">` + L(`usersRoleSup`) + `</option>` +
-          `<option value="driver">` + L(`usersRoleDrv`) + `</option>` +
-        `</select></div>` +
-        `<div class="cl-f"><label>` + L(`usersBranch`) + `</label><select id="cuBranch">` + brOpts + `</select></div>` +
-        `<div class="cl-f"><label>` + L(`usersTempPass`) + `</label><input id="cuPass" class="ltr" placeholder="` + L(`usersTempGen`) + `"></div>` +
-        `<button type="submit" class="cl-btn cl-add" style="align-self:flex-end">` + L(`usersCreate`) + `</button>` +
-      `</form>` +
-      `<div class="cl-res" id="cuResult"></div>` +
-    `</div>` +
-    `<div class="cl-card">` +
-      `<h3>` + L(`usersListTitle`) + `</h3>` +
-      `<div style="overflow-x:auto"><table class="cl-tbl" id="cuTable"></table></div>` +
-      `<div class="cl-res" id="cuAct"></div>` +
-    `</div>`;
-  var form = el(`cuForm`);
-  if(form){
-    form.addEventListener(`submit`, async function(e){
-      e.preventDefault();
-      var name = mv(`cuName`).trim();
-      var phone = mv(`cuPhone`).trim();
-      var username = mv(`cuUser`).trim().toLowerCase();
-      var role = el(`cuRole`).value;
-      var branch_id = el(`cuBranch`).value;
-      var password = mv(`cuPass`).trim() || undefined;
-      if(!name || !username){
-        toast(L(`usersName`) + ` / ` + L(`usersUsername`), `warn`);
-        return;
-      }
-      var btn = form.querySelector(`button[type="submit"]`);
-      btn.disabled = true;
-      btn.textContent = L(`publishing`);
-      try{
-        var d = await capi(`/api/admin/users`, {
-          method:`POST`,
-          body: JSON.stringify({
-            name:name, phone:phone, username:username,
-            password:password, role:role, branch_id:branch_id
-          })
-        });
-        var box = el(`cuResult`);
-        box.classList.add(`show`);
-        box.innerHTML = `✅ ` + L(`usersCreated`) + ` — ` +
-          L(`usersUsername`) + `: <b dir="ltr">` + esc(d.username) + `</b><br>` +
-          `🔑 ` + L(`usersTempPass`) + `: <span class="pass">` + esc(d.temp_password) + `</span><br>` +
-          `⚠️ ` + L(`usersGivePass`);
-        form.reset();
-        loadUsersTab();
-      }catch(err){
-        toast(`⚠️ ` + err.message, `error`);
-      }
-      btn.disabled = false;
-      btn.textContent = L(`usersCreate`);
-    });
-  }
-  var tbl = el(`cuTable`);
-  if(tbl){
-    tbl.addEventListener(`click`, async function(e){
-      var ut = e.target.closest(`[data-ut]`);
-      var ur = e.target.closest(`[data-ur]`);
-      var ud = e.target.closest(`[data-ud]`);
-      try{
-        if(ut){
-          var uid = +ut.getAttribute(`data-ut`);
-          var ua = +ut.getAttribute(`data-ua`);
-          await capi(`/api/admin/users/` + uid, {
-            method:`PUT`,
-            body: JSON.stringify({ is_active: ua })
-          });
-          toast(ua ? `✓ ` + L(`usersEnable`) : `⛔ ` + L(`usersDisable`), `success`);
-          loadUsersTab();
-        } else if(ur){
-          var uid2 = +ur.getAttribute(`data-ur`);
-          var d = await capi(`/api/admin/users/` + uid2 + `/reset-password`, { method:`POST` });
-          var box = el(`cuAct`);
-          box.classList.add(`show`);
-          box.innerHTML = `🔑 <b dir="ltr">` + esc(d.username) + `</b> ← <span class="pass">` + esc(d.temp_password) + `</span>`;
-        } else if(ud){
-          var uid3 = +ud.getAttribute(`data-ud`);
-          var uname = ud.getAttribute(`data-name`) || ``;
-          var ok = await askConfirm(
-            (ALANG===`ar`) ?
-              `سيُحذف الموظف «${uname}» نهائياً. اكتب delete للتأكيد.` :
-              `Delete ${uname} permanently. Type delete to confirm.`,
-            L(`btnDelFinal`), `🗑`, L(`btnDelFinal`), true);
-          if(!ok) return;
-          await capi(`/api/admin/users/` + uid3, { method:`DELETE` });
-          toast((ALANG===`ar`)?`تم الحذف`:`Deleted`, `success`);
-          loadUsersTab();
-        }
-      }catch(err){
-        toast(`⚠️ ` + err.message, `error`);
-      }
-    });
-  }
+var sec = el(`tab-cloud-users`);
+if(!sec) return;
+if(!STATE) return;
+var brs = branches();
+var brOpts = brs.map(function(b){
+return `<option value="` + esc(b.id) + `">` + esc(brName(b)) + `</option>`;
+}).join(``);
+sec.innerHTML =
+`<div class="cl-card">` +
+`<h3>` + L(`usersAddTitle`) + `</h3>` +
+`<form id="cuForm" class="cl-row">` +
+`<div class="cl-f"><label>` + L(`usersName`) + `</label><input id="cuName" required></div>` +
+`<div class="cl-f"><label>` + L(`usersPhone`) + `</label><input id="cuPhone" class="ltr" placeholder="9665xxxxxxxx"></div>` +
+`<div class="cl-f"><label>` + L(`usersUsername`) + `</label><input id="cuUser" class="ltr" required></div>` +
+`<div class="cl-f"><label>` + L(`usersRole`) + `</label><select id="cuRole">` +
+`<option value="supervisor">` + L(`usersRoleSup`) + `</option>` +
+`<option value="driver">` + L(`usersRoleDrv`) + `</option>` +
+`</select></div>` +
+`<div class="cl-f"><label>` + L(`usersBranch`) + `</label><select id="cuBranch">` + brOpts + `</select></div>` +
+`<div class="cl-f"><label>` + L(`usersTempPass`) + `</label><input id="cuPass" class="ltr" placeholder="` + L(`usersTempGen`) + `"></div>` +
+`<button type="submit" class="cl-btn cl-add" style="align-self:flex-end">` + L(`usersCreate`) + `</button>` +
+`</form>` +
+`<div class="cl-res" id="cuResult"></div>` +
+`</div>` +
+`<div class="cl-card">` +
+`<h3>` + L(`usersListTitle`) + `</h3>` +
+`<div style="overflow-x:auto"><table class="cl-tbl" id="cuTable"></table></div>` +
+`<div class="cl-res" id="cuAct"></div>` +
+`</div>`;
+var form = el(`cuForm`);
+if(form){
+form.addEventListener(`submit`, async function(e){
+e.preventDefault();
+var name = mv(`cuName`).trim();
+var phone = mv(`cuPhone`).trim();
+var username = mv(`cuUser`).trim().toLowerCase();
+var role = el(`cuRole`).value;
+var branch_id = el(`cuBranch`).value;
+var password = mv(`cuPass`).trim() || undefined;
+if(!name || !username){
+toast(L(`usersName`) + ` / ` + L(`usersUsername`), `warn`);
+return;
 }
-
+var btn = form.querySelector(`button[type="submit"]`);
+btn.disabled = true;
+btn.textContent = L(`publishing`);
+try{
+var d = await capi(`/api/admin/users`, {
+method:`POST`,
+body: JSON.stringify({
+name:name, phone:phone, username:username,
+password:password, role:role, branch_id:branch_id
+})
+});
+var box = el(`cuResult`);
+box.classList.add(`show`);
+box.innerHTML = `✅ ` + L(`usersCreated`) + ` — ` +
+L(`usersUsername`) + `: <b dir="ltr">` + esc(d.username) + `</b><br>` +
+`🔑 ` + L(`usersTempPass`) + `: <span class="pass">` + esc(d.temp_password) + `</span><br>` +
+`⚠️ ` + L(`usersGivePass`);
+form.reset();
+loadUsersTab();
+}catch(err){
+toast(`⚠️ ` + err.message, `error`);
+}
+btn.disabled = false;
+btn.textContent = L(`usersCreate`);
+});
+}
+var tbl = el(`cuTable`);
+if(tbl){
+tbl.addEventListener(`click`, async function(e){
+var ut = e.target.closest(`[data-ut]`);
+var ur = e.target.closest(`[data-ur]`);
+var ud = e.target.closest(`[data-ud]`);
+try{
+if(ut){
+var uid = +ut.getAttribute(`data-ut`);
+var ua = +ut.getAttribute(`data-ua`);
+await capi(`/api/admin/users/` + uid, {
+method:`PUT`,
+body: JSON.stringify({ is_active: ua })
+});
+toast(ua ? `✓ ` + L(`usersEnable`) : `⛔ ` + L(`usersDisable`), `success`);
+loadUsersTab();
+} else if(ur){
+var uid2 = +ur.getAttribute(`data-ur`);
+var d = await capi(`/api/admin/users/` + uid2 + `/reset-password`, { method:`POST` });
+var box = el(`cuAct`);
+box.classList.add(`show`);
+box.innerHTML = `🔑 <b dir="ltr">` + esc(d.username) + `</b> ← <span class="pass">` + esc(d.temp_password) + `</span>`;
+} else if(ud){
+var uid3 = +ud.getAttribute(`data-ud`);
+var uname = ud.getAttribute(`data-name`) || ``;
+var ok = await askConfirm(
+(ALANG===`ar`) ?
+`سيُحذف الموظف «${uname}» نهائياً. اكتب delete للتأكيد.` :
+`Delete ${uname} permanently. Type delete to confirm.`,
+L(`btnDelFinal`), `🗑`, L(`btnDelFinal`), true);
+if(!ok) return;
+await capi(`/api/admin/users/` + uid3, { method:`DELETE` });
+toast((ALANG===`ar`)?`تم الحذف`:`Deleted`, `success`);
+loadUsersTab();
+}
+}catch(err){
+toast(`⚠️ ` + err.message, `error`);
+}
+});
+}
+}
 async function loadUsersTab(){
-  var tbl = el(`cuTable`);
-  if(!tbl) return;
-  var ROLE_MAP = {
-    super_admin: L(`usersRoleOwner`),
-    supervisor: L(`usersRoleSup`),
-    driver: L(`usersRoleDrv`)
-  };
-  try{
-    if(!CLOUD_JWT) await cloudBridge();
-    var d = await capi(`/api/admin/users`);
-    var rows = (d.users || []).map(function(u){
-      var isOwner = u.role === `super_admin`;
-      var actions;
-      if(isOwner){
-        actions = `<span class="cl-locked" title="` +
-          ((ALANG===`ar`)?`حساب المالك محمي`:`Owner protected`) +
-          `">🔒</span>` +
-          `<button class="cl-btn-sm cl-plain" data-ur="` + u.id + `" title="` +
-          ((ALANG===`ar`)?`إعادة تعيين كلمة المرور`:`Reset password`) + `">🔑</button>`;
-      } else {
-        actions =
-          `<button class="cl-btn-sm ` + (u.is_active ? `cl-err` : `cl-ok`) +
-            `" data-ut="` + u.id + `" data-ua="` + (u.is_active ? 0 : 1) + `">` +
-            (u.is_active ? L(`usersDisable`) : L(`usersEnable`)) + `</button>` +
-          `<button class="cl-btn-sm cl-plain" data-ur="` + u.id + `" title="` +
-          ((ALANG===`ar`)?`إعادة تعيين كلمة المرور`:`Reset password`) + `">🔑</button>` +
-          `<button class="cl-btn-sm cl-err" data-ud="` + u.id + `" data-name="` +
-          esc(u.name) + `" title="` +
-          ((ALANG===`ar`)?`حذف نهائي`:`Delete permanently`) + `">🗑</button>`;
-      }
-      return `<tr>` +
-        `<td>` + esc(u.name) + `</td>` +
-        `<td dir="ltr">` + esc(u.username) + `</td>` +
-        `<td>` + (ROLE_MAP[u.role] || u.role) + `</td>` +
-        `<td>` + esc(u.branch_name || `—`) + `</td>` +
-        `<td>` + (u.is_active ? `<span class="cl-badge-on">` + L(`usersActive`) + `</span>` : `<span class="cl-badge-off">` + L(`usersInactive`) + `</span>`) + `</td>` +
-        `<td class="cl-actions">` + actions + `</td>` +
-      `</tr>`;
-    }).join(``);
-    tbl.innerHTML = `<tr>` +
-      `<th>` + L(`usersName`) + `</th>` +
-      `<th>` + L(`usersUsername`) + `</th>` +
-      `<th>` + L(`usersRole`) + `</th>` +
-      `<th>` + L(`usersBranch`) + `</th>` +
-      `<th>` + L(`ordersStatus`) + `</th>` +
-      `<th>—</th>` +
-    `</tr>` +
-    (rows || `<tr><td colspan="6" class="cl-empty">` + L(`usersEmpty`) + `</td></tr>`);
-  }catch(err){
-    tbl.innerHTML = `<tr><td colspan="6" class="cl-empty">⚠️ ` + esc(err.message) + `</td></tr>`;
-  }
+var tbl = el(`cuTable`);
+if(!tbl) return;
+var ROLE_MAP = {
+super_admin: L(`usersRoleOwner`),
+supervisor: L(`usersRoleSup`),
+driver: L(`usersRoleDrv`)
+};
+try{
+if(!CLOUD_JWT) await cloudBridge();
+var d = await capi(`/api/admin/users`);
+var rows = (d.users || []).map(function(u){
+var isOwner = u.role === `super_admin`;
+var actions;
+if(isOwner){
+actions = `<span class="cl-locked" title="` +
+((ALANG===`ar`)?`حساب المالك محمي`:`Owner protected`) +
+`">🔒</span>` +
+`<button class="cl-btn-sm cl-plain" data-ur="` + u.id + `" title="` +
+((ALANG===`ar`)?`إعادة تعيين كلمة المرور`:`Reset password`) + `">🔑</button>`;
+} else {
+actions =
+`<button class="cl-btn-sm ` + (u.is_active ? `cl-err` : `cl-ok`) +
+`" data-ut="` + u.id + `" data-ua="` + (u.is_active ? 0 : 1) + `">` +
+(u.is_active ? L(`usersDisable`) : L(`usersEnable`)) + `</button>` +
+`<button class="cl-btn-sm cl-plain" data-ur="` + u.id + `" title="` +
+((ALANG===`ar`)?`إعادة تعيين كلمة المرور`:`Reset password`) + `">🔑</button>` +
+`<button class="cl-btn-sm cl-err" data-ud="` + u.id + `" data-name="` +
+esc(u.name) + `" title="` +
+((ALANG===`ar`)?`حذف نهائي`:`Delete permanently`) + `">🗑</button>`;
 }
-
-/* =====================================================
-   v9.2: تبويب الطلبات
-   ===================================================== */
+return `<tr>` +
+`<td>` + esc(u.name) + `</td>` +
+`<td dir="ltr">` + esc(u.username) + `</td>` +
+`<td>` + (ROLE_MAP[u.role] || u.role) + `</td>` +
+`<td>` + esc(u.branch_name || `—`) + `</td>` +
+`<td>` + (u.is_active ? `<span class="cl-badge-on">` + L(`usersActive`) + `</span>` : `<span class="cl-badge-off">` + L(`usersInactive`) + `</span>`) + `</td>` +
+`<td class="cl-actions">` + actions + `</td>` +
+`</tr>`;
+}).join(``);
+tbl.innerHTML = `<tr>` +
+`<th>` + L(`usersName`) + `</th>` +
+`<th>` + L(`usersUsername`) + `</th>` +
+`<th>` + L(`usersRole`) + `</th>` +
+`<th>` + L(`usersBranch`) + `</th>` +
+`<th>` + L(`ordersStatus`) + `</th>` +
+`<th>—</th>` +
+`</tr>` +
+(rows || `<tr><td colspan="6" class="cl-empty">` + L(`usersEmpty`) + `</td></tr>`);
+}catch(err){
+tbl.innerHTML = `<tr><td colspan="6" class="cl-empty">⚠️ ` + esc(err.message) + `</td></tr>`;
+}
+}
+/* ===== v9.2: تبويب الطلبات ===== */
 function buildOrdersTab(){
-  var sec = el(`tab-cloud-orders`);
-  if(!sec) return;
-  if(!STATE) return;
-  var brs = branches();
-  var brOpts = `<option value="">` + L(`ordersAllBranches`) + `</option>` +
-    brs.map(function(b){
-      return `<option value="` + esc(b.id) + `">` + esc(brName(b)) + `</option>`;
-    }).join(``);
-  var statusOpts = `<option value="">` + L(`ordersAllStatuses`) + `</option>` +
-    `<option value="pending">` + L(`statusPending`) + `</option>` +
-    `<option value="accepted">` + L(`statusAccepted`) + `</option>` +
-    `<option value="preparing">` + L(`statusPreparing`) + `</option>` +
-    `<option value="ready">` + L(`statusReady`) + `</option>` +
-    `<option value="driver_assigned">` + L(`statusDrvAssigned`) + `</option>` +
-    `<option value="out_for_delivery">` + L(`statusOutForDel`) + `</option>` +
-    `<option value="delivered">` + L(`statusDelivered`) + `</option>` +
-    `<option value="cancelled">` + L(`statusCancelled`) + `</option>`;
-  var typeOpts =
-    `<option value="">` + ((ALANG===`ar`)?`كل الأنواع`:`All types`) + `</option>` +
-    `<option value="pickup">🏪 ` + ((ALANG===`ar`)?`استلام`:`Pickup`) + `</option>` +
-    `<option value="delivery">🛵 ` + ((ALANG===`ar`)?`توصيل`:`Delivery`) + `</option>`;
-  sec.innerHTML =
-    `<div class="cl-card">` +
-      `<h3>` + L(`ordersTitle`) + `</h3>` +
-      `<div class="cl-row">` +
-        `<div class="cl-f"><label>` + L(`ordersBranch`) + `</label><select id="coBranch">` + brOpts + `</select></div>` +
-        `<div class="cl-f"><label>` + L(`ordersStatus`) + `</label><select id="coStatus">` + statusOpts + `</select></div>` +
-        `<div class="cl-f"><label>` + ((ALANG===`ar`)?`النوع`:`Type`) + `</label><select id="coType">` + typeOpts + `</select></div>` +
-        `<button class="cl-btn cl-add" id="coRefresh" style="align-self:flex-end">` + L(`ordersRefresh`) + `</button>` +
-      `</div>` +
-      `<div style="overflow-x:auto"><table class="cl-tbl" id="coTable"></table></div>` +
-    `</div>`;
-  var refBtn = el(`coRefresh`);
-  if(refBtn) refBtn.addEventListener(`click`, loadOrdersTab);
-  var brSel = el(`coBranch`), stSel = el(`coStatus`), tySel = el(`coType`);
-  [brSel, stSel, tySel].forEach(function(s){
-    if(s) s.addEventListener(`change`, loadOrdersTab);
-  });
+var sec = el(`tab-cloud-orders`);
+if(!sec) return;
+if(!STATE) return;
+var brs = branches();
+var brOpts = `<option value="">` + L(`ordersAllBranches`) + `</option>` +
+brs.map(function(b){
+return `<option value="` + esc(b.id) + `">` + esc(brName(b)) + `</option>`;
+}).join(``);
+var statusOpts = `<option value="">` + L(`ordersAllStatuses`) + `</option>` +
+`<option value="pending">` + L(`statusPending`) + `</option>` +
+`<option value="accepted">` + L(`statusAccepted`) + `</option>` +
+`<option value="preparing">` + L(`statusPreparing`) + `</option>` +
+`<option value="ready">` + L(`statusReady`) + `</option>` +
+`<option value="driver_assigned">` + L(`statusDrvAssigned`) + `</option>` +
+`<option value="out_for_delivery">` + L(`statusOutForDel`) + `</option>` +
+`<option value="delivered">` + L(`statusDelivered`) + `</option>` +
+`<option value="cancelled">` + L(`statusCancelled`) + `</option>`;
+var typeOpts =
+`<option value="">` + ((ALANG===`ar`)?`كل الأنواع`:`All types`) + `</option>` +
+`<option value="pickup">🏪 ` + ((ALANG===`ar`)?`استلام`:`Pickup`) + `</option>` +
+`<option value="delivery">🛵 ` + ((ALANG===`ar`)?`توصيل`:`Delivery`) + `</option>`;
+sec.innerHTML =
+`<div class="cl-card">` +
+`<h3>` + L(`ordersTitle`) + `</h3>` +
+`<div class="cl-row">` +
+`<div class="cl-f"><label>` + L(`ordersBranch`) + `</label><select id="coBranch">` + brOpts + `</select></div>` +
+`<div class="cl-f"><label>` + L(`ordersStatus`) + `</label><select id="coStatus">` + statusOpts + `</select></div>` +
+`<div class="cl-f"><label>` + ((ALANG===`ar`)?`النوع`:`Type`) + `</label><select id="coType">` + typeOpts + `</select></div>` +
+`<button class="cl-btn cl-add" id="coRefresh" style="align-self:flex-end">` + L(`ordersRefresh`) + `</button>` +
+`</div>` +
+`<div style="overflow-x:auto"><table class="cl-tbl" id="coTable"></table></div>` +
+`</div>`;
+var refBtn = el(`coRefresh`);
+if(refBtn) refBtn.addEventListener(`click`, loadOrdersTab);
+var brSel = el(`coBranch`), stSel = el(`coStatus`), tySel = el(`coType`);
+[brSel, stSel, tySel].forEach(function(s){
+if(s) s.addEventListener(`change`, loadOrdersTab);
+});
 }
-
 async function loadOrdersTab(){
-  var tbl = el(`coTable`);
-  if(!tbl) return;
-  var STATUS_MAP = {
-    pending: L(`statusPending`),
-    accepted: L(`statusAccepted`),
-    preparing: L(`statusPreparing`),
-    ready: L(`statusReady`),
-    driver_assigned: L(`statusDrvAssigned`),
-    out_for_delivery: L(`statusOutForDel`),
-    delivered: L(`statusDelivered`),
-    cancelled: L(`statusCancelled`),
-    archived: L(`statusArchived`)
-  };
-  var q = `/api/admin/orders?`;
-  var b = el(`coBranch`) ? el(`coBranch`).value : ``;
-  var st = el(`coStatus`) ? el(`coStatus`).value : ``;
-  var ty = el(`coType`) ? el(`coType`).value : ``;
-  if(b) q += `branch_id=` + encodeURIComponent(b) + `&`;
-  if(st) q += `status=` + encodeURIComponent(st) + `&`;
-  if(ty) q += `type=` + encodeURIComponent(ty) + `&`;
-  try{
-    if(!CLOUD_JWT) await cloudBridge();
-    var d = await capi(q);
-    var rows = (d.orders || []).map(function(o){
-      var ot = o.order_type || `delivery`;
-      var typeBadge = ot === `pickup`
-        ? `<span class="cl-badge-pickup">🏪 ` + ((ALANG===`ar`)?`استلام`:`Pickup`) + `</span>` +
-          `<small style="display:block;font-size:.6rem;color:var(--amber);margin-top:.15rem">💵 ` +
-          ((ALANG===`ar`)?`كاشير`:`Cashier`) + `</small>`
-        : `<span class="cl-badge-delivery">🛵 ` + ((ALANG===`ar`)?`توصيل`:`Delivery`) + `</span>`;
-      var statusText = STATUS_MAP[o.status] || o.status;
-      if(ot === `pickup` && o.status === `ready`) statusText = (ALANG===`ar`)?`جاهز للاستلام`:`Ready for pickup`;
-      if(ot === `pickup` && o.status === `delivered`) statusText = (ALANG===`ar`)?`تم الاستلام من الفرع ✅`:`Picked up ✅`;
-      return `<tr>` +
-        `<td dir="ltr"><b>` + esc(o.number) + `</b></td>` +
-        `<td>` + typeBadge + `</td>` +
-        `<td>` + esc(o.branch_name) + `</td>` +
-        `<td>` + esc(o.customer_name) + `</td>` +
-        `<td dir="ltr">` + esc(o.customer_phone) + `</td>` +
-        `<td>` + (o.total || 0) + `</td>` +
-        `<td>` + statusText + `</td>` +
-        `<td>` + esc(o.driver_name || L(`ordersNoDriver`)) + `</td>` +
-        `<td>` + esc(String(o.created_at).slice(0,16)) + `</td>` +
-      `</tr>`;
-    }).join(``);
-    tbl.innerHTML = `<tr>` +
-      `<th>` + L(`ordersNumber`) + `</th>` +
-      `<th>` + ((ALANG===`ar`)?`النوع`:`Type`) + `</th>` +
-      `<th>` + L(`ordersBranch`) + `</th>` +
-      `<th>` + L(`ordersCustomer`) + `</th>` +
-      `<th>` + L(`ordersPhone`) + `</th>` +
-      `<th>` + L(`ordersTotal`) + `</th>` +
-      `<th>` + L(`ordersStatus`) + `</th>` +
-      `<th>` + L(`ordersDriver`) + `</th>` +
-      `<th>` + L(`ordersTime`) + `</th>` +
-    `</tr>` +
-    (rows || `<tr><td colspan="9" class="cl-empty">` + L(`ordersEmpty`) + `</td></tr>`);
-  }catch(err){
-    tbl.innerHTML = `<tr><td colspan="9" class="cl-empty">⚠️ ` + esc(err.message) + `</td></tr>`;
-  }
+var tbl = el(`coTable`);
+if(!tbl) return;
+var STATUS_MAP = {
+pending: L(`statusPending`),
+accepted: L(`statusAccepted`),
+preparing: L(`statusPreparing`),
+ready: L(`statusReady`),
+driver_assigned: L(`statusDrvAssigned`),
+out_for_delivery: L(`statusOutForDel`),
+delivered: L(`statusDelivered`),
+cancelled: L(`statusCancelled`),
+archived: L(`statusArchived`)
+};
+var q = `/api/admin/orders?`;
+var b = el(`coBranch`) ? el(`coBranch`).value : ``;
+var st = el(`coStatus`) ? el(`coStatus`).value : ``;
+var ty = el(`coType`) ? el(`coType`).value : ``;
+if(b) q += `branch_id=` + encodeURIComponent(b) + `&`;
+if(st) q += `status=` + encodeURIComponent(st) + `&`;
+if(ty) q += `type=` + encodeURIComponent(ty) + `&`;
+try{
+if(!CLOUD_JWT) await cloudBridge();
+var d = await capi(q);
+var rows = (d.orders || []).map(function(o){
+var ot = o.order_type || `delivery`;
+var typeBadge = ot === `pickup`
+? `<span class="cl-badge-pickup">🏪 ` + ((ALANG===`ar`)?`استلام`:`Pickup`) + `</span>` +
+`<small style="display:block;font-size:.6rem;color:var(--amber);margin-top:.15rem">💵 ` +
+((ALANG===`ar`)?`كاشير`:`Cashier`) + `</small>`
+: `<span class="cl-badge-delivery">🛵 ` + ((ALANG===`ar`)?`توصيل`:`Delivery`) + `</span>`;
+var statusText = STATUS_MAP[o.status] || o.status;
+if(ot === `pickup` && o.status === `ready`) statusText = (ALANG===`ar`)?`جاهز للاستلام`:`Ready for pickup`;
+if(ot === `pickup` && o.status === `delivered`) statusText = (ALANG===`ar`)?`تم الاستلام من الفرع ✅`:`Picked up ✅`;
+return `<tr>` +
+`<td dir="ltr"><b>` + esc(o.number) + `</b></td>` +
+`<td>` + typeBadge + `</td>` +
+`<td>` + esc(o.branch_name) + `</td>` +
+`<td>` + esc(o.customer_name) + `</td>` +
+`<td dir="ltr">` + esc(o.customer_phone) + `</td>` +
+`<td>` + (o.total || 0) + `</td>` +
+`<td>` + statusText + `</td>` +
+`<td>` + esc(o.driver_name || L(`ordersNoDriver`)) + `</td>` +
+`<td>` + esc(String(o.created_at).slice(0,16)) + `</td>` +
+`</tr>`;
+}).join(``);
+tbl.innerHTML = `<tr>` +
+`<th>` + L(`ordersNumber`) + `</th>` +
+`<th>` + ((ALANG===`ar`)?`النوع`:`Type`) + `</th>` +
+`<th>` + L(`ordersBranch`) + `</th>` +
+`<th>` + L(`ordersCustomer`) + `</th>` +
+`<th>` + L(`ordersPhone`) + `</th>` +
+`<th>` + L(`ordersTotal`) + `</th>` +
+`<th>` + L(`ordersStatus`) + `</th>` +
+`<th>` + L(`ordersDriver`) + `</th>` +
+`<th>` + L(`ordersTime`) + `</th>` +
+`</tr>` +
+(rows || `<tr><td colspan="9" class="cl-empty">` + L(`ordersEmpty`) + `</td></tr>`);
+}catch(err){
+tbl.innerHTML = `<tr><td colspan="9" class="cl-empty">⚠️ ` + esc(err.message) + `</td></tr>`;
 }
-
-/* =====================================================
-   v9.6: التبويب المحاسبي — مفاتيح L() + xlsx حقيقي + PDF محسّن
-   ===================================================== */
+}
+/* ===== v9.7: التبويب المحاسبي ===== */
 let LAST_ACCT = null;
-
 function money(v){ return Math.round((+v||0)*100)/100; }
 function stat(v, label){ return `<div class="cl-stat"><b>` + v + `</b><small>` + label + `</small></div>`; }
 function table(title, heads, rows){
-  return `<h4 style="margin:1rem 0 .5rem;color:var(--brown);font-weight:900">` + title + `</h4>` +
-    `<table class="cl-tbl"><tr>` + heads.map(h=>`<th>`+h+`</th>`).join(``) + `</tr>` +
-    rows.map(r=>`<tr>` + r.map(c=>`<td>`+c+`</td>`).join(``) + `</tr>`).join(``) + `</table>`;
-}
-function barBlocks(v, max, len){
-  const n = max > 0 ? Math.round((+v||0)/max*(len||18)) : 0;
-  let s = ``;
-  for(let i=0;i<n;i++) s += `█`;
-  return s;
+return `<h4 style="margin:1rem 0 .5rem;color:var(--brown);font-weight:900">` + title + `</h4>` +
+`<table class="cl-tbl"><tr>` + heads.map(h=>`<th>`+h+`</th>`).join(``) + `</tr>` +
+rows.map(r=>`<tr>` + r.map(c=>`<td>`+c+`</td>`).join(``) + `</tr>`).join(``) + `</table>`;
 }
 function brandNameNow(){
-  var b = STATE && STATE.SETTINGS && STATE.SETTINGS.brand;
-  if(!b) return `Makaronjy`;
-  return (ALANG===`ar`) ? (b.nameAr||b.nameEn) : (b.nameEn||b.nameAr);
+var b = STATE && STATE.SETTINGS && STATE.SETTINGS.brand;
+if(!b) return `Makaronjy`;
+return (ALANG===`ar`) ? (b.nameAr||b.nameEn) : (b.nameEn||b.nameAr);
 }
 function acctRef(){
-  if(!LAST_ACCT) return ``;
-  return `MK-` + LAST_ACCT.from.replace(/-/g,``) + `-` + LAST_ACCT.to.replace(/-/g,``);
+if(!LAST_ACCT) return ``;
+return `MK-` + LAST_ACCT.from.replace(/-/g,``) + `-` + LAST_ACCT.to.replace(/-/g,``);
 }
 function computeRange(){
-  const preset = el(`crPreset`).value;
-  const now = new Date();
-  const p2 = n => String(n).padStart(2,'0');
-  const today = now.getFullYear()+`-`+p2(now.getMonth()+1)+`-`+p2(now.getDate());
-  if(preset===`today`) return {from:today, to:today};
-  if(preset===`thisMonth`) return {from: today.slice(0,8)+`01`, to: today};
-  if(preset===`lastMonth`){
-    const d = new Date(now.getFullYear(), now.getMonth()-1, 1);
-    const last = new Date(now.getFullYear(), now.getMonth(), 0);
-    return {from: d.getFullYear()+`-`+p2(d.getMonth()+1)+`-01`,
-            to:   d.getFullYear()+`-`+p2(d.getMonth()+1)+`-`+p2(last.getDate())};
-  }
-  if(preset===`thisYear`) return {from: now.getFullYear()+`-01-01`, to: today};
-  if(preset===`month`){
-    const mvv = el(`crMonth`).value || today.slice(0,7);
-    const y = +mvv.slice(0,4), mo = +mvv.slice(5,7);
-    const last = new Date(y, mo, 0).getDate();
-    return {from: mvv+`-01`, to: mvv+`-`+p2(last)};
-  }
-  if(preset===`year`){
-    const y = el(`crYear`).value || now.getFullYear();
-    return {from: y+`-01-01`, to: y+`-12-31`};
-  }
-  return {from: el(`crFrom`).value || (today.slice(0,8)+`01`), to: el(`crTo`).value || today};
+const preset = el(`crPreset`).value;
+const now = new Date();
+const p2 = n => String(n).padStart(2,'0');
+const today = now.getFullYear()+`-`+p2(now.getMonth()+1)+`-`+p2(now.getDate());
+if(preset===`today`) return {from:today, to:today};
+if(preset===`thisMonth`) return {from: today.slice(0,8)+`01`, to: today};
+if(preset===`lastMonth`){
+const d = new Date(now.getFullYear(), now.getMonth()-1, 1);
+const last = new Date(now.getFullYear(), now.getMonth(), 0);
+return {from: d.getFullYear()+`-`+p2(d.getMonth()+1)+`-01`,
+to:   d.getFullYear()+`-`+p2(d.getMonth()+1)+`-`+p2(last.getDate())};
+}
+if(preset===`thisYear`) return {from: now.getFullYear()+`-01-01`, to: today};
+if(preset===`month`){
+const mvv = el(`crMonth`).value || today.slice(0,7);
+const y = +mvv.slice(0,4), mo = +mvv.slice(5,7);
+const last = new Date(y, mo, 0).getDate();
+return {from: mvv+`-01`, to: mvv+`-`+p2(last)};
+}
+if(preset===`year`){
+const y = el(`crYear`).value || now.getFullYear();
+return {from: y+`-01-01`, to: y+`-12-31`};
+}
+return {from: el(`crFrom`).value || (today.slice(0,8)+`01`), to: el(`crTo`).value || today};
 }
 function syncRangeInputs(){
-  const v = el(`crPreset`).value;
-  el(`crMonthWrap`).style.display = (v===`month`) ? `` : `none`;
-  el(`crYearWrap`).style.display  = (v===`year`)  ? `` : `none`;
-  el(`crFromWrap`).style.display  = (v===`custom`)? `` : `none`;
-  el(`crToWrap`).style.display    = (v===`custom`)? `` : `none`;
+const v = el(`crPreset`).value;
+el(`crMonthWrap`).style.display = (v===`month`) ? `` : `none`;
+el(`crYearWrap`).style.display  = (v===`year`)  ? `` : `none`;
+el(`crFromWrap`).style.display  = (v===`custom`)? `` : `none`;
+el(`crToWrap`).style.display    = (v===`custom`)? `` : `none`;
 }
 function buildReportsTab(){
-  var sec = el(`tab-cloud-reports`);
-  if(!sec) return;
-  if(!STATE) return;
-  var brs = branches();
-  var brOpts = `<option value="">` + L(`ordersAllBranches`) + `</option>` +
-    brs.map(function(b){ return `<option value="` + esc(b.id) + `">` + esc(brName(b)) + `</option>`; }).join(``);
-  sec.innerHTML =
-    `<div class="cl-card">` +
-      `<h3>` + L(`acctTitle`) + `</h3>` +
-      `<div class="cl-row">` +
-        `<div class="cl-f"><label>` + L(`acctPeriod`) + `</label><select id="crPreset">` +
-          `<option value="thisMonth">` + L(`acctThisMonth`) + `</option>` +
-          `<option value="lastMonth">` + L(`acctLastMonth`) + `</option>` +
-          `<option value="thisYear">` + L(`acctThisYear`) + `</option>` +
-          `<option value="today">` + L(`acctToday`) + `</option>` +
-          `<option value="month">` + L(`acctMonthPick`) + `</option>` +
-          `<option value="year">` + L(`acctYearPick`) + `</option>` +
-          `<option value="custom">` + L(`acctCustom`) + `</option>` +
-        `</select></div>` +
-        `<div class="cl-f" id="crMonthWrap" style="display:none"><label>` + L(`acctMonthLbl`) + `</label><input type="month" id="crMonth"></div>` +
-        `<div class="cl-f" id="crYearWrap" style="display:none"><label>` + L(`acctYearLbl`) + `</label><input type="number" id="crYear" min="2020" max="2040" value="` + new Date().getFullYear() + `"></div>` +
-        `<div class="cl-f" id="crFromWrap" style="display:none"><label>` + L(`acctFrom`) + `</label><input type="date" id="crFrom"></div>` +
-        `<div class="cl-f" id="crToWrap" style="display:none"><label>` + L(`acctTo`) + `</label><input type="date" id="crTo"></div>` +
-        `<div class="cl-f"><label>` + L(`ordersBranch`) + `</label><select id="crBranch2">` + brOpts + `</select></div>` +
-        `<button class="cl-btn cl-add" id="crGo" style="align-self:flex-end">` + L(`acctShow`) + `</button>` +
-        `<button class="cl-btn cl-plain" id="crXls" style="align-self:flex-end">` + L(`acctXls`) + `</button>` +
-        `<button class="cl-btn cl-plain" id="crPrint" style="align-self:flex-end">` + L(`acctPdf`) + `</button>` +
-      `</div>` +
-      `<div id="crBox" style="margin-top:.9rem"></div>` +
-    `</div>`;
-  el(`crPreset`).addEventListener(`change`, syncRangeInputs);
-  el(`crGo`).addEventListener(`click`, loadReportsTab);
-  el(`crXls`).addEventListener(`click`, exportExcel);
-  el(`crPrint`).addEventListener(`click`, printAcct);
-  syncRangeInputs();
+var sec = el(`tab-cloud-reports`);
+if(!sec) return;
+if(!STATE) return;
+var brs = branches();
+var brOpts = `<option value="">` + L(`ordersAllBranches`) + `</option>` +
+brs.map(function(b){ return `<option value="` + esc(b.id) + `">` + esc(brName(b)) + `</option>`; }).join(``);
+sec.innerHTML =
+`<div class="cl-card">` +
+`<h3>` + L(`acctTitle`) + `</h3>` +
+`<div class="cl-row">` +
+`<div class="cl-f"><label>` + L(`acctPeriod`) + `</label><select id="crPreset">` +
+`<option value="thisMonth">` + L(`acctThisMonth`) + `</option>` +
+`<option value="lastMonth">` + L(`acctLastMonth`) + `</option>` +
+`<option value="thisYear">` + L(`acctThisYear`) + `</option>` +
+`<option value="today">` + L(`acctToday`) + `</option>` +
+`<option value="month">` + L(`acctMonthPick`) + `</option>` +
+`<option value="year">` + L(`acctYearPick`) + `</option>` +
+`<option value="custom">` + L(`acctCustom`) + `</option>` +
+`</select></div>` +
+`<div class="cl-f" id="crMonthWrap" style="display:none"><label>` + L(`acctMonthLbl`) + `</label><input type="month" id="crMonth"></div>` +
+`<div class="cl-f" id="crYearWrap" style="display:none"><label>` + L(`acctYearLbl`) + `</label><input type="number" id="crYear" min="2020" max="2040" value="` + new Date().getFullYear() + `"></div>` +
+`<div class="cl-f" id="crFromWrap" style="display:none"><label>` + L(`acctFrom`) + `</label><input type="date" id="crFrom"></div>` +
+`<div class="cl-f" id="crToWrap" style="display:none"><label>` + L(`acctTo`) + `</label><input type="date" id="crTo"></div>` +
+`<div class="cl-f"><label>` + L(`ordersBranch`) + `</label><select id="crBranch2">` + brOpts + `</select></div>` +
+`<button class="cl-btn cl-add" id="crGo" style="align-self:flex-end">` + L(`acctShow`) + `</button>` +
+`<button class="cl-btn cl-plain" id="crXls" style="align-self:flex-end">` + L(`acctXls`) + `</button>` +
+`<button class="cl-btn cl-plain" id="crPrint" style="align-self:flex-end">` + L(`acctPdf`) + `</button>` +
+`</div>` +
+`<div id="crBox" style="margin-top:.9rem"></div>` +
+`</div>`;
+el(`crPreset`).addEventListener(`change`, syncRangeInputs);
+el(`crGo`).addEventListener(`click`, loadReportsTab);
+el(`crXls`).addEventListener(`click`, exportExcel);
+el(`crPrint`).addEventListener(`click`, printAcct);
+syncRangeInputs();
 }
 async function loadReportsTab(){
-  var box = el(`crBox`);
-  if(!box) return;
-  const range = computeRange();
-  let q = `/api/reports/accounting?from=` + range.from + `&to=` + range.to;
-  const b = el(`crBranch2`) ? el(`crBranch2`).value : ``;
-  if(b) q += `&branch_id=` + encodeURIComponent(b);
-  box.innerHTML = `<div class="cl-empty">` + L(`publishing`) + `</div>`;
-  try{
-    if(!CLOUD_JWT) await cloudBridge();
-    const d = await capi(q);
-    LAST_ACCT = { from: range.from, to: range.to, data: d };
-    renderAcct(d, box);
-  }catch(err){
-    box.innerHTML = `<div class="cl-empty">⚠️ ` + esc(err.message) + `</div>`;
-  }
+var box = el(`crBox`);
+if(!box) return;
+const range = computeRange();
+let q = `/api/reports/accounting?from=` + range.from + `&to=` + range.to;
+const b = el(`crBranch2`) ? el(`crBranch2`).value : ``;
+if(b) q += `&branch_id=` + encodeURIComponent(b);
+box.innerHTML = `<div class="cl-empty">` + L(`publishing`) + `</div>`;
+try{
+if(!CLOUD_JWT) await cloudBridge();
+const d = await capi(q);
+LAST_ACCT = { from: range.from, to: range.to, data: d };
+renderAcct(d, box);
+}catch(err){
+box.innerHTML = `<div class="cl-empty">⚠️ ` + esc(err.message) + `</div>`;
+}
 }
 function renderAcct(d, box){
-  const t = d.totals || {};
-  const gross = money(t.gross), fees = money(t.fees);
-  const net = money(gross / 1.15), vat = money(gross - net);
-  let html = `<div class="cl-stats">` +
-    stat(t.orders||0,        L(`acctOrders`)) +
-    stat(t.delivered||0,     L(`acctDelivered`)) +
-    stat(t.cancelled||0,     L(`acctCancelled`)) +
-    stat(t.abandoned||0,     L(`acctAbandoned`)) +
-    stat(gross,              L(`acctGross`)) +
-    stat(net,                L(`acctNet`)) +
-    stat(vat,                L(`acctVat`)) +
-    stat(fees,               L(`acctFees`)) +
-    stat(t.avg||0,           L(`acctAvg`)) +
-    stat((t.cancel_rate||0)+`%`, L(`acctCancelRate`)) +
-    stat(money(t.pickup_gross),  L(`acctPickupRev`)) +
-    stat(money(t.delivery_gross),L(`acctDeliveryRev`)) +
-  `</div>`;
-  const months = d.months || [];
-  if(months.length){
-    const max = Math.max.apply(null, months.map(m=>+m.gross||0).concat([1]));
-    html += `<h4 style="margin:1rem 0 .5rem;color:var(--brown);font-weight:900">` + L(`acctMonthlyRev`) + `</h4>` +
-      `<div style="display:flex;gap:.4rem;align-items:flex-end;height:160px;background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:.6rem">` +
-      months.map(function(m){
-        const h = Math.max(6, Math.round((+m.gross||0)/max*115));
-        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:.2rem">` +
-          `<small style="font-size:.6rem;font-weight:900;color:var(--brown)">` + money(m.gross) + `</small>` +
-          `<div style="width:100%;max-width:34px;height:` + h + `px;background:linear-gradient(180deg,var(--gold),var(--gold2));border-radius:6px 6px 0 0"></div>` +
-          `<small style="font-size:.58rem;font-weight:800;color:var(--muted)">` + m.ym.slice(5) + `/` + m.ym.slice(2,4) + `</small>` +
-        `</div>`;
-      }).join(``) + `</div>`;
-    html += table(L(`acctMonthsTbl`),
-      [L(`acctColMonth`), L(`acctColOrders`), L(`acctColDelivered`), L(`acctColCancelled`), L(`acctColAbandoned`), L(`acctColGross`), L(`acctColVat`)],
-      months.map(function(m){
-        const g = money(m.gross);
-        return [m.ym, m.orders, m.delivered, m.cancelled, m.abandoned, g, money(g - g/1.15)];
-      }));
-  }
-  if((d.drivers||[]).length){
-    html += table(L(`acctDriversTbl`),
-      [L(`acctColDriver`), L(`acctColDeliveries`), L(`acctColEarnings`)],
-      d.drivers.map(function(x){ return [esc(x.driver_name), x.deliveries, money(x.earnings)]; }));
-  }
-  if((d.branches||[]).length){
-    html += table(L(`acctBranchesTbl`),
-      [L(`acctColBranch`), L(`acctColOrders`), L(`acctColDelivered`), L(`acctColGross`)],
-      d.branches.map(function(x){ return [esc(ALANG===`ar` ? x.branch_name : x.branch_name_en), x.orders, x.delivered, money(x.gross)]; }));
-  }
-  if((d.top_items||[]).length){
-    html += table(L(`acctItemsTbl`),
-      [L(`acctColItem`), L(`acctColQty`), L(`acctColRevenue`)],
-      d.top_items.map(function(x){ return [esc(ALANG===`ar` ? (x.name_ar||x.name_en) : (x.name_en||x.name_ar)), x.qty, money(x.revenue)]; }));
-  }
-  html += `<div style="text-align:center;color:var(--muted);font-size:.68rem;font-weight:800;margin-top:.8rem">` +
-    L(`acctPeriodLbl`) + `: ` + d.from + ` → ` + d.to + ` • ` + L(`acctNote`) + `</div>`;
-  box.innerHTML = html;
+const t = d.totals || {};
+const gross = money(t.gross), fees = money(t.fees);
+const net = money(gross / 1.15), vat = money(gross - net);
+let html = `<div class="cl-stats">` +
+stat(t.orders||0,        L(`acctOrders`)) +
+stat(t.delivered||0,     L(`acctDelivered`)) +
+stat(t.cancelled||0,     L(`acctCancelled`)) +
+stat(t.abandoned||0,     L(`acctAbandoned`)) +
+stat(gross,              L(`acctGross`)) +
+stat(net,                L(`acctNet`)) +
+stat(vat,                L(`acctVat`)) +
+stat(fees,               L(`acctFees`)) +
+stat(t.avg||0,           L(`acctAvg`)) +
+stat((t.cancel_rate||0)+`%`, L(`acctCancelRate`)) +
+stat(money(t.pickup_gross),  L(`acctPickupRev`)) +
+stat(money(t.delivery_gross),L(`acctDeliveryRev`)) +
+`</div>`;
+const months = d.months || [];
+if(months.length){
+const max = Math.max.apply(null, months.map(m=>+m.gross||0).concat([1]));
+html += `<h4 style="margin:1rem 0 .5rem;color:var(--brown);font-weight:900">` + L(`acctMonthlyRev`) + `</h4>` +
+`<div style="display:flex;gap:.4rem;align-items:flex-end;height:160px;background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:.6rem">` +
+months.map(function(m){
+const h = Math.max(6, Math.round((+m.gross||0)/max*115));
+return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:.2rem">` +
+`<small style="font-size:.6rem;font-weight:900;color:var(--brown)">` + money(m.gross) + `</small>` +
+`<div style="width:100%;max-width:34px;height:` + h + `px;background:linear-gradient(180deg,var(--gold),var(--gold2));border-radius:6px 6px 0 0"></div>` +
+`<small style="font-size:.58rem;font-weight:800;color:var(--muted)">` + m.ym.slice(5) + `/` + m.ym.slice(2,4) + `</small>` +
+`</div>`;
+}).join(``) + `</div>`;
+html += table(L(`acctMonthsTbl`),
+[L(`acctColMonth`), L(`acctColOrders`), L(`acctColDelivered`), L(`acctColCancelled`), L(`acctColAbandoned`), L(`acctColGross`), L(`acctColVat`)],
+months.map(function(m){
+const g = money(m.gross);
+return [m.ym, m.orders, m.delivered, m.cancelled, m.abandoned, g, money(g - g/1.15)];
+}));
 }
-
-/* ═══════════════════════════════════════════
-   v9.6: منشئ ملفات Excel الحقيقية (.xlsx)
-   ZIP + OOXML داخل المتصفح — بدون مكتبات خارجية
-   ═══════════════════════════════════════════ */
+if((d.drivers||[]).length){
+html += table(L(`acctDriversTbl`),
+[L(`acctColDriver`), L(`acctColDeliveries`), L(`acctColEarnings`)],
+d.drivers.map(function(x){ return [esc(x.driver_name), x.deliveries, money(x.earnings)]; }));
+}
+if((d.branches||[]).length){
+html += table(L(`acctBranchesTbl`),
+[L(`acctColBranch`), L(`acctColOrders`), L(`acctColDelivered`), L(`acctColGross`)],
+d.branches.map(function(x){ return [esc(ALANG===`ar` ? x.branch_name : x.branch_name_en), x.orders, x.delivered, money(x.gross)]; }));
+}
+if((d.top_items||[]).length){
+html += table(L(`acctItemsTbl`),
+[L(`acctColItem`), L(`acctColQty`), L(`acctColRevenue`)],
+d.top_items.map(function(x){ return [esc(ALANG===`ar` ? (x.name_ar||x.name_en) : (x.name_en||x.name_ar)), x.qty, money(x.revenue)]; }));
+}
+html += `<div style="text-align:center;color:var(--muted);font-size:.68rem;font-weight:800;margin-top:.8rem">` +
+L(`acctPeriodLbl`) + `: ` + d.from + ` → ` + d.to + ` • ` + L(`acctNote`) + `</div>`;
+box.innerHTML = html;
+}
+/* ===== v9.7: منشئ Excel احترافي (.xlsx) ===== */
 let CRC_TABLE = null;
 function crc32(bytes){
-  if(!CRC_TABLE){
-    CRC_TABLE = new Int32Array(256);
-    for(let n=0;n<256;n++){
-      let c = n;
-      for(let k=0;k<8;k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-      CRC_TABLE[n] = c;
-    }
-  }
-  let crc = -1;
-  for(let i=0;i<bytes.length;i++) crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ bytes[i]) & 0xFF];
-  return (crc ^ -1) >>> 0;
+if(!CRC_TABLE){
+CRC_TABLE = new Int32Array(256);
+for(let n=0;n<256;n++){
+let c = n;
+for(let k=0;k<8;k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+CRC_TABLE[n] = c;
+}
+}
+let crc = -1;
+for(let i=0;i<bytes.length;i++) crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ bytes[i]) & 0xFF];
+return (crc ^ -1) >>> 0;
 }
 function zipBuild(files){
-  const enc = new TextEncoder();
-  const chunks = [];
-  const central = [];
-  let offset = 0;
-  files.forEach(function(f){
-    const nameB = enc.encode(f.name);
-    const crc = crc32(f.data);
-    const loc = new Uint8Array(30 + nameB.length);
-    const dv = new DataView(loc.buffer);
-    dv.setUint32(0, 0x04034b50, true);
-    dv.setUint16(4, 20, true);
-    dv.setUint32(14, crc, true);
-    dv.setUint32(18, f.data.length, true);
-    dv.setUint32(22, f.data.length, true);
-    dv.setUint16(26, nameB.length, true);
-    loc.set(nameB, 30);
-    chunks.push(loc, f.data);
-    const cen = new Uint8Array(46 + nameB.length);
-    const cv = new DataView(cen.buffer);
-    cv.setUint32(0, 0x02014b50, true);
-    cv.setUint16(4, 20, true);
-    cv.setUint16(6, 20, true);
-    cv.setUint32(16, crc, true);
-    cv.setUint32(20, f.data.length, true);
-    cv.setUint32(24, f.data.length, true);
-    cv.setUint16(28, nameB.length, true);
-    cv.setUint32(42, offset, true);
-    cen.set(nameB, 46);
-    central.push(cen);
-    offset += loc.length + f.data.length;
-  });
-  const cenSize = central.reduce((s,c)=>s+c.length,0);
-  const end = new Uint8Array(22);
-  const ev = new DataView(end.buffer);
-  ev.setUint32(0, 0x06054b50, true);
-  ev.setUint16(8, files.length, true);
-  ev.setUint16(10, files.length, true);
-  ev.setUint32(12, cenSize, true);
-  ev.setUint32(16, offset, true);
-  return new Blob(chunks.concat(central, [end]),
-    {type:`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`});
+const enc = new TextEncoder();
+const chunks = [];
+const central = [];
+let offset = 0;
+files.forEach(function(f){
+const nameB = enc.encode(f.name);
+const crc = crc32(f.data);
+const loc = new Uint8Array(30 + nameB.length);
+const dv = new DataView(loc.buffer);
+dv.setUint32(0, 0x04034b50, true);
+dv.setUint16(4, 20, true);
+dv.setUint32(14, crc, true);
+dv.setUint32(18, f.data.length, true);
+dv.setUint32(22, f.data.length, true);
+dv.setUint16(26, nameB.length, true);
+loc.set(nameB, 30);
+chunks.push(loc, f.data);
+const cen = new Uint8Array(46 + nameB.length);
+const cv = new DataView(cen.buffer);
+cv.setUint32(0, 0x02014b50, true);
+cv.setUint16(4, 20, true);
+cv.setUint16(6, 20, true);
+cv.setUint32(16, crc, true);
+cv.setUint32(20, f.data.length, true);
+cv.setUint32(24, f.data.length, true);
+cv.setUint16(28, nameB.length, true);
+cv.setUint32(42, offset, true);
+cen.set(nameB, 46);
+central.push(cen);
+offset += loc.length + f.data.length;
+});
+const cenSize = central.reduce((s,c)=>s+c.length,0);
+const end = new Uint8Array(22);
+const ev = new DataView(end.buffer);
+ev.setUint32(0, 0x06054b50, true);
+ev.setUint16(8, files.length, true);
+ev.setUint16(10, files.length, true);
+ev.setUint32(12, cenSize, true);
+ev.setUint32(16, offset, true);
+return new Blob(chunks.concat(central, [end]),
+{type:`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`});
 }
 function escXml(s){
-  return String(s==null?``:s)
-    .replace(/&/g,`&amp;`).replace(/</g,`&lt;`)
-    .replace(/>/g,`&gt;`).replace(/"/g,`&quot;`);
+return String(s==null?``:s)
+.replace(/&/g,`&amp;`).replace(/</g,`&lt;`)
+.replace(/>/g,`&gt;`).replace(/"/g,`&quot;`);
 }
 function colName(i){
-  let s = ``; i++;
-  while(i>0){ const m=(i-1)%26; s=String.fromCharCode(65+m)+s; i=Math.floor((i-1)/26); }
-  return s;
+let s = ``; i++;
+while(i>0){ const m=(i-1)%26; s=String.fromCharCode(65+m)+s; i=Math.floor((i-1)/26); }
+return s;
 }
-/* أنماط الخلايا: فهرس ثابت */
-const XS = { def:0, title:1, sub:2, sec:3, hdr:4, goldN:5, goldS:6, cell:7, num:8, int:9, bar:10 };
+const XS = { def:0, title:1, sub:2, sec:3, hdr:4, goldN:5, goldS:6, cell:7, num:8, int:9, zeb:10, zebNum:11, zebInt:12 };
 function xlsxStyles(){
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
-  `<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
-  `<numFmts count="2">` +
-    `<numFmt numFmtId="164" formatCode="#,##0.00"/>` +
-    `<numFmt numFmtId="165" formatCode="#,##0"/>` +
-  `</numFmts>` +
-  `<fonts count="7">` +
-    `<font><sz val="11"/><name val="Calibri"/></font>` +
-    `<font><b/><sz val="18"/><color rgb="FF5A1830"/><name val="Calibri"/></font>` +
-    `<font><sz val="10"/><color rgb="FF8A6F63"/><name val="Calibri"/></font>` +
-    `<font><b/><sz val="12"/><color rgb="FF8E2A4A"/><name val="Calibri"/></font>` +
-    `<font><b/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>` +
-    `<font><b/><color rgb="FFE0912F"/><name val="Calibri"/></font>` +
-    `<font><b/><color rgb="FF5A1830"/><name val="Calibri"/></font>` +
-  `</fonts>` +
-  `<fills count="6">` +
-    `<fill><patternFill patternType="none"/></fill>` +
-    `<fill><patternFill patternType="gray125"/></fill>` +
-    `<fill><patternFill patternType="solid"><fgColor rgb="FFF3E7D7"/><bgColor indexed="64"/></patternFill></fill>` +
-    `<fill><patternFill patternType="solid"><fgColor rgb="FF5A1830"/><bgColor indexed="64"/></patternFill></fill>` +
-    `<fill><patternFill patternType="solid"><fgColor rgb="FFF2B95F"/><bgColor indexed="64"/></patternFill></fill>` +
-    `<fill><patternFill patternType="solid"><fgColor rgb="FFFFF6E6"/><bgColor indexed="64"/></patternFill></fill>` +
-  `</fills>` +
-  `<borders count="2">` +
-    `<border><left/><right/><top/><bottom/><diagonal/></border>` +
-    `<border><left/><right/><top style="thin"><color rgb="FFEADFD2"/></top><bottom style="thin"><color rgb="FFEADFD2"/></bottom><diagonal/></border>` +
-  `</borders>` +
-  `<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>` +
-  `<cellXfs count="11">` +
-    `<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>` +
-    `<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>` +
-    `<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>` +
-    `<xf numFmtId="0" fontId="3" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>` +
-    `<xf numFmtId="0" fontId="4" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1"/>` +
-    `<xf numFmtId="164" fontId="6" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"/>` +
-    `<xf numFmtId="0" fontId="6" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>` +
-    `<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>` +
-    `<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/>` +
-    `<xf numFmtId="165" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/>` +
-    `<xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1"/>` +
-  `</cellXfs>` +
-  `</styleSheet>`;
+return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+`<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
+`<numFmts count="2">` +
+`<numFmt numFmtId="164" formatCode="#,##0.00"/>` +
+`<numFmt numFmtId="165" formatCode="#,##0"/>` +
+`</numFmts>` +
+`<fonts count="7">` +
+`<font><sz val="11"/><name val="Calibri"/></font>` +
+`<font><b/><sz val="16"/><color rgb="FF5A1830"/><name val="Calibri"/></font>` +
+`<font><sz val="10"/><color rgb="FF8A6F63"/><name val="Calibri"/></font>` +
+`<font><b/><sz val="12"/><color rgb="FF8E2A4A"/><name val="Calibri"/></font>` +
+`<font><b/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>` +
+`<font><b/><color rgb="FFE0912F"/><name val="Calibri"/></font>` +
+`<font><b/><color rgb="FF5A1830"/><name val="Calibri"/></font>` +
+`</fonts>` +
+`<fills count="7">` +
+`<fill><patternFill patternType="none"/></fill>` +
+`<fill><patternFill patternType="gray125"/></fill>` +
+`<fill><patternFill patternType="solid"><fgColor rgb="FFF3E7D7"/><bgColor indexed="64"/></patternFill></fill>` +
+`<fill><patternFill patternType="solid"><fgColor rgb="FF5A1830"/><bgColor indexed="64"/></patternFill></fill>` +
+`<fill><patternFill patternType="solid"><fgColor rgb="FFF2B95F"/><bgColor indexed="64"/></patternFill></fill>` +
+`<fill><patternFill patternType="solid"><fgColor rgb="FFFFF6E6"/><bgColor indexed="64"/></patternFill></fill>` +
+`<fill><patternFill patternType="solid"><fgColor rgb="FFFAF3EA"/><bgColor indexed="64"/></patternFill></fill>` +
+`</fills>` +
+`<borders count="2">` +
+`<border><left/><right/><top/><bottom/><diagonal/></border>` +
+`<border><left style="thin"><color rgb="FFD9C9BC"/></left><right style="thin"><color rgb="FFD9C9BC"/></right><top style="thin"><color rgb="FFD9C9BC"/></top><bottom style="thin"><color rgb="FFD9C9BC"/></bottom><diagonal/></border>` +
+`</borders>` +
+`<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>` +
+`<cellXfs count="13">` +
+`<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>` +
+`<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>` +
+`<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>` +
+`<xf numFmtId="0" fontId="3" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>` +
+`<xf numFmtId="0" fontId="4" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>` +
+`<xf numFmtId="164" fontId="6" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"/>` +
+`<xf numFmtId="0" fontId="6" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>` +
+`<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>` +
+`<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/>` +
+`<xf numFmtId="165" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/>` +
+`<xf numFmtId="0" fontId="0" fillId="6" borderId="1" xfId="0" applyFill="1" applyBorder="1"/>` +
+`<xf numFmtId="164" fontId="0" fillId="6" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1" applyBorder="1"/>` +
+`<xf numFmtId="165" fontId="0" fillId="6" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1" applyBorder="1"/>` +
+`</cellXfs>` +
+`</styleSheet>`;
 }
-function xlsxSheet(rows, cols){
-  let xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
-   `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
-   `<sheetViews><sheetView rightToLeft="1" workbookViewId="0"/></sheetViews>` +
-   (cols ? `<cols>` + cols.map(function(w){
-     return `<col min="` + w.i + `" max="` + w.i + `" width="` + w.w + `" customWidth="1"/>`;
-   }).join(``) + `</cols>` : ``) +
-   `<sheetData>` +
-   rows.map(function(r, ri){
-     return `<row r="` + (ri+1) + `">` + r.map(function(c, ci){
-       const ref = colName(ci) + (ri+1);
-       const st = (c.s === undefined) ? 0 : c.s;
-       if(c.n === true) return `<c r="` + ref + `" s="` + st + `"><v>` + c.v + `</v></c>`;
-       return `<c r="` + ref + `" s="` + st + `" t="inlineStr"><is><t xml:space="preserve">` + escXml(c.v) + `</t></is></c>`;
-     }).join(``) + `</row>`;
-   }).join(``) +
-   `</sheetData></worksheet>`;
-  return xml;
+function xlsxSheet(rows, opts){
+opts = opts || {};
+let xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+`<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
+`<sheetViews><sheetView rightToLeft="1" workbookViewId="0">` +
+(opts.freeze ? `<pane ySplit="` + opts.freeze + `" topLeftCell="A` + (opts.freeze+1) + `" activePane="bottomLeft" state="frozen"/>` : ``) +
+`</sheetView></sheetViews>` +
+(opts.cols ? `<cols>` + opts.cols.map(function(w){
+return `<col min="` + w.i + `" max="` + w.i + `" width="` + w.w + `" customWidth="1"/>`;
+}).join(``) + `</cols>` : ``) +
+`<sheetData>` +
+rows.map(function(r, ri){
+return `<row r="` + (ri+1) + `">` + r.map(function(c, ci){
+const ref = colName(ci) + (ri+1);
+const st = (c.s === undefined) ? 0 : c.s;
+if(c.n === true) return `<c r="` + ref + `" s="` + st + `"><v>` + c.v + `</v></c>`;
+return `<c r="` + ref + `" s="` + st + `" t="inlineStr"><is><t xml:space="preserve">` + escXml(c.v) + `</t></is></c>`;
+}).join(``) + `</row>`;
+}).join(``) +
+`</sheetData>` +
+(opts.filter ? `<autoFilter ref="` + opts.filter + `"/>` : ``) +
+(opts.merges && opts.merges.length ? `<mergeCells count="` + opts.merges.length + `">` + opts.merges.map(function(m){ return `<mergeCell ref="` + m + `"/>`; }).join(``) + `</mergeCells>` : ``) +
+(opts.cf ? opts.cf.map(function(c){
+return `<conditionalFormatting sqref="` + c.sqref + `"><cfRule type="dataBar" priority="1"><dataBar showValue="1"><cfvo type="min"/><cfvo type="max"/><color rgb="FFE0912F"/></dataBar></cfRule></conditionalFormatting>`;
+}).join(``) : ``) +
+`</worksheet>`;
+return xml;
 }
 function exportExcel(){
-  if(!LAST_ACCT){ toast(L(`acctShowFirst`), `warn`); return; }
-  const d = LAST_ACCT.data, t = d.totals || {};
-  const gross = money(t.gross), net = money(gross/1.15), vat = money(gross-net);
-  const months = d.months || [], drivers = d.drivers || [],
-        branchesR = d.branches || [], items = d.top_items || [];
-  const maxM = Math.max.apply(null, months.map(m=>+m.gross||0).concat([1]));
-  const maxD = Math.max.apply(null, drivers.map(x=>+x.deliveries||0).concat([1]));
-  const maxB = Math.max.apply(null, branchesR.map(x=>+x.gross||0).concat([1]));
-  const maxI = Math.max.apply(null, items.map(x=>+x.qty||0).concat([1]));
-  const S = XS;
-  const N = function(v, s){ return { v: v, s: s, n: true }; };
-  const T = function(v, s){ return { v: v, s: s }; };
-
-  const sumRows = [
-    [T(`🍝 ` + brandNameNow() + ` — ` + L(`acctDocTitle`), S.title)],
-    [T(L(`acctPeriodLbl`) + `: ` + LAST_ACCT.from + ` → ` + LAST_ACCT.to, S.sub)],
-    [T(L(`acctRef`) + `: ` + acctRef() + `  |  ` + L(`acctIssued`) + `: ` + new Date().toLocaleString(), S.sub)],
-    [T(L(`acctScope`) + `: ` + (el(`crBranch2`) && el(`crBranch2`).value ? (brName(branches().find(b=>b.id===el(`crBranch2`).value)||{}) ) : L(`ordersAllBranches`)), S.sub)],
-    [],
-    [T(L(`acctOrders`), S.cell), N(t.orders||0, S.int)],
-    [T(L(`acctDelivered`), S.cell), N(t.delivered||0, S.int)],
-    [T(L(`acctCancelled`), S.cell), N(t.cancelled||0, S.int)],
-    [T(L(`acctAbandoned`), S.cell), N(t.abandoned||0, S.int)],
-    [T(L(`acctGross`), S.goldS), N(gross, S.goldN)],
-    [T(L(`acctNet`), S.cell), N(net, S.num)],
-    [T(L(`acctVat`), S.cell), N(vat, S.num)],
-    [T(L(`acctFees`), S.cell), N(money(t.fees), S.num)],
-    [T(L(`acctAvg`), S.cell), N(t.avg||0, S.num)],
-    [T(L(`acctCancelRate`) + ` %`, S.cell), N(t.cancel_rate||0, S.int)],
-    [T(L(`acctPickupRev`), S.cell), N(money(t.pickup_gross), S.num)],
-    [T(L(`acctDeliveryRev`), S.cell), N(money(t.delivery_gross), S.num)]
-  ];
-  const monRows = [
-    [T(L(`acctMonthlyRev`), S.sec)],
-    [T(L(`acctColMonth`),S.hdr), T(L(`acctColOrders`),S.hdr), T(L(`acctColDelivered`),S.hdr), T(L(`acctColCancelled`),S.hdr), T(L(`acctColAbandoned`),S.hdr), T(L(`acctColGross`),S.hdr), T(L(`acctColVat`),S.hdr), T(L(`acctColFees`),S.hdr), T(L(`acctColChart`),S.hdr)]
-  ].concat(months.map(function(m){
-    const g = money(m.gross);
-    return [T(m.ym,S.cell), N(m.orders,S.int), N(m.delivered,S.int), N(m.cancelled,S.int), N(m.abandoned,S.int), N(g,S.num), N(money(g-g/1.15),S.num), N(money(m.fees),S.num), T(barBlocks(m.gross,maxM),S.bar)];
-  }));
-  const drvRows = [
-    [T(L(`acctDriversTbl`), S.sec)],
-    [T(L(`acctColDriver`),S.hdr), T(L(`acctColDeliveries`),S.hdr), T(L(`acctColEarnings`),S.hdr), T(L(`acctColChart`),S.hdr)]
-  ].concat(drivers.map(function(x){
-    return [T(x.driver_name,S.cell), N(x.deliveries,S.int), N(money(x.earnings),S.num), T(barBlocks(x.deliveries,maxD),S.bar)];
-  }));
-  const brRows = [
-    [T(L(`acctBranchesTbl`), S.sec)],
-    [T(L(`acctColBranch`),S.hdr), T(L(`acctColOrders`),S.hdr), T(L(`acctColDelivered`),S.hdr), T(L(`acctColGross`),S.hdr), T(L(`acctColChart`),S.hdr)]
-  ].concat(branchesR.map(function(x){
-    return [T(ALANG===`ar`?x.branch_name:x.branch_name_en,S.cell), N(x.orders,S.int), N(x.delivered,S.int), N(money(x.gross),S.num), T(barBlocks(x.gross,maxB),S.bar)];
-  }));
-  const itRows = [
-    [T(L(`acctItemsTbl`), S.sec)],
-    [T(L(`acctColItem`),S.hdr), T(L(`acctColQty`),S.hdr), T(L(`acctColRevenue`),S.hdr), T(L(`acctColChart`),S.hdr)]
-  ].concat(items.map(function(x){
-    const nm = ALANG===`ar` ? (x.name_ar||x.name_en) : (x.name_en||x.name_ar);
-    return [T(nm,S.cell), N(x.qty,S.int), N(money(x.revenue),S.num), T(barBlocks(x.qty,maxI),S.bar)];
-  }));
-
-  const sheetNames = [
-    L(`acctSecSummary`).replace(/^[0-9]+\)\s*/,``),
-    L(`acctMonthlyRev`).replace(/[📊]/g,``).trim(),
-    L(`acctDriversTbl`).replace(/[🚗]/g,``).trim(),
-    L(`acctBranchesTbl`).replace(/[🏪]/g,``).trim(),
-    L(`acctItemsTbl`).replace(/[🍝]/g,``).trim()
-  ];
-  const sheetsXml = [
-    xlsxSheet(sumRows, [{i:1,w:34},{i:2,w:16}]),
-    xlsxSheet(monRows, [{i:1,w:12},{i:9,w:24}]),
-    xlsxSheet(drvRows, [{i:1,w:22},{i:4,w:24}]),
-    xlsxSheet(brRows, [{i:1,w:24},{i:5,w:24}]),
-    xlsxSheet(itRows, [{i:1,w:30},{i:4,w:24}])
-  ];
-  const enc = new TextEncoder();
-  const files = [
-    { name:`[Content_Types].xml`, data: enc.encode(
-      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
-      `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">` +
-      `<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>` +
-      `<Default Extension="xml" ContentType="application/xml"/>` +
-      `<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>` +
-      sheetsXml.map(function(_,i){ return `<Override PartName="/xl/worksheets/sheet` + (i+1) + `.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`; }).join(``) +
-      `<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>` +
-      `</Types>`) },
-    { name:`_rels/.rels`, data: enc.encode(
-      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
-      `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
-      `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>` +
-      `</Relationships>`) },
-    { name:`xl/workbook.xml`, data: enc.encode(
-      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
-      `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">` +
-      `<sheets>` + sheetNames.map(function(nm,i){
-        return `<sheet name="` + escXml(nm).slice(0,31) + `" sheetId="` + (i+1) + `" r:id="rId` + (i+1) + `"/>`;
-      }).join(``) + `</sheets></workbook>`) },
-    { name:`xl/_rels/workbook.xml.rels`, data: enc.encode(
-      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
-      `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
-      sheetNames.map(function(_,i){ return `<Relationship Id="rId` + (i+1) + `" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet` + (i+1) + `.xml"/>`; }).join(``) +
-      `<Relationship Id="rId9" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>` +
-      `</Relationships>`) },
-    { name:`xl/styles.xml`, data: enc.encode(xlsxStyles()) }
-  ];
-  sheetsXml.forEach(function(x, i){
-    files.push({ name:`xl/worksheets/sheet` + (i+1) + `.xml`, data: enc.encode(x) });
-  });
-  const blob = zipBuild(files);
-  const a = document.createElement(`a`);
-  a.href = URL.createObjectURL(blob);
-  a.download = `Makaronjy-` + acctRef() + `.xlsx`;
-  a.click();
-  URL.revokeObjectURL(a.href);
-  toast(L(`acctXlsDone`), `success`);
+if(!LAST_ACCT){ toast(L(`acctShowFirst`), `warn`); return; }
+const d = LAST_ACCT.data, t = d.totals || {};
+const gross = money(t.gross), net = money(gross/1.15), vat = money(gross-net);
+const months = d.months || [], drivers = d.drivers || [],
+branchesR = d.branches || [], items = d.top_items || [];
+const S = XS;
+const N = function(v, s){ return { v: v, s: s, n: true }; };
+const T = function(v, s){ return { v: v, s: s }; };
+const scope = (el(`crBranch2`) && el(`crBranch2`).value)
+? brName(branches().find(b=>b.id===el(`crBranch2`).value)||{})
+: L(`ordersAllBranches`);
+const pairs = [
+[L(`acctOrders`), t.orders||0, 'i'],
+[L(`acctDelivered`), t.delivered||0, 'i'],
+[L(`acctCancelled`), t.cancelled||0, 'i'],
+[L(`acctAbandoned`), t.abandoned||0, 'i'],
+[L(`acctGross`), gross, 'g'],
+[L(`acctNet`), net, 'n'],
+[L(`acctVat`), vat, 'n'],
+[L(`acctFees`), money(t.fees), 'n'],
+[L(`acctAvg`), t.avg||0, 'n'],
+[L(`acctCancelRate`) + ` %`, t.cancel_rate||0, 'i'],
+[L(`acctPickupRev`), money(t.pickup_gross), 'n'],
+[L(`acctDeliveryRev`), money(t.delivery_gross), 'n']
+];
+const sumRows = [
+[T(brandNameNow() + ` — ` + L(`acctDocTitle`), S.title)],
+[T(L(`acctPeriodLbl`) + `: ` + LAST_ACCT.from + ` → ` + LAST_ACCT.to, S.sub)],
+[T(L(`acctRef`) + `: ` + acctRef() + `   |   ` + L(`acctIssued`) + `: ` + new Date().toLocaleString(), S.sub)],
+[T(L(`acctScope`) + `: ` + scope, S.sub)],
+[],
+[T(L(`acctSecSummary`).replace(/^[0-9]+\)\s*/,``), S.sec)],
+[T(ALANG===`ar`?`المؤشر`:`Metric`, S.hdr), T(ALANG===`ar`?`القيمة`:`Value`, S.hdr)]
+].concat(pairs.map(function(p, i){
+if(p[2] === 'g') return [T(p[0], S.goldS), N(p[1], S.goldN)];
+const zb = (i % 2 === 1);
+return [T(p[0], zb?S.zeb:S.cell), N(p[1], zb ? (p[2]==='i'?S.zebInt:S.zebNum) : (p[2]==='i'?S.int:S.num))];
+}));
+const monRows = [
+[T(L(`acctMonthlyRev`), S.sec)],
+[T(L(`acctColMonth`),S.hdr), T(L(`acctColOrders`),S.hdr), T(L(`acctColDelivered`),S.hdr), T(L(`acctColCancelled`),S.hdr), T(L(`acctColAbandoned`),S.hdr), T(L(`acctColGross`),S.hdr), T(L(`acctColVat`),S.hdr), T(L(`acctColFees`),S.hdr)]
+].concat(months.map(function(m, i){
+const g = money(m.gross);
+const zb = (i % 2 === 1);
+const c = zb?S.zeb:S.cell, cn = zb?S.zebNum:S.num, ci = zb?S.zebInt:S.int;
+return [T(m.ym,c), N(m.orders,ci), N(m.delivered,ci), N(m.cancelled,ci), N(m.abandoned,ci), N(g,cn), N(money(g-g/1.15),cn), N(money(m.fees),cn)];
+}));
+const monLast = 2 + months.length;
+const drvRows = [
+[T(L(`acctDriversTbl`), S.sec)],
+[T(L(`acctColDriver`),S.hdr), T(L(`acctColDeliveries`),S.hdr), T(L(`acctColEarnings`),S.hdr)]
+].concat(drivers.map(function(x, i){
+const zb = (i % 2 === 1);
+return [T(x.driver_name, zb?S.zeb:S.cell), N(x.deliveries, zb?S.zebInt:S.int), N(money(x.earnings), zb?S.zebNum:S.num)];
+}));
+const drvLast = 2 + drivers.length;
+const brRows = [
+[T(L(`acctBranchesTbl`), S.sec)],
+[T(L(`acctColBranch`),S.hdr), T(L(`acctColOrders`),S.hdr), T(L(`acctColDelivered`),S.hdr), T(L(`acctColGross`),S.hdr)]
+].concat(branchesR.map(function(x, i){
+const zb = (i % 2 === 1);
+return [T(ALANG===`ar`?x.branch_name:x.branch_name_en, zb?S.zeb:S.cell), N(x.orders, zb?S.zebInt:S.int), N(x.delivered, zb?S.zebInt:S.int), N(money(x.gross), zb?S.zebNum:S.num)];
+}));
+const brLast = 2 + branchesR.length;
+const itRows = [
+[T(L(`acctItemsTbl`), S.sec)],
+[T(L(`acctColItem`),S.hdr), T(L(`acctColQty`),S.hdr), T(L(`acctColRevenue`),S.hdr)]
+].concat(items.map(function(x, i){
+const zb = (i % 2 === 1);
+const nm = ALANG===`ar` ? (x.name_ar||x.name_en) : (x.name_en||x.name_ar);
+return [T(nm, zb?S.zeb:S.cell), N(x.qty, zb?S.zebInt:S.int), N(money(x.revenue), zb?S.zebNum:S.num)];
+}));
+const itLast = 2 + items.length;
+const sheetNames = [
+L(`acctSecSummary`).replace(/^[0-9]+\)\s*/,``),
+L(`acctMonthlyRev`).replace(/[^\p{L}\p{N} ]/gu,``).trim().slice(0,31),
+L(`acctDriversTbl`).replace(/[^\p{L}\p{N} ]/gu,``).trim().slice(0,31),
+L(`acctBranchesTbl`).replace(/[^\p{L}\p{N} ]/gu,``).trim().slice(0,31),
+L(`acctItemsTbl`).replace(/[^\p{L}\p{N} ]/gu,``).trim().slice(0,31)
+];
+const sheetsXml = [
+xlsxSheet(sumRows, { cols:[{i:1,w:40},{i:2,w:20}], merges:[`A1:B1`,`A2:B2`,`A3:B3`,`A4:B4`,`A6:B6`] }),
+xlsxSheet(monRows, { cols:[{i:1,w:14},{i:2,w:10},{i:3,w:10},{i:4,w:10},{i:5,w:10},{i:6,w:14},{i:7,w:12},{i:8,w:12}],
+merges:[`A1:H1`], freeze:2, filter:`A2:H` + monLast,
+cf: months.length ? [{sqref:`F3:F` + monLast}] : null }),
+xlsxSheet(drvRows, { cols:[{i:1,w:26},{i:2,w:14},{i:3,w:16}],
+merges:[`A1:C1`], freeze:2, filter:`A2:C` + drvLast,
+cf: drivers.length ? [{sqref:`B3:B` + drvLast}] : null }),
+xlsxSheet(brRows, { cols:[{i:1,w:28},{i:2,w:12},{i:3,w:12},{i:4,w:16}],
+merges:[`A1:D1`], freeze:2, filter:`A2:D` + brLast,
+cf: branchesR.length ? [{sqref:`D3:D` + brLast}] : null }),
+xlsxSheet(itRows, { cols:[{i:1,w:36},{i:2,w:10},{i:3,w:16}],
+merges:[`A1:C1`], freeze:2, filter:`A2:C` + itLast,
+cf: items.length ? [{sqref:`C3:C` + itLast}] : null })
+];
+const enc = new TextEncoder();
+const files = [
+{ name:`[Content_Types].xml`, data: enc.encode(
+`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+`<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">` +
+`<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>` +
+`<Default Extension="xml" ContentType="application/xml"/>` +
+`<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>` +
+sheetsXml.map(function(_,i){ return `<Override PartName="/xl/worksheets/sheet` + (i+1) + `.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`; }).join(``) +
+`<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>` +
+`</Types>`) },
+{ name:`_rels/.rels`, data: enc.encode(
+`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+`<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>` +
+`</Relationships>`) },
+{ name:`xl/workbook.xml`, data: enc.encode(
+`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+`<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">` +
+`<sheets>` + sheetNames.map(function(nm,i){
+return `<sheet name="` + escXml(nm).slice(0,31) + `" sheetId="` + (i+1) + `" r:id="rId` + (i+1) + `"/>`;
+}).join(``) + `</sheets></workbook>`) },
+{ name:`xl/_rels/workbook.xml.rels`, data: enc.encode(
+`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+`<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">` +
+sheetNames.map(function(_,i){ return `<Relationship Id="rId` + (i+1) + `" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet` + (i+1) + `.xml"/>`; }).join(``) +
+`<Relationship Id="rId9" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>` +
+`</Relationships>`) },
+{ name:`xl/styles.xml`, data: enc.encode(xlsxStyles()) }
+];
+sheetsXml.forEach(function(x, i){
+files.push({ name:`xl/worksheets/sheet` + (i+1) + `.xml`, data: enc.encode(x) });
+});
+const blob = zipBuild(files);
+const a = document.createElement(`a`);
+a.href = URL.createObjectURL(blob);
+a.download = `Makaronjy-` + acctRef() + `.xlsx`;
+a.click();
+URL.revokeObjectURL(a.href);
+toast(L(`acctXlsDone`), `success`);
 }
-
-/* ═══════════════════════════════════════════
-   v9.6: PDF محسّن — بدون كلمة "رسمي" + أقسام مرقمة
-   ═══════════════════════════════════════════ */
+/* ===== v9.7: PDF بلا شعار ===== */
 function printAcct(){
-  if(!LAST_ACCT){ toast(L(`acctShowFirst`), `warn`); return; }
-  const d = LAST_ACCT.data, t = d.totals||{};
-  const gross = money(t.gross), net = money(gross/1.15), vat = money(gross-net);
-  const months = d.months||[];
-  const maxM = Math.max.apply(null, months.map(m=>+m.gross||0).concat([1]));
-  const scope = (el(`crBranch2`) && el(`crBranch2`).value)
-    ? brName(branches().find(b=>b.id===el(`crBranch2`).value)||{})
-    : L(`ordersAllBranches`);
-  const kpi = function(v,l){
-    return `<div style="border:1.5px solid #EADFD2;border-radius:12px;padding:9px 6px;text-align:center;background:#FFFDF9"><b style="display:block;font-size:15px;color:#8E2A4A">` + v + `</b><small style="color:#8A6F63;font-weight:700;font-size:8.5px">` + l + `</small></div>`;
-  };
-  const secTitle = function(txt){
-    return `<div style="margin:14px 0 6px;padding:4px 10px;border-inline-start:4px solid #E0912F;background:#FAF3EA;border-radius:6px;font-size:12px;font-weight:900;color:#8E2A4A">` + txt + `</div>`;
-  };
-  const tbl = function(heads, rows){
-    return `<table style="width:100%;border-collapse:collapse;margin:6px 0;font-size:10.5px">` +
-      `<tr>` + heads.map(h=>`<th style="background:#5A1830;color:#fff;padding:6px;border:1px solid #D9C9BC;text-align:right;font-weight:800">`+h+`</th>`).join(``) + `</tr>` +
-      rows.map(function(r, i){
-        const bg = (i % 2 === 1) ? `background:#FAF3EA;` : ``;
-        return `<tr style="` + bg + `">` + r.map(c=>`<td style="padding:5px 6px;border:1px solid #EADFD2;text-align:right;font-weight:600">`+c+`</td>`).join(``) + `</tr>`;
-      }).join(``) + `</table>`;
-  };
-  const bars = months.map(function(m){
-    const h = Math.max(6, Math.round((+m.gross||0)/maxM*105));
-    return `<div style="flex:1;text-align:center"><div style="background:linear-gradient(180deg,#E0912F,#F2B95F);height:` + h + `px;border-radius:6px 6px 0 0"></div><small style="font-size:8px;color:#8A6F63;font-weight:700">` + m.ym.slice(5) + `/` + m.ym.slice(2,4) + `</small><small style="display:block;font-size:8px;font-weight:800;color:#8E2A4A">` + money(m.gross) + `</small></div>`;
-  }).join(``);
-  const html = `<html dir="rtl"><head><meta charset="utf-8"><title>` + brandNameNow() + ` — ` + L(`acctDocTitle`) + `</title><style>
-    @page{size:A4;margin:11mm}
-    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-    body{font-family:Cairo,'Segoe UI',Tahoma,sans-serif;color:#2B1A15;margin:0;padding:16px}
-  </style></head><body>
-  <div style="background:#5A1830;color:#fff;border-radius:16px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;gap:10px">
-    <div style="display:flex;align-items:center;gap:10px">
-      <div style="width:46px;height:46px;border-radius:50%;background:#F2B95F;display:flex;align-items:center;justify-content:center;font-size:24px">🍝</div>
-      <div><b style="font-size:19px">` + brandNameNow() + `</b>
-      <div style="font-size:11px;color:#F2B95F;font-weight:800">` + L(`acctDocTitle`) + `</div></div>
-    </div>
-    <div style="text-align:left;font-size:9px;line-height:1.8;color:#F5E9DC">
-      <b style="color:#F2B95F">` + L(`acctRef`) + `:</b> ` + acctRef() + `<br>
-      <b style="color:#F2B95F">` + L(`acctPeriodLbl`) + `:</b> ` + LAST_ACCT.from + ` → ` + LAST_ACCT.to + `<br>
-      <b style="color:#F2B95F">` + L(`acctScope`) + `:</b> ` + escXml(scope) + `<br>
-      <b style="color:#F2B95F">` + L(`acctIssued`) + `:</b> ` + new Date().toLocaleString() + `
-    </div>
-  </div>
-  ` + secTitle(L(`acctSecSummary`)) + `
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px">
-    ` + kpi(gross, L(`acctGross`)) + kpi(net, L(`acctNet`)) + kpi(vat, L(`acctVat`)) + kpi(money(t.fees), L(`acctFees`)) +
-    kpi(t.orders||0, L(`acctOrders`)) + kpi(t.delivered||0, L(`acctDelivered`)) +
-    kpi(t.cancelled||0, L(`acctCancelled`)) + kpi((t.cancel_rate||0)+`%`, L(`acctCancelRate`)) + `
-  </div>` +
-  (months.length ? secTitle(L(`acctSecMonths`)) +
-    `<div style="border:1.5px solid #EADFD2;border-radius:14px;padding:10px;background:#fff"><div style="display:flex;gap:5px;align-items:flex-end;height:140px">` + bars + `</div></div>` +
-    tbl([L(`acctColMonth`),L(`acctColOrders`),L(`acctColDelivered`),L(`acctColCancelled`),L(`acctColAbandoned`),L(`acctColGross`),L(`acctColVat`)],
-        months.map(function(m){ const g=money(m.gross); return [m.ym, m.orders, m.delivered, m.cancelled, m.abandoned, g, money(g-g/1.15)]; }))
-  : ``) +
-  secTitle(L(`acctSecVat`)) +
-  `<div style="background:#FFF6E6;border:1.5px dashed #E0912F;border-radius:12px;padding:10px">` +
-    tbl([L(`acctVatBoxTotal`), L(`acctVatBoxVat`), L(`acctVatBoxNet`)],
-        [[gross, vat, net]]) +
-    `<div style="font-size:9px;color:#A06B1C;font-weight:800;margin-top:4px">` + L(`acctVatNote`) + `</div>
-  </div>` +
-  ((d.drivers||[]).length || (d.branches||[]).length || (d.top_items||[]).length
-    ? secTitle(L(`acctSecTables`)) +
-      ((d.drivers||[]).length ? tbl([L(`acctColDriver`),L(`acctColDeliveries`),L(`acctColEarnings`)], d.drivers.map(function(x){ return [esc(x.driver_name), x.deliveries, money(x.earnings)]; })) : ``) +
-      ((d.branches||[]).length ? tbl([L(`acctColBranch`),L(`acctColOrders`),L(`acctColDelivered`),L(`acctColGross`)], d.branches.map(function(x){ return [esc(ALANG===`ar`?x.branch_name:x.branch_name_en), x.orders, x.delivered, money(x.gross)]; })) : ``) +
-      ((d.top_items||[]).length ? tbl([L(`acctColItem`),L(`acctColQty`),L(`acctColRevenue`)], d.top_items.map(function(x){ return [esc(ALANG===`ar`?(x.name_ar||x.name_en):(x.name_en||x.name_ar)), x.qty, money(x.revenue)]; })) : ``)
-    : ``) +
-  `<div style="margin-top:14px;border-top:1.5px solid #EADFD2;padding-top:8px;font-size:8.5px;color:#8A6F63;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
-     <span>` + L(`acctPreparedBy`) + ` • ` + L(`acctNote`) + `</span>
-     <span>` + L(`acctSystem`) + ` • ` + acctRef() + `</span>
-   </div>
-  </body></html>`;
-  const w = window.open(``, `_blank`);
-  if(!w){ toast(L(`acctPopupWarn`), `warn`); return; }
-  w.document.write(html);
-  w.document.close();
-  setTimeout(function(){ w.print(); }, 500);
+if(!LAST_ACCT){ toast(L(`acctShowFirst`), `warn`); return; }
+const d = LAST_ACCT.data, t = d.totals||{};
+const gross = money(t.gross), net = money(gross/1.15), vat = money(gross-net);
+const months = d.months||[];
+const maxM = Math.max.apply(null, months.map(m=>+m.gross||0).concat([1]));
+const scope = (el(`crBranch2`) && el(`crBranch2`).value)
+? brName(branches().find(b=>b.id===el(`crBranch2`).value)||{})
+: L(`ordersAllBranches`);
+const kpi = function(v,l){
+return `<div style="border:1.5px solid #EADFD2;border-radius:12px;padding:9px 6px;text-align:center;background:#FFFDF9"><b style="display:block;font-size:15px;color:#8E2A4A">` + v + `</b><small style="color:#8A6F63;font-weight:700;font-size:8.5px">` + l + `</small></div>`;
+};
+const secTitle = function(txt){
+return `<div style="margin:14px 0 6px;padding:4px 10px;border-inline-start:4px solid #E0912F;background:#FAF3EA;border-radius:6px;font-size:12px;font-weight:900;color:#8E2A4A">` + txt + `</div>`;
+};
+const tbl = function(heads, rows){
+return `<table style="width:100%;border-collapse:collapse;margin:6px 0;font-size:10.5px">` +
+`<tr>` + heads.map(h=>`<th style="background:#5A1830;color:#fff;padding:6px;border:1px solid #D9C9BC;text-align:right;font-weight:800">`+h+`</th>`).join(``) + `</tr>` +
+rows.map(function(r, i){
+const bg = (i % 2 === 1) ? `background:#FAF3EA;` : ``;
+return `<tr style="` + bg + `">` + r.map(c=>`<td style="padding:5px 6px;border:1px solid #EADFD2;text-align:right;font-weight:600">`+c+`</td>`).join(``) + `</tr>`;
+}).join(``) + `</table>`;
+};
+const bars = months.map(function(m){
+const h = Math.max(6, Math.round((+m.gross||0)/maxM*105));
+return `<div style="flex:1;display:flex;flex-direction:column;align-items:center"><div style="width:100%;max-width:56px;background:linear-gradient(180deg,#E0912F,#F2B95F);height:` + h + `px;border-radius:6px 6px 0 0"></div><small style="font-size:8px;color:#8A6F63;font-weight:700;margin-top:3px">` + m.ym.slice(5) + `/` + m.ym.slice(2,4) + `</small><small style="font-size:8px;font-weight:800;color:#8E2A4A">` + money(m.gross) + `</small></div>`;
+}).join(``);
+const html = `<html dir="rtl"><head><meta charset="utf-8"><title>` + brandNameNow() + ` — ` + L(`acctDocTitle`) + `</title><style>
+@page{size:A4;margin:11mm}
+*{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{font-family:Cairo,'Segoe UI',Tahoma,sans-serif;color:#2B1A15;margin:0;padding:16px}
+</style></head><body>
+<div style="background:#5A1830;color:#fff;border-radius:16px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;gap:10px">
+<div>
+<b style="font-size:19px">` + brandNameNow() + `</b>
+<div style="font-size:11px;color:#F2B95F;font-weight:800">` + L(`acctDocTitle`) + `</div>
+</div>
+<div style="text-align:left;font-size:9px;line-height:1.8;color:#F5E9DC">
+<b style="color:#F2B95F">` + L(`acctRef`) + `:</b> ` + acctRef() + `<br>
+<b style="color:#F2B95F">` + L(`acctPeriodLbl`) + `:</b> ` + LAST_ACCT.from + ` → ` + LAST_ACCT.to + `<br>
+<b style="color:#F2B95F">` + L(`acctScope`) + `:</b> ` + escXml(scope) + `<br>
+<b style="color:#F2B95F">` + L(`acctIssued`) + `:</b> ` + new Date().toLocaleString() + `
+</div>
+</div>
+` + secTitle(L(`acctSecSummary`)) + `
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px">
+` + kpi(gross, L(`acctGross`)) + kpi(net, L(`acctNet`)) + kpi(vat, L(`acctVat`)) + kpi(money(t.fees), L(`acctFees`)) +
+kpi(t.orders||0, L(`acctOrders`)) + kpi(t.delivered||0, L(`acctDelivered`)) +
+kpi(t.cancelled||0, L(`acctCancelled`)) + kpi((t.cancel_rate||0)+`%`, L(`acctCancelRate`)) + `
+</div>` +
+(months.length ? secTitle(L(`acctSecMonths`)) +
+`<div style="border:1.5px solid #EADFD2;border-radius:14px;padding:10px;background:#fff"><div style="display:flex;gap:5px;align-items:flex-end;height:140px;justify-content:center">` + bars + `</div></div>` +
+tbl([L(`acctColMonth`),L(`acctColOrders`),L(`acctColDelivered`),L(`acctColCancelled`),L(`acctColAbandoned`),L(`acctColGross`),L(`acctColVat`)],
+months.map(function(m){ const g=money(m.gross); return [m.ym, m.orders, m.delivered, m.cancelled, m.abandoned, g, money(g-g/1.15)]; }))
+: ``) +
+secTitle(L(`acctSecVat`)) +
+`<div style="background:#FFF6E6;border:1.5px dashed #E0912F;border-radius:12px;padding:10px">` +
+tbl([L(`acctVatBoxTotal`), L(`acctVatBoxVat`), L(`acctVatBoxNet`)],
+[[gross, vat, net]]) +
+`<div style="font-size:9px;color:#A06B1C;font-weight:800;margin-top:4px">` + L(`acctVatNote`) + `</div>
+</div>` +
+((d.drivers||[]).length || (d.branches||[]).length || (d.top_items||[]).length
+? secTitle(L(`acctSecTables`)) +
+((d.drivers||[]).length ? tbl([L(`acctColDriver`),L(`acctColDeliveries`),L(`acctColEarnings`)], d.drivers.map(function(x){ return [esc(x.driver_name), x.deliveries, money(x.earnings)]; })) : ``) +
+((d.branches||[]).length ? tbl([L(`acctColBranch`),L(`acctColOrders`),L(`acctColDelivered`),L(`acctColGross`)], d.branches.map(function(x){ return [esc(ALANG===`ar`?x.branch_name:x.branch_name_en), x.orders, x.delivered, money(x.gross)]; })) : ``) +
+((d.top_items||[]).length ? tbl([L(`acctColItem`),L(`acctColQty`),L(`acctColRevenue`)], d.top_items.map(function(x){ return [esc(ALANG===`ar`?(x.name_ar||x.name_en):(x.name_en||x.name_ar)), x.qty, money(x.revenue)]; })) : ``)
+: ``) +
+`<div style="margin-top:14px;border-top:1.5px solid #EADFD2;padding-top:8px;font-size:8.5px;color:#8A6F63;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+<span>` + L(`acctPreparedBy`) + ` • ` + L(`acctNote`) + `</span>
+<span>` + L(`acctSystem`) + ` • ` + acctRef() + `</span>
+</div>
+</body></html>`;
+const w = window.open(``, `_blank`);
+if(!w){ toast(L(`acctPopupWarn`), `warn`); return; }
+w.document.write(html);
+w.document.close();
+setTimeout(function(){ w.print(); }, 500);
 }
-
-/* v9.5: تبديل اللغة يعيد بناء التقرير فوراً */
+/* ===== v9.5: تبديل اللغة يعيد بناء التقرير ===== */
 (function hookLangRefresh(){
-  var btn = el(`adminLangBtn`);
-  if(!btn || btn._acctHook) return;
-  btn._acctHook = true;
-  btn.addEventListener(`click`, function(){
-    setTimeout(function(){
-      if(el(`crPreset`)){
-        var preset = el(`crPreset`).value;
-        var branch = el(`crBranch2`) ? el(`crBranch2`).value : ``;
-        buildReportsTab();
-        el(`crPreset`).value = preset;
-        if(el(`crBranch2`) && branch) el(`crBranch2`).value = branch;
-        syncRangeInputs();
-        if(LAST_ACCT) renderAcct(LAST_ACCT.data, el(`crBox`));
-      }
-    }, 80);
-  });
+var btn = el(`adminLangBtn`);
+if(!btn || btn._acctHook) return;
+btn._acctHook = true;
+btn.addEventListener(`click`, function(){
+setTimeout(function(){
+if(el(`crPreset`)){
+var preset = el(`crPreset`).value;
+var branch = el(`crBranch2`) ? el(`crBranch2`).value : ``;
+buildReportsTab();
+el(`crPreset`).value = preset;
+if(el(`crBranch2`) && branch) el(`crBranch2`).value = branch;
+syncRangeInputs();
+if(LAST_ACCT) renderAcct(LAST_ACCT.data, el(`crBox`));
+}
+}, 80);
+});
 })();
-
-/* =====================================================
-   v9.2: ربط التبويبات بأحداث الفتح
-   ===================================================== */
+/* ===== v9.2: ربط التبويبات ===== */
 (function setupCloudTabs(){
-  var defs = [
-    {id:`cloud-users`, build:buildUsersTab, load:loadUsersTab},
-    {id:`cloud-orders`, build:buildOrdersTab, load:loadOrdersTab},
-    {id:`cloud-reports`, build:buildReportsTab, load:loadReportsTab}
-  ];
-  var built = {};
-  function bindAll(){
-    defs.forEach(function(t){
-      var btn = document.querySelector(`[data-tab="` + t.id + `"]`);
-      if(!btn || btn._cloudBound) return;
-      btn._cloudBound = true;
-      btn.addEventListener(`click`, function(){
-        if(typeof STATE === `undefined` || !STATE) return;
-        if(!built[t.id]){
-          t.build();
-          built[t.id] = true;
-        }
-        t.load();
-      });
-    });
-  }
-  if(document.readyState === `loading`){
-    document.addEventListener(`DOMContentLoaded`, bindAll);
-  } else {
-    bindAll();
-  }
+var defs = [
+{id:`cloud-users`, build:buildUsersTab, load:loadUsersTab},
+{id:`cloud-orders`, build:buildOrdersTab, load:loadOrdersTab},
+{id:`cloud-reports`, build:buildReportsTab, load:loadReportsTab}
+];
+var built = {};
+function bindAll(){
+defs.forEach(function(t){
+var btn = document.querySelector(`[data-tab="` + t.id + `"]`);
+if(!btn || btn._cloudBound) return;
+btn._cloudBound = true;
+btn.addEventListener(`click`, function(){
+if(typeof STATE === `undefined` || !STATE) return;
+if(!built[t.id]){
+t.build();
+built[t.id] = true;
+}
+t.load();
+});
+});
+}
+if(document.readyState === `loading`){
+document.addEventListener(`DOMContentLoaded`, bindAll);
+} else {
+bindAll();
+}
 })();
-
 /* ===== التصدير الاحتياطي ===== */
 el(`btnExport`).addEventListener(`click`, function(){
 var data = {
@@ -2498,4 +2491,4 @@ return;
 applyAdminLang();
 })();
 window.__ADMIN_BOOTED = true;
-/* ===== END admin-tabs.js (v9.6) ===== */
+/* ===== END admin-tabs.js (v9.7) ===== */
