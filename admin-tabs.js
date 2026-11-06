@@ -1,5 +1,6 @@
-/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v9.4) ===== */
-/* v9.4: تبويب التقارير المحاسبية الكامل (دفتر + ضريبة 15% + CSV + PDF) */
+/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v9.5) ===== */
+/* v9.5: تقارير: لغة فورية + Excel مصمم + PDF رسمي
+   v9.4: التبويب المحاسبي (دفتر + ضريبة 15%) */
 
 function nmOf(x){
 return (ALANG===`ar`) ? x.ar : (x.en || x.ar);
@@ -1351,7 +1352,6 @@ const APP_IMGS = [
 ];
 const imgPending = {};
 let imgRenderStamp = Date.now();
-/* نشر إعداد توفر التوصيل */
 async function publishAvail(btn){
 var mode = el(`availMode`).value;
 var ids = Array.prototype.slice
@@ -1892,7 +1892,7 @@ async function loadOrdersTab(){
 }
 
 /* =====================================================
-   v9.4: تبويب التقارير المحاسبية (دفتر دائم + ضريبة 15%)
+   v9.5: التبويب المحاسبي — لغة فورية + Excel مصمم + PDF رسمي
    ===================================================== */
 let LAST_ACCT = null;
 
@@ -1903,6 +1903,13 @@ function table(title, heads, rows){
   return `<h4 style="margin:1rem 0 .5rem;color:var(--brown);font-weight:900">` + title + `</h4>` +
     `<table class="cl-tbl"><tr>` + heads.map(h=>`<th>`+h+`</th>`).join(``) + `</tr>` +
     rows.map(r=>`<tr>` + r.map(c=>`<td>`+c+`</td>`).join(``) + `</tr>`).join(``) + `</table>`;
+}
+/* أعمدة بيانية نصية ███ لملف Excel */
+function barBlocks(v, max, len){
+  const n = max > 0 ? Math.round((+v||0)/max*(len||18)) : 0;
+  let s = ``;
+  for(let i=0;i<n;i++) s += `█`;
+  return s;
 }
 function computeRange(){
   const preset = el(`crPreset`).value;
@@ -1963,14 +1970,14 @@ function buildReportsTab(){
         `<div class="cl-f" id="crToWrap" style="display:none"><label>` + arEn(`إلى`,`To`) + `</label><input type="date" id="crTo"></div>` +
         `<div class="cl-f"><label>` + L(`ordersBranch`) + `</label><select id="crBranch2">` + brOpts + `</select></div>` +
         `<button class="cl-btn cl-add" id="crGo" style="align-self:flex-end">` + arEn(`📊 عرض`,`📊 Show`) + `</button>` +
-        `<button class="cl-btn cl-plain" id="crCsv" style="align-self:flex-end">⬇ CSV</button>` +
-        `<button class="cl-btn cl-plain" id="crPrint" style="align-self:flex-end">🖨 PDF</button>` +
+        `<button class="cl-btn cl-plain" id="crXls" style="align-self:flex-end">⬇ ` + arEn(`Excel مصمم`,`Styled Excel`) + `</button>` +
+        `<button class="cl-btn cl-plain" id="crPrint" style="align-self:flex-end">🖨 ` + arEn(`PDF رسمي`,`Official PDF`) + `</button>` +
       `</div>` +
       `<div id="crBox" style="margin-top:.9rem"></div>` +
     `</div>`;
   el(`crPreset`).addEventListener(`change`, syncRangeInputs);
   el(`crGo`).addEventListener(`click`, loadReportsTab);
-  el(`crCsv`).addEventListener(`click`, exportCsv);
+  el(`crXls`).addEventListener(`click`, exportExcel);
   el(`crPrint`).addEventListener(`click`, printAcct);
   syncRangeInputs();
 }
@@ -2046,73 +2053,214 @@ function renderAcct(d, box){
   }
   html += `<div style="text-align:center;color:var(--muted);font-size:.68rem;font-weight:800;margin-top:.8rem">` +
     arEn(`الفترة: `,`Period: `) + d.from + ` → ` + d.to + ` • ` +
-    arEn(`الإيراد يُحتسب بتاريخ التسليم`,`Revenue recognized on delivery date`) + `</div>`;
+    arEn(`الإيراد يُحتسب بتاريخ التسليم (المسلّم فقط)`,`Revenue recognized on delivery date (delivered only)`) + `</div>`;
   box.innerHTML = html;
 }
-function exportCsv(){
+
+/* ═══════════════════════════════════════════
+   v9.5: Excel مصمم (SpreadsheetML: 5 أوراق + ألوان + رسوم)
+   ═══════════════════════════════════════════ */
+function escXml(s){
+  return String(s==null?``:s)
+    .replace(/&/g,`&amp;`).replace(/</g,`&lt;`)
+    .replace(/>/g,`&gt;`).replace(/"/g,`&quot;`);
+}
+function xCell(v, style, type){
+  const t = type || (typeof v === `number` ? `Number` : `String`);
+  return `<Cell` + (style ? ` ss:StyleID="` + style + `"` : ``) +
+    `><Data ss:Type="` + t + `">` + escXml(v) + `</Data></Cell>`;
+}
+function xRow(cells){ return `<Row>` + cells.join(``) + `</Row>`; }
+function xSheet(name, tableHtml){
+  return `<Worksheet ss:Name="` + escXml(name) + `">` + tableHtml +
+    `<WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel"><DisplayRightToLeft/></WorksheetOptions>` +
+    `</Worksheet>`;
+}
+function exportExcel(){
   if(!LAST_ACCT){ toast(arEn(`اعرض التقرير أولاً`,`Show a report first`), `warn`); return; }
-  const d = LAST_ACCT.data, t = d.totals||{};
+  const d = LAST_ACCT.data, t = d.totals || {};
   const gross = money(t.gross), net = money(gross/1.15), vat = money(gross-net);
-  const R = [];
-  R.push([arEn(`تقرير مكرونجي المحاسبي`,`Makaronjy accounting report`)]);
-  R.push([arEn(`الفترة`,`Period`), LAST_ACCT.from, LAST_ACCT.to]);
-  R.push([]);
-  R.push([arEn(`المؤشر`,`Metric`), arEn(`القيمة`,`Value`)]);
-  R.push([arEn(`إجمالي الطلبات`,`Total orders`), t.orders||0]);
-  R.push([arEn(`مسلّمة`,`Delivered`), t.delivered||0]);
-  R.push([arEn(`ملغية`,`Cancelled`), t.cancelled||0]);
-  R.push([arEn(`مهجورة`,`Abandoned`), t.abandoned||0]);
-  R.push([arEn(`الإيراد شامل الضريبة`,`Gross revenue`), gross]);
-  R.push([arEn(`الصافي قبل الضريبة`,`Net (excl. VAT)`), net]);
-  R.push([arEn(`ضريبة القيمة 15%`,`VAT 15%`), vat]);
-  R.push([arEn(`رسوم توصيل`,`Delivery fees`), money(t.fees)]);
-  R.push([arEn(`متوسط الطلب`,`Avg order`), t.avg||0]);
-  R.push([arEn(`معدل الإلغاء %`,`Cancel rate %`), t.cancel_rate||0]);
-  R.push([arEn(`إيراد استلام`,`Pickup revenue`), money(t.pickup_gross)]);
-  R.push([arEn(`إيراد توصيل`,`Delivery revenue`), money(t.delivery_gross)]);
-  R.push([]);
-  R.push([arEn(`الشهر`,`Month`), arEn(`طلبات`,`Orders`), arEn(`مسلّمة`,`Delivered`), arEn(`ملغية`,`Cancelled`), arEn(`مهجورة`,`Abandoned`), arEn(`الإيراد`,`Gross`), arEn(`رسوم`,`Fees`)]);
-  (d.months||[]).forEach(function(m){ R.push([m.ym, m.orders, m.delivered, m.cancelled, m.abandoned, money(m.gross), money(m.fees)]); });
-  const csv = '\uFEFF' + R.map(function(r){ return r.join(`,`); }).join(`\n`);
-  const blob = new Blob([csv], {type:`text/csv;charset=utf-8`});
+  const months = d.months || [], drivers = d.drivers || [],
+        branchesR = d.branches || [], items = d.top_items || [];
+  const maxM = Math.max.apply(null, months.map(m=>+m.gross||0).concat([1]));
+  const maxD = Math.max.apply(null, drivers.map(x=>+x.deliveries||0).concat([1]));
+  const maxB = Math.max.apply(null, branchesR.map(x=>+x.gross||0).concat([1]));
+  const maxI = Math.max.apply(null, items.map(x=>+x.qty||0).concat([1]));
+
+  const styles =
+   `<Styles>` +
+   `<Style ss:ID="Default" ss:Name="Normal"><Alignment ss:Vertical="Center"/><Font ss:FontName="Calibri" ss:Size="11"/></Style>` +
+   `<Style ss:ID="title"><Font ss:Bold="1" ss:Size="18" ss:Color="#5A1830"/></Style>` +
+   `<Style ss:ID="sub"><Font ss:Size="10" ss:Color="#8A6F63"/></Style>` +
+   `<Style ss:ID="sec"><Interior ss:Color="#F3E7D7" ss:Pattern="Solid"/><Font ss:Bold="1" ss:Size="12" ss:Color="#8E2A4A"/></Style>` +
+   `<Style ss:ID="hdr"><Interior ss:Color="#5A1830" ss:Pattern="Solid"/><Font ss:Bold="1" ss:Color="#FFFFFF"/></Style>` +
+   `<Style ss:ID="gold"><Interior ss:Color="#F2B95F" ss:Pattern="Solid"/><Font ss:Bold="1" ss:Color="#5A1830"/></Style>` +
+   `<Style ss:ID="cell"><Borders><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#EADFD2"/><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#EADFD2"/></Borders></Style>` +
+   `<Style ss:ID="num" ss:Parent="cell"><NumberFormat ss:Format="#,##0.00"/></Style>` +
+   `<Style ss:ID="int" ss:Parent="cell"><NumberFormat ss:Format="#,##0"/></Style>` +
+   `<Style ss:ID="bar"><Font ss:Bold="1" ss:Color="#E0912F"/></Style>` +
+   `</Styles>`;
+
+  const sSummary = xSheet(arEn(`الملخص`,`Summary`),
+    `<Table ss:DefaultColumnWidth="150">` +
+    xRow([xCell(arEn(`🍝 مكرونجي — تقرير محاسبي رسمي`,`🍝 Makaronjy — Official Accounting Report`), `title`)]) +
+    xRow([xCell(arEn(`الفترة`,`Period`) + `: ` + LAST_ACCT.from + ` → ` + LAST_ACCT.to, `sub`)]) +
+    xRow([xCell(arEn(`تاريخ الإصدار`,`Issued`) + `: ` + new Date().toLocaleString(), `sub`)]) +
+    xRow([]) +
+    xRow([xCell(arEn(`المؤشر`,`Metric`), `hdr`), xCell(arEn(`القيمة`,`Value`), `hdr`)]) +
+    xRow([xCell(arEn(`إجمالي الطلبات`,`Total orders`), `cell`), xCell(t.orders||0, `int`)]) +
+    xRow([xCell(arEn(`مسلّمة ✅`,`Delivered ✅`), `cell`), xCell(t.delivered||0, `int`)]) +
+    xRow([xCell(arEn(`ملغية ❌`,`Cancelled ❌`), `cell`), xCell(t.cancelled||0, `int`)]) +
+    xRow([xCell(arEn(`مهجورة 🌙`,`Abandoned 🌙`), `cell`), xCell(t.abandoned||0, `int`)]) +
+    xRow([xCell(arEn(`الإيراد شامل الضريبة`,`Gross revenue (incl. VAT)`), `gold`), xCell(gross, `gold`)]) +
+    xRow([xCell(arEn(`الصافي قبل الضريبة`,`Net (excl. VAT)`), `cell`), xCell(net, `num`)]) +
+    xRow([xCell(arEn(`ضريبة القيمة المضافة 15%`,`VAT 15%`), `cell`), xCell(vat, `num`)]) +
+    xRow([xCell(arEn(`رسوم التوصيل`,`Delivery fees`), `cell`), xCell(money(t.fees), `num`)]) +
+    xRow([xCell(arEn(`متوسط الطلب`,`Avg order`), `cell`), xCell(t.avg||0, `num`)]) +
+    xRow([xCell(arEn(`معدل الإلغاء %`,`Cancel rate %`), `cell`), xCell(t.cancel_rate||0, `int`)]) +
+    xRow([xCell(arEn(`إيراد الاستلام 🏪`,`Pickup revenue 🏪`), `cell`), xCell(money(t.pickup_gross), `num`)]) +
+    xRow([xCell(arEn(`إيراد التوصيل 🛵`,`Delivery revenue 🛵`), `cell`), xCell(money(t.delivery_gross), `num`)]) +
+    `</Table>`);
+
+  const sMonths = months.length ? xSheet(arEn(`الأشهر`,`Months`),
+    `<Table ss:DefaultColumnWidth="85">` +
+    xRow([xCell(arEn(`📅 الإيراد الشهري`,`📅 Monthly revenue`), `sec`)]) +
+    xRow([xCell(arEn(`الشهر`,`Month`),`hdr`), xCell(arEn(`طلبات`,`Orders`),`hdr`), xCell(arEn(`مسلّمة`,`Delivered`),`hdr`), xCell(arEn(`ملغية`,`Cancelled`),`hdr`), xCell(arEn(`مهجورة`,`Abandoned`),`hdr`), xCell(arEn(`الإيراد`,`Gross`),`hdr`), xCell(arEn(`الضريبة`,`VAT`),`hdr`), xCell(arEn(`الرسوم`,`Fees`),`hdr`), xCell(arEn(`📊 الرسم البياني`,`📊 Chart`),`hdr`)]) +
+    months.map(function(m){
+      const g = money(m.gross);
+      return xRow([
+        xCell(m.ym, `cell`), xCell(m.orders, `int`), xCell(m.delivered, `int`),
+        xCell(m.cancelled, `int`), xCell(m.abandoned, `int`),
+        xCell(g, `num`), xCell(money(g - g/1.15), `num`), xCell(money(m.fees), `num`),
+        xCell(barBlocks(m.gross, maxM), `bar`)
+      ]);
+    }).join(``) +
+    `</Table>`) : ``;
+
+  const sDrivers = drivers.length ? xSheet(arEn(`السائقون`,`Drivers`),
+    `<Table ss:DefaultColumnWidth="110">` +
+    xRow([xCell(arEn(`🚗 أداء السائقين`,`🚗 Driver performance`), `sec`)]) +
+    xRow([xCell(arEn(`السائق`,`Driver`),`hdr`), xCell(arEn(`توصيلات`,`Deliveries`),`hdr`), xCell(arEn(`أرباح`,`Earnings`),`hdr`), xCell(arEn(`📊 الرسم`,`📊 Chart`),`hdr`)]) +
+    drivers.map(function(x){
+      return xRow([xCell(x.driver_name,`cell`), xCell(x.deliveries,`int`), xCell(money(x.earnings),`num`), xCell(barBlocks(x.deliveries, maxD),`bar`)]);
+    }).join(``) +
+    `</Table>`) : ``;
+
+  const sBranches = branchesR.length ? xSheet(arEn(`الفروع`,`Branches`),
+    `<Table ss:DefaultColumnWidth="110">` +
+    xRow([xCell(arEn(`🏪 أداء الفروع`,`🏪 Branch performance`), `sec`)]) +
+    xRow([xCell(arEn(`الفرع`,`Branch`),`hdr`), xCell(arEn(`طلبات`,`Orders`),`hdr`), xCell(arEn(`مسلّمة`,`Delivered`),`hdr`), xCell(arEn(`الإيراد`,`Gross`),`hdr`), xCell(arEn(`📊 الرسم`,` Chart`),`hdr`)]) +
+    branchesR.map(function(x){
+      return xRow([xCell(ALANG===`ar`?x.branch_name:x.branch_name_en,`cell`), xCell(x.orders,`int`), xCell(x.delivered,`int`), xCell(money(x.gross),`num`), xCell(barBlocks(x.gross, maxB),`bar`)]);
+    }).join(``) +
+    `</Table>`) : ``;
+
+  const sItems = items.length ? xSheet(arEn(`الأصناف`,`Items`),
+    `<Table ss:DefaultColumnWidth="110">` +
+    xRow([xCell(arEn(`🍝 الأكثر مبيعاً`,`🍝 Top items`), `sec`)]) +
+    xRow([xCell(arEn(`الصنف`,`Item`),`hdr`), xCell(arEn(`كمية`,`Qty`),`hdr`), xCell(arEn(`إيراد`,`Revenue`),`hdr`), xCell(arEn(`📊 الرسم`,`📊 Chart`),`hdr`)]) +
+    items.map(function(x){
+      const nm = ALANG===`ar` ? (x.name_ar||x.name_en) : (x.name_en||x.name_ar);
+      return xRow([xCell(nm,`cell`), xCell(x.qty,`int`), xCell(money(x.revenue),`num`), xCell(barBlocks(x.qty, maxI),`bar`)]);
+    }).join(``) +
+    `</Table>`) : ``;
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>` +
+    `<?mso-application progid="Excel.Sheet"?>` +
+    `<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">` +
+    styles + sSummary + sMonths + sDrivers + sBranches + sItems +
+    `</Workbook>`;
+  const blob = new Blob([xml], {type:`application/vnd.ms-excel;charset=utf-8`});
   const a = document.createElement(`a`);
   a.href = URL.createObjectURL(blob);
-  a.download = `makaronjy-report-` + LAST_ACCT.from + `-` + LAST_ACCT.to + `.csv`;
+  a.download = `Makaronjy-Report-` + LAST_ACCT.from + `_` + LAST_ACCT.to + `.xls`;
   a.click();
   URL.revokeObjectURL(a.href);
-  toast(arEn(`تم تصدير CSV ✔`,`CSV exported ✔`), `success`);
+  toast(arEn(`✔ ملف Excel مصمم: 5 أوراق + ألوان + رسوم بيانية`,`✔ Styled Excel: 5 sheets + colors + charts`), `success`);
 }
+
+/* ═══════════════════════════════════════════
+   v9.5: PDF رسمي بهوية مكرونجي
+   ═══════════════════════════════════════════ */
 function printAcct(){
   if(!LAST_ACCT){ toast(arEn(`اعرض التقرير أولاً`,`Show a report first`), `warn`); return; }
   const d = LAST_ACCT.data, t = d.totals||{};
   const gross = money(t.gross), net = money(gross/1.15), vat = money(gross-net);
-  const rowsM = (d.months||[]).map(function(m){
-    return `<tr><td>${m.ym}</td><td>${m.orders}</td><td>${m.delivered}</td><td>${m.cancelled}</td><td>${m.abandoned}</td><td>${money(m.gross)}</td><td>${money(m.fees)}</td></tr>`;
+  const months = d.months||[];
+  const maxM = Math.max.apply(null, months.map(m=>+m.gross||0).concat([1]));
+  const kpi = function(v,l){
+    return `<div style="border:1.5px solid #EADFD2;border-radius:12px;padding:8px;text-align:center;background:#FFFDF9"><b style="display:block;font-size:15px;color:#8E2A4A">` + v + `</b><small style="color:#8A6F63;font-weight:700;font-size:9px">` + l + `</small></div>`;
+  };
+  const tbl = function(heads, rows){
+    return `<table style="width:100%;border-collapse:collapse;margin:8px 0;font-size:11px"><tr>` +
+      heads.map(h=>`<th style="background:#5A1830;color:#fff;padding:6px;border:1px solid #ddd;text-align:right">`+h+`</th>`).join(``) + `</tr>` +
+      rows.map(r=>`<tr>` + r.map(c=>`<td style="padding:5px 6px;border:1px solid #EADFD2;text-align:right;font-weight:600">`+c+`</td>`).join(``) + `</tr>`).join(``) + `</table>`;
+  };
+  const bars = months.map(function(m){
+    const h = Math.max(6, Math.round((+m.gross||0)/maxM*110));
+    return `<div style="flex:1;text-align:center"><div style="background:linear-gradient(180deg,#E0912F,#F2B95F);height:` + h + `px;border-radius:6px 6px 0 0"></div><small style="font-size:9px;color:#8A6F63;font-weight:700">` + m.ym.slice(5) + `/` + m.ym.slice(2,4) + `</small><small style="display:block;font-size:9px;font-weight:800;color:#8E2A4A">` + money(m.gross) + `</small></div>`;
   }).join(``);
-  const html = `<html dir="rtl"><head><meta charset="utf-8"><title>report</title>
-   <style>body{font-family:Cairo,Arial,sans-serif;padding:2rem;color:#2b1a15}
-   h1{font-size:1.3rem} table{width:100%;border-collapse:collapse;margin:1rem 0;font-size:12px}
-   th,td{border:1px solid #999;padding:6px;text-align:right}
-   .k{display:inline-block;margin:.3rem .8rem .3rem 0;font-weight:700}</style></head><body>
-   <h1>🍝 ${arEn(`تقرير مكرونجي المحاسبي`,`Makaronjy accounting report`)}</h1>
-   <p>${arEn(`الفترة`,`Period`)}: ${LAST_ACCT.from} → ${LAST_ACCT.to}</p>
-   <p><span class="k">${arEn(`الإجمالي`,`Gross`)}: ${gross}</span>
-      <span class="k">${arEn(`الصافي`,`Net`)}: ${net}</span>
-      <span class="k">${arEn(`الضريبة`,`VAT`)}: ${vat}</span>
-      <span class="k">${arEn(`رسوم`,`Fees`)}: ${money(t.fees)}</span>
-      <span class="k">${arEn(`طلبات`,`Orders`)}: ${t.orders||0}</span>
-      <span class="k">${arEn(`مسلّمة`,`Delivered`)}: ${t.delivered||0}</span>
-      <span class="k">${arEn(`ملغية`,`Cancelled`)}: ${t.cancelled||0}</span>
-      <span class="k">${arEn(`مهجورة`,`Abandoned`)}: ${t.abandoned||0}</span></p>
-   <table><tr><th>${arEn(`الشهر`,`Month`)}</th><th>${arEn(`طلبات`,`Orders`)}</th><th>${arEn(`مسلّمة`,`Delivered`)}</th><th>${arEn(`ملغية`,`Cancelled`)}</th><th>${arEn(`مهجورة`,`Abandoned`)}</th><th>${arEn(`الإيراد`,`Gross`)}</th><th>${arEn(`رسوم`,`Fees`)}</th></tr>${rowsM}</table>
-   <p style="font-size:11px">${arEn(`طُبع بتاريخ`,`Printed on`)}: ${new Date().toLocaleString()}</p>
-   </body></html>`;
+  const html = `<html dir="rtl"><head><meta charset="utf-8"><title>Makaronjy Report</title><style>
+    @page{size:A4;margin:12mm}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    body{font-family:Cairo,'Segoe UI',Tahoma,sans-serif;color:#2B1A15;margin:0;padding:18px}
+  </style></head><body>
+  <div style="background:#5A1830;color:#fff;border-radius:16px;padding:16px 18px;display:flex;justify-content:space-between;align-items:center">
+    <div><b style="font-size:20px">🍝 ` + arEn(`مكرونجي`,`Makaronjy`) + `</b>
+    <div style="font-size:11px;color:#F2B95F;font-weight:700">` + arEn(`تقرير محاسبي رسمي`,`Official Accounting Report`) + `</div></div>
+    <div style="text-align:left;font-size:10px;line-height:1.7"><b>` + LAST_ACCT.from + ` → ` + LAST_ACCT.to + `</b><br>` + arEn(`أصدر`,`Issued`) + `: ` + new Date().toLocaleString() + `</div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0">
+    ` + kpi(gross, arEn(`الإيراد شامل الضريبة`,`Gross incl. VAT`)) +
+    kpi(net, arEn(`الصافي قبل الضريبة`,`Net excl. VAT`)) +
+    kpi(vat, arEn(`ضريبة القيمة 15%`,`VAT 15%`)) +
+    kpi(money(t.fees), arEn(`رسوم التوصيل`,`Delivery fees`)) +
+    kpi(t.orders||0, arEn(`إجمالي الطلبات`,`Total orders`)) +
+    kpi(t.delivered||0, arEn(`مسلّمة ✅`,`Delivered ✅`)) +
+    kpi(t.cancelled||0, arEn(`ملغية ❌`,`Cancelled `)) +
+    kpi((t.cancel_rate||0)+`%`, arEn(`معدل الإلغاء`,`Cancel rate`)) + `
+  </div>` +
+  (months.length ? `<div style="border:1.5px solid #EADFD2;border-radius:14px;padding:10px;background:#fff"><b style="font-size:11px;color:#8E2A4A">📊 ` + arEn(`الإيراد الشهري`,`Monthly revenue`) + `</b><div style="display:flex;gap:6px;align-items:flex-end;height:150px;margin-top:8px">` + bars + `</div></div>` : ``) +
+  `<div style="background:#FFF6E6;border:1.5px dashed #E0912F;border-radius:12px;padding:10px;margin:12px 0;font-size:12px;font-weight:800;color:#A06B1C;display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px">
+     <span>` + arEn(`الإجمالي شامل الضريبة`,`Total incl. VAT`) + `: ` + gross + `</span>
+     <span>` + arEn(`الضريبة 15%`,`VAT 15%`) + `: ` + vat + `</span>
+     <span>` + arEn(`الصافي`,`Net`) + `: ` + net + `</span>
+   </div>` +
+  (months.length ? `<b style="font-size:12px;color:#8E2A4A">📅 ` + arEn(`تفاصيل الأشهر`,`Month details`) + `</b>` + tbl([arEn(`الشهر`,`Month`),arEn(`طلبات`,`Orders`),arEn(`مسلّمة`,`Delivered`),arEn(`ملغية`,`Cancelled`),arEn(`مهجورة`,`Abandoned`),arEn(`الإيراد`,`Gross`),arEn(`الضريبة`,`VAT`)], months.map(function(m){ const g=money(m.gross); return [m.ym, m.orders, m.delivered, m.cancelled, m.abandoned, g, money(g-g/1.15)]; })) : ``) +
+  ((d.drivers||[]).length ? `<b style="font-size:12px;color:#8E2A4A">🚗 ` + arEn(`أداء السائقين`,`Drivers`) + `</b>` + tbl([arEn(`السائق`,`Driver`),arEn(`توصيلات`,`Deliveries`),arEn(`أرباح`,`Earnings`)], d.drivers.map(function(x){ return [esc(x.driver_name), x.deliveries, money(x.earnings)]; })) : ``) +
+  ((d.branches||[]).length ? `<b style="font-size:12px;color:#8E2A4A">🏪 ` + arEn(`أداء الفروع`,`Branches`) + `</b>` + tbl([arEn(`الفرع`,`Branch`),arEn(`طلبات`,`Orders`),arEn(`مسلّمة`,`Delivered`),arEn(`الإيراد`,`Gross`)], d.branches.map(function(x){ return [esc(ALANG===`ar`?x.branch_name:x.branch_name_en), x.orders, x.delivered, money(x.gross)]; })) : ``) +
+  ((d.top_items||[]).length ? `<b style="font-size:12px;color:#8E2A4A">🍝 ` + arEn(`الأكثر مبيعاً`,`Top items`) + `</b>` + tbl([arEn(`الصنف`,`Item`),arEn(`كمية`,`Qty`),arEn(`إيراد`,`Revenue`)], d.top_items.map(function(x){ return [esc(ALANG===`ar`?(x.name_ar||x.name_en):(x.name_en||x.name_ar)), x.qty, money(x.revenue)]; })) : ``) +
+  `<div style="margin-top:16px;border-top:1.5px solid #EADFD2;padding-top:8px;font-size:9px;color:#8A6F63;display:flex;justify-content:space-between">
+     <span>` + arEn(`الأسعار شاملة ضريبة القيمة المضافة 15%`,`Prices include 15% VAT`) + `</span>
+     <span>` + arEn(`نظام مكرونجي السحابي`,`Makaronjy Cloud System`) + `</span>
+   </div>
+  </body></html>`;
   const w = window.open(``, `_blank`);
   if(!w){ toast(arEn(`اسمح بالنوافذ المنبثقة للطباعة`,`Allow popups for printing`), `warn`); return; }
   w.document.write(html);
   w.document.close();
-  setTimeout(function(){ w.print(); }, 400);
+  setTimeout(function(){ w.print(); }, 500);
 }
+
+/* v9.5: تبديل اللغة يعيد بناء التقرير فوراً */
+(function hookLangRefresh(){
+  var btn = el(`adminLangBtn`);
+  if(!btn || btn._acctHook) return;
+  btn._acctHook = true;
+  btn.addEventListener(`click`, function(){
+    setTimeout(function(){
+      if(el(`crPreset`)){
+        var preset = el(`crPreset`).value;
+        var branch = el(`crBranch2`) ? el(`crBranch2`).value : ``;
+        buildReportsTab();
+        el(`crPreset`).value = preset;
+        if(el(`crBranch2`) && branch) el(`crBranch2`).value = branch;
+        syncRangeInputs();
+        if(LAST_ACCT) renderAcct(LAST_ACCT.data, el(`crBox`));
+      }
+    }, 80);
+  });
+})();
 
 /* =====================================================
    v9.2: ربط التبويبات بأحداث الفتح
@@ -2195,4 +2343,4 @@ return;
 applyAdminLang();
 })();
 window.__ADMIN_BOOTED = true;
-/* ===== END admin-tabs.js (v9.4) ===== */
+/* ===== END admin-tabs.js (v9.5) ===== */
