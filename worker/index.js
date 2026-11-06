@@ -1,15 +1,12 @@
 // ═══════════════════════════════════════════
 //  مكرونجي - Cloudflare Worker API (كامل)
-//  الإصدار: 1.8
-//  v1.8: إصلاح مسار التتبع:
-//        • رد /api/track يرسل إحداثيات العميل وعنوانه
-//          (كانت ناقصة ← كان المسار يُرسم للفرع بالخطأ)
-//        • موقع السائق = آخر إشارة GPS له مهما كان
-//          طلبه السابق (يدعم التسليم المتسلسل)
-//  يحتوي كل ميزات v1.7:
-//  • حذف كسول فوري للمهجور (ساعة) + دفتر محاسبي
-//  • GET صورة الإثبات + تقارير accounting
-//  • حوض الطلبات + claim + أرقام عشوائية بدون #
+//  الإصدار: 1.9
+//  v1.9: إصلاح محاسبي جوهري — الإيراد والرسوم والضريبة
+//        تُحتسب من المسلّم فقط (كانت تجمع الملغي والمهجور)
+//  يحتوي كل ميزات v1.8:
+//  • تتبع يرسل إحداثيات العميل + آخر إشارة للسائق
+//  • حذف كسول فوري + دفتر محاسبي + accounting
+//  • حوض + claim + صورة إثبات + GET صورة
 // ═══════════════════════════════════════════
 
 const CORS_HEADERS = {
@@ -399,9 +396,7 @@ async function handleCreateOrder(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  5) تتبع الطلب
-//  v1.8: يرسل إحداثيات العميل + عنوانه
-//        + موقع السائق = آخر إشارة له (أي طلب)
+//  5) تتبع الطلب (إحداثيات العميل + آخر إشارة سائق)
 // ═══════════════════════════════════════════
 async function handleTrackOrder(orderNumber, env) {
   const order = await env.DB.prepare(`
@@ -414,8 +409,6 @@ async function handleTrackOrder(orderNumber, env) {
   if (!order) return error('الطلب غير موجود', 404);
   const trackingResult = await env.DB.prepare(`SELECT status, notes, created_at FROM order_tracking WHERE order_id = ? ORDER BY created_at ASC`).bind(order.id).all();
   const isPickup = order.order_type === 'pickup';
-
-  // v1.8: آخر إشارة GPS للسائق مهما كان طلبه السابق
   let driverLocation = null;
   if (!isPickup && order.driver_id && order.status !== 'delivered' && order.status !== 'cancelled') {
     driverLocation = await env.DB.prepare(`
@@ -423,7 +416,6 @@ async function handleTrackOrder(orderNumber, env) {
       WHERE driver_id = ? ORDER BY created_at DESC LIMIT 1
     `).bind(order.driver_id).first();
   }
-
   return json({
     order: {
       number: order.order_number,
@@ -431,7 +423,6 @@ async function handleTrackOrder(orderNumber, env) {
       status_text: statusTextFor(order),
       order_type: order.order_type || 'delivery',
       customer_name: order.customer_name,
-      // v1.8: وجهة العميل كاملة (كانت ناقصة!)
       customer_address: order.customer_address || '',
       customer_lat: order.customer_lat,
       customer_lng: order.customer_lng,
@@ -456,7 +447,7 @@ async function handleTrackOrder(orderNumber, env) {
 }
 
 // ═══════════════════════════════════════════
-//  6) طلبات المشرف (+ purge فوري)
+//  6) طلبات المشرف (+ purge)
 // ═══════════════════════════════════════════
 async function handleSupervisorOrders(request, env) {
   const auth = await requireAuth(request, env, ['supervisor', 'super_admin']);
@@ -880,6 +871,7 @@ async function handleReportsSummary(request, env) {
 
 // ═══════════════════════════════════════════
 //  19) التقرير المحاسبي
+//  v1.9: الإيراد والرسوم والضريبة = المسلّم فقط
 // ═══════════════════════════════════════════
 async function handleReportsAccounting(request, env) {
   const auth = await requireAuth(request, env, ['super_admin', 'supervisor']);
@@ -900,37 +892,52 @@ async function handleReportsAccounting(request, env) {
     GROUP BY ym, kind, order_type, branch_id, driver_id
     ORDER BY ym
   `).bind(from, to, branchId, branchId).all();
+
   const totals = { orders: 0, delivered: 0, cancelled: 0, abandoned: 0, gross: 0, fees: 0, pickup_gross: 0, delivery_gross: 0 };
   const monthsMap = {};
   const branchesMap = {};
   const driversMap = {};
+
   for (const r of rows.results) {
+    const g = r.gross || 0;
+    const f = r.fees || 0;
     const m = monthsMap[r.ym] || (monthsMap[r.ym] = { ym: r.ym, orders: 0, delivered: 0, cancelled: 0, abandoned: 0, gross: 0, fees: 0 });
+
+    /* العدادات: كل الأنواع */
     m.orders += r.n; totals.orders += r.n;
-    m.gross += r.gross || 0; totals.gross += r.gross || 0;
-    m.fees += r.fees || 0; totals.fees += r.fees || 0;
+    if (r.kind === 'cancelled')  { m.cancelled  += r.n; totals.cancelled  += r.n; }
+    if (r.kind === 'abandoned')  { m.abandoned  += r.n; totals.abandoned  += r.n; }
+
+    /* v1.9: المال يدخل من المسلّم فقط */
     if (r.kind === 'delivered') {
       m.delivered += r.n; totals.delivered += r.n;
-      if (r.order_type === 'pickup') totals.pickup_gross += r.gross || 0;
-      else totals.delivery_gross += r.gross || 0;
+      m.gross += g;       totals.gross += g;
+      m.fees  += f;       totals.fees  += f;
+      if (r.order_type === 'pickup') totals.pickup_gross += g;
+      else                           totals.delivery_gross += g;
+      if (r.driver_id) {
+        const d = driversMap[r.driver_id] || (driversMap[r.driver_id] = { driver_id: r.driver_id, deliveries: 0, earnings: 0 });
+        d.deliveries += r.n;
+        d.earnings += f;
+      }
     }
-    if (r.kind === 'cancelled') { m.cancelled += r.n; totals.cancelled += r.n; }
-    if (r.kind === 'abandoned') { m.abandoned += r.n; totals.abandoned += r.n; }
+
+    /* الفروع: عدد الطلبات لكل الأنواع، والإيراد للمسلّم فقط */
     if (r.branch_id) {
       const b = branchesMap[r.branch_id] || (branchesMap[r.branch_id] = { branch_id: r.branch_id, orders: 0, delivered: 0, gross: 0 });
-      b.orders += r.n; b.gross += r.gross || 0;
-      if (r.kind === 'delivered') b.delivered += r.n;
-    }
-    if (r.kind === 'delivered' && r.driver_id) {
-      const d = driversMap[r.driver_id] || (driversMap[r.driver_id] = { driver_id: r.driver_id, deliveries: 0, earnings: 0 });
-      d.deliveries += r.n; d.earnings += r.fees || 0;
+      b.orders += r.n;
+      if (r.kind === 'delivered') { b.delivered += r.n; b.gross += g; }
     }
   }
+
   const months = Object.values(monthsMap).sort((a, b) => a.ym.localeCompare(b.ym));
   totals.gross = Math.round(totals.gross * 100) / 100;
   totals.fees = Math.round(totals.fees * 100) / 100;
+  totals.pickup_gross = Math.round(totals.pickup_gross * 100) / 100;
+  totals.delivery_gross = Math.round(totals.delivery_gross * 100) / 100;
   totals.avg = totals.delivered ? Math.round(totals.gross / totals.delivered) : 0;
   totals.cancel_rate = totals.orders ? Math.round(((totals.cancelled + totals.abandoned) / totals.orders) * 100) : 0;
+
   const branches = [];
   if (Object.keys(branchesMap).length) {
     const brs = await env.DB.prepare('SELECT id, name_ar, name_en FROM branches').all();
@@ -938,7 +945,7 @@ async function handleReportsAccounting(request, env) {
     brs.results.forEach(b => { nameById[b.id] = b; });
     for (const id in branchesMap) {
       const b = branchesMap[id];
-      branches.push({ ...b, branch_name: nameById[id]?.name_ar || id, branch_name_en: nameById[id]?.name_en || id });
+      branches.push({ ...b, gross: Math.round(b.gross * 100) / 100, branch_name: nameById[id]?.name_ar || id, branch_name_en: nameById[id]?.name_en || id });
     }
     branches.sort((a, b) => b.gross - a.gross);
   }
@@ -949,10 +956,11 @@ async function handleReportsAccounting(request, env) {
     usrs.results.forEach(u => { nameById[u.id] = u.name; });
     for (const id in driversMap) {
       const d = driversMap[id];
-      drivers.push({ ...d, driver_name: nameById[id] || ('#' + id) });
+      drivers.push({ ...d, earnings: Math.round(d.earnings * 100) / 100, driver_name: nameById[id] || ('#' + id) });
     }
     drivers.sort((a, b) => b.deliveries - a.deliveries);
   }
+
   let topItems = [];
   try {
     const ti = await env.DB.prepare(`
@@ -967,6 +975,7 @@ async function handleReportsAccounting(request, env) {
     `).bind(from, to, branchId, branchId).all();
     topItems = ti.results;
   } catch (e) { topItems = []; }
+
   return json({ from, to, totals, months, branches, drivers, top_items: topItems });
 }
 
@@ -979,7 +988,7 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
     try {
-      if (path === '/api/health' && request.method === 'GET') return json({ status: 'ok', version: '1.8', live_mode: env.LIVE_MODE || 'polling' });
+      if (path === '/api/health' && request.method === 'GET') return json({ status: 'ok', version: '1.9', live_mode: env.LIVE_MODE || 'polling' });
       if (path === '/api/auth/login' && request.method === 'POST') return await handleLogin(request, env);
       if (path === '/api/auth/admin-bridge' && request.method === 'POST') return await handleAdminBridge(request, env);
       if (path === '/api/auth/change-password' && request.method === 'POST') return await handleChangePassword(request, env);
@@ -1069,7 +1078,6 @@ export default {
           await env.BACKUPS.delete(sorted.slice(0, list.objects.length - 30).map(o => o.key));
         }
       } else {
-        // أي cron آخر (كل 10 دقائق): حذف كسول فوري
         await purgeStaleOrders(env);
       }
     } catch (e) { console.error('Cron error:', e); }
@@ -1077,5 +1085,5 @@ export default {
 };
 
 // ═══════════════════════════════════════════
-//  نهاية worker/index.js (v1.8)
+//  نهاية worker/index.js (v1.9)
 // ═══════════════════════════════════════════
