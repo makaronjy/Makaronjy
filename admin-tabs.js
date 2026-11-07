@@ -1,6 +1,6 @@
-/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v9.8) ===== */
-/* v9.8: هيدر Excel منسق (عنابي/كريمي/ارتفاعات/توسيط) بلا مرجع التقرير
-         + PDF بلا مرجع + اسم ملف بالتواريخ */
+/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v9.9) ===== */
+/* v9.9: إصلاح صيغة OOXML (customHeight + alignment) ← Excel يفتح سليماً
+         + حذف مرجع التقرير نهائياً من Excel وPDF واسم الملف */
 function nmOf(x){
 return (ALANG===`ar`) ? x.ar : (x.en || x.ar);
 }
@@ -2031,7 +2031,7 @@ html += `<div style="text-align:center;color:var(--muted);font-size:.68rem;font-
 L(`acctPeriodLbl`) + `: ` + d.from + ` → ` + d.to + ` • ` + L(`acctNote`) + `</div>`;
 box.innerHTML = html;
 }
-/* ===== v9.8: منشئ Excel احترافي (.xlsx) — هيدر منسق بلا مرجع ===== */
+/* ===== v9.9: منشئ Excel (.xlsx) بصيغة OOXML سليمة 100% ===== */
 let CRC_TABLE = null;
 function crc32(bytes){
 if(!CRC_TABLE){
@@ -2146,11 +2146,12 @@ return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
 `<xf numFmtId="0" fontId="0" fillId="6" borderId="1" xfId="0" applyFill="1" applyBorder="1"/>` +
 `<xf numFmtId="164" fontId="0" fillId="6" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1" applyBorder="1"/>` +
 `<xf numFmtId="165" fontId="0" fillId="6" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1" applyBorder="1"/>` +
-`<xf numFmtId="0" fontId="7" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/></xf>` +
-`<xf numFmtId="0" fontId="8" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/></xf>` +
+`<xf numFmtId="0" fontId="7" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>` +
+`<xf numFmtId="0" fontId="8" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>` +
 `</cellXfs>` +
 `</styleSheet>`;
 }
+/* v9.9: customHeight بصيغة OOXML الصحيحة (بدون ss:) */
 function xlsxSheet(rows, opts){
 opts = opts || {};
 let xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
@@ -2163,7 +2164,7 @@ return `<col min="` + w.i + `" max="` + w.i + `" width="` + w.w + `" customWidth
 }).join(``) + `</cols>` : ``) +
 `<sheetData>` +
 rows.map(function(r, ri){
-const ht = r.ht ? ` ht="` + r.ht + `" ss:CustomHeight="1"` : ``;
+const ht = r.ht ? ` ht="` + r.ht + `" customHeight="1"` : ``;
 return `<row r="` + (ri+1) + `"` + ht + `>` + r.map(function(c, ci){
 const ref = colName(ci) + (ri+1);
 const st = (c.s === undefined) ? 0 : c.s;
@@ -2182,6 +2183,7 @@ return xml;
 }
 function exportExcel(){
 if(!LAST_ACCT){ toast(L(`acctShowFirst`), `warn`); return; }
+try{
 const d = LAST_ACCT.data, t = d.totals || {};
 const gross = money(t.gross), net = money(gross/1.15), vat = money(gross-net);
 const months = d.months || [], drivers = d.drivers || [],
@@ -2206,6 +2208,7 @@ const pairs = [
 [L(`acctPickupRev`), money(t.pickup_gross), 'n'],
 [L(`acctDeliveryRev`), money(t.delivery_gross), 'n']
 ];
+/* v9.9: هيدر 4 صفوف منسق — بدون مرجع التقرير */
 const sumRows = [
 Object.assign([T(brandNameNow() + ` — ` + L(`acctDocTitle`), S.banT)], {ht:32}),
 Object.assign([T(L(`acctPeriodLbl`) + `: ` + LAST_ACCT.from + `  →  ` + LAST_ACCT.to, S.banS)], {ht:20}),
@@ -2316,8 +2319,12 @@ a.download = `Makaronjy-` + LAST_ACCT.from + `_` + LAST_ACCT.to + `.xlsx`;
 a.click();
 URL.revokeObjectURL(a.href);
 toast(L(`acctXlsDone`), `success`);
+}catch(err){
+console.error('xlsx error:', err);
+toast(`⚠️ ` + (err.message || err), `error`);
 }
-/* ===== v9.8: PDF بلا شعار وبلا مرجع ===== */
+}
+/* ===== v9.9: PDF بلا شعار وبلا مرجع نهائياً ===== */
 function printAcct(){
 if(!LAST_ACCT){ toast(L(`acctShowFirst`), `warn`); return; }
 const d = LAST_ACCT.data, t = d.totals||{};
@@ -2492,4 +2499,4 @@ return;
 applyAdminLang();
 })();
 window.__ADMIN_BOOTED = true;
-/* ===== END admin-tabs.js (v9.8) ===== */
+/* ===== END admin-tabs.js (v9.9) ===== */
