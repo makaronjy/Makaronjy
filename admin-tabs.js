@@ -1,5 +1,6 @@
-/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v9.7) ===== */
-/* v9.7: Excel احترافي (دمج/تجميد/فلاتر/Zebra/DataBars) بلا شعار + PDF بلا شعار */
+/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v9.8) ===== */
+/* v9.8: هيدر Excel منسق (عنابي/كريمي/ارتفاعات/توسيط) بلا مرجع التقرير
+         + PDF بلا مرجع + اسم ملف بالتواريخ */
 function nmOf(x){
 return (ALANG===`ar`) ? x.ar : (x.en || x.ar);
 }
@@ -1886,10 +1887,6 @@ var b = STATE && STATE.SETTINGS && STATE.SETTINGS.brand;
 if(!b) return `Makaronjy`;
 return (ALANG===`ar`) ? (b.nameAr||b.nameEn) : (b.nameEn||b.nameAr);
 }
-function acctRef(){
-if(!LAST_ACCT) return ``;
-return `MK-` + LAST_ACCT.from.replace(/-/g,``) + `-` + LAST_ACCT.to.replace(/-/g,``);
-}
 function computeRange(){
 const preset = el(`crPreset`).value;
 const now = new Date();
@@ -2034,7 +2031,7 @@ html += `<div style="text-align:center;color:var(--muted);font-size:.68rem;font-
 L(`acctPeriodLbl`) + `: ` + d.from + ` → ` + d.to + ` • ` + L(`acctNote`) + `</div>`;
 box.innerHTML = html;
 }
-/* ===== v9.7: منشئ Excel احترافي (.xlsx) ===== */
+/* ===== v9.8: منشئ Excel احترافي (.xlsx) — هيدر منسق بلا مرجع ===== */
 let CRC_TABLE = null;
 function crc32(bytes){
 if(!CRC_TABLE){
@@ -2102,7 +2099,7 @@ let s = ``; i++;
 while(i>0){ const m=(i-1)%26; s=String.fromCharCode(65+m)+s; i=Math.floor((i-1)/26); }
 return s;
 }
-const XS = { def:0, title:1, sub:2, sec:3, hdr:4, goldN:5, goldS:6, cell:7, num:8, int:9, zeb:10, zebNum:11, zebInt:12 };
+const XS = { def:0, title:1, sub:2, sec:3, hdr:4, goldN:5, goldS:6, cell:7, num:8, int:9, zeb:10, zebNum:11, zebInt:12, banT:13, banS:14 };
 function xlsxStyles(){
 return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
 `<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
@@ -2110,7 +2107,7 @@ return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
 `<numFmt numFmtId="164" formatCode="#,##0.00"/>` +
 `<numFmt numFmtId="165" formatCode="#,##0"/>` +
 `</numFmts>` +
-`<fonts count="7">` +
+`<fonts count="9">` +
 `<font><sz val="11"/><name val="Calibri"/></font>` +
 `<font><b/><sz val="16"/><color rgb="FF5A1830"/><name val="Calibri"/></font>` +
 `<font><sz val="10"/><color rgb="FF8A6F63"/><name val="Calibri"/></font>` +
@@ -2118,6 +2115,8 @@ return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
 `<font><b/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>` +
 `<font><b/><color rgb="FFE0912F"/><name val="Calibri"/></font>` +
 `<font><b/><color rgb="FF5A1830"/><name val="Calibri"/></font>` +
+`<font><b/><sz val="16"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>` +
+`<font><b/><sz val="10"/><color rgb="FF5A1830"/><name val="Calibri"/></font>` +
 `</fonts>` +
 `<fills count="7">` +
 `<fill><patternFill patternType="none"/></fill>` +
@@ -2133,7 +2132,7 @@ return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
 `<border><left style="thin"><color rgb="FFD9C9BC"/></left><right style="thin"><color rgb="FFD9C9BC"/></right><top style="thin"><color rgb="FFD9C9BC"/></top><bottom style="thin"><color rgb="FFD9C9BC"/></bottom><diagonal/></border>` +
 `</borders>` +
 `<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>` +
-`<cellXfs count="13">` +
+`<cellXfs count="15">` +
 `<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>` +
 `<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>` +
 `<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>` +
@@ -2147,6 +2146,8 @@ return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
 `<xf numFmtId="0" fontId="0" fillId="6" borderId="1" xfId="0" applyFill="1" applyBorder="1"/>` +
 `<xf numFmtId="164" fontId="0" fillId="6" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1" applyBorder="1"/>` +
 `<xf numFmtId="165" fontId="0" fillId="6" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1" applyBorder="1"/>` +
+`<xf numFmtId="0" fontId="7" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/></xf>` +
+`<xf numFmtId="0" fontId="8" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><Alignment ss:Horizontal="Center" ss:Vertical="Center"/></xf>` +
 `</cellXfs>` +
 `</styleSheet>`;
 }
@@ -2162,7 +2163,8 @@ return `<col min="` + w.i + `" max="` + w.i + `" width="` + w.w + `" customWidth
 }).join(``) + `</cols>` : ``) +
 `<sheetData>` +
 rows.map(function(r, ri){
-return `<row r="` + (ri+1) + `">` + r.map(function(c, ci){
+const ht = r.ht ? ` ht="` + r.ht + `" ss:CustomHeight="1"` : ``;
+return `<row r="` + (ri+1) + `"` + ht + `>` + r.map(function(c, ci){
 const ref = colName(ci) + (ri+1);
 const st = (c.s === undefined) ? 0 : c.s;
 if(c.n === true) return `<c r="` + ref + `" s="` + st + `"><v>` + c.v + `</v></c>`;
@@ -2205,10 +2207,10 @@ const pairs = [
 [L(`acctDeliveryRev`), money(t.delivery_gross), 'n']
 ];
 const sumRows = [
-[T(brandNameNow() + ` — ` + L(`acctDocTitle`), S.title)],
-[T(L(`acctPeriodLbl`) + `: ` + LAST_ACCT.from + ` → ` + LAST_ACCT.to, S.sub)],
-[T(L(`acctRef`) + `: ` + acctRef() + `   |   ` + L(`acctIssued`) + `: ` + new Date().toLocaleString(), S.sub)],
-[T(L(`acctScope`) + `: ` + scope, S.sub)],
+Object.assign([T(brandNameNow() + ` — ` + L(`acctDocTitle`), S.banT)], {ht:32}),
+Object.assign([T(L(`acctPeriodLbl`) + `: ` + LAST_ACCT.from + `  →  ` + LAST_ACCT.to, S.banS)], {ht:20}),
+Object.assign([T(L(`acctIssued`) + `: ` + new Date().toLocaleString(), S.banS)], {ht:20}),
+Object.assign([T(L(`acctScope`) + `: ` + scope, S.banS)], {ht:20}),
 [],
 [T(L(`acctSecSummary`).replace(/^[0-9]+\)\s*/,``), S.sec)],
 [T(ALANG===`ar`?`المؤشر`:`Metric`, S.hdr), T(ALANG===`ar`?`القيمة`:`Value`, S.hdr)]
@@ -2310,12 +2312,12 @@ files.push({ name:`xl/worksheets/sheet` + (i+1) + `.xml`, data: enc.encode(x) })
 const blob = zipBuild(files);
 const a = document.createElement(`a`);
 a.href = URL.createObjectURL(blob);
-a.download = `Makaronjy-` + acctRef() + `.xlsx`;
+a.download = `Makaronjy-` + LAST_ACCT.from + `_` + LAST_ACCT.to + `.xlsx`;
 a.click();
 URL.revokeObjectURL(a.href);
 toast(L(`acctXlsDone`), `success`);
 }
-/* ===== v9.7: PDF بلا شعار ===== */
+/* ===== v9.8: PDF بلا شعار وبلا مرجع ===== */
 function printAcct(){
 if(!LAST_ACCT){ toast(L(`acctShowFirst`), `warn`); return; }
 const d = LAST_ACCT.data, t = d.totals||{};
@@ -2354,7 +2356,6 @@ body{font-family:Cairo,'Segoe UI',Tahoma,sans-serif;color:#2B1A15;margin:0;paddi
 <div style="font-size:11px;color:#F2B95F;font-weight:800">` + L(`acctDocTitle`) + `</div>
 </div>
 <div style="text-align:left;font-size:9px;line-height:1.8;color:#F5E9DC">
-<b style="color:#F2B95F">` + L(`acctRef`) + `:</b> ` + acctRef() + `<br>
 <b style="color:#F2B95F">` + L(`acctPeriodLbl`) + `:</b> ` + LAST_ACCT.from + ` → ` + LAST_ACCT.to + `<br>
 <b style="color:#F2B95F">` + L(`acctScope`) + `:</b> ` + escXml(scope) + `<br>
 <b style="color:#F2B95F">` + L(`acctIssued`) + `:</b> ` + new Date().toLocaleString() + `
@@ -2385,7 +2386,7 @@ tbl([L(`acctVatBoxTotal`), L(`acctVatBoxVat`), L(`acctVatBoxNet`)],
 : ``) +
 `<div style="margin-top:14px;border-top:1.5px solid #EADFD2;padding-top:8px;font-size:8.5px;color:#8A6F63;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
 <span>` + L(`acctPreparedBy`) + ` • ` + L(`acctNote`) + `</span>
-<span>` + L(`acctSystem`) + ` • ` + acctRef() + `</span>
+<span>` + L(`acctSystem`) + `</span>
 </div>
 </body></html>`;
 const w = window.open(``, `_blank`);
@@ -2491,4 +2492,4 @@ return;
 applyAdminLang();
 })();
 window.__ADMIN_BOOTED = true;
-/* ===== END admin-tabs.js (v9.7) ===== */
+/* ===== END admin-tabs.js (v9.8) ===== */
