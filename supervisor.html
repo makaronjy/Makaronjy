@@ -306,7 +306,10 @@ body{
 
 <script>
 /* ═══════════════════════════════════════════
-   مكرونجي — لوحة مشرف الفرع (v2.5)
+   مكرونجي — لوحة مشرف الفرع (v3.0)
+   v3.0: رسائل الواتساب بلغة الطلب (ttLang)
+         + حذف "عزيزنا" من الرسائل
+         + ذاكرة لغة معزولة (mk_lang_sup)
    الثوابت الصحيحة:
    • REFRESH_MS = 10000  ← بيانات كل 10 ثوانٍ (توفير حصة Worker)
    • TIME_REFRESH_MS = 5000 ← وقت نسبي كل 5 ثوانٍ (محلي مجاني)
@@ -543,8 +546,14 @@ function waOpen(phone, msg) {
   const w = window.open(url, '_blank');
   if (!w) location.href = url;
 }
+
+/* ═══════════════════════════════════════════
+   v3.0: رسالة واتساب بلغة الطلب (ttLang)
+   محايدة للجنسين (بدون "عزيزنا")
+   ═══════════════════════════════════════════ */
 function waConfirm(o) {
-  const msg = tt('messages.supConfirm', {
+  const orderLang = o.lang || 'ar';
+  const msg = ttLang(orderLang, 'messages.supConfirm', {
     customer_name: o.customer_name,
     supervisor_name: USER.name || '—',
     branch_name: USER.branchName || o.branch_name || '—',
@@ -941,4 +950,4 @@ document.addEventListener('visibilitychange', () => {
 
 </body>
 </html>
-<!-- ===== END supervisor.html (v2.5) ===== -->
+<!-- ===== END supervisor.html (v3.0) ===== -->
