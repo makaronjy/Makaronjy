@@ -174,7 +174,10 @@ h3.sec .cnt{background:var(--maroon);color:var(--gold);border-radius:50px;paddin
 
 <script>
 /* ═══════════════════════════════════════════
-   مكرونجي — بوابة السائق (v2.5.1)
+   مكرونجي — بوابة السائق (v3.0)
+   v3.0: رسائل الواتساب بلغة الطلب (ttLang)
+         + حذف "عزيزنا" من الرسائل
+         + ذاكرة لغة معزولة (mk_lang_driver)
    الثوابت الصحيحة:
    • REFRESH_MS = 10000  ← بيانات كل 10 ثوانٍ (توفير حصة Worker)
    • TIME_REFRESH_MS = 5000 ← وقت نسبي كل 5 ثوانٍ (محلي مجاني)
@@ -414,9 +417,13 @@ function distKm(la1, lo1, la2, lo2){
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
-/* رسائل السائق المعتمدة */
+/* ═══════════════════════════════════════════
+   v3.0: رسائل الواتساب بلغة الطلب (ttLang)
+   رسائل محايدة للجنسين (بدون "عزيزنا")
+   ═══════════════════════════════════════════ */
 function waOnWay(o){
-  waOpen(o.customer_phone, tt('messages.drvOnWay', {
+  const orderLang = o.lang || 'ar';
+  waOpen(o.customer_phone, ttLang(orderLang, 'messages.drvOnWay', {
     customer_name: o.customer_name,
     driver_name: (ME && ME.name) || '—',
     order_number: o.number,
@@ -425,13 +432,15 @@ function waOnWay(o){
   }));
 }
 function waThanks(o){
-  waOpen(o.customer_phone, tt('messages.drvThanks', {
+  const orderLang = o.lang || 'ar';
+  waOpen(o.customer_phone, ttLang(orderLang, 'messages.drvThanks', {
     customer_name: o.customer_name,
     order_number: o.number
   }));
 }
 function waNoGps(o){
-  waOpen(o.customer_phone, tt('messages.drvNoGps', {
+  const orderLang = o.lang || 'ar';
+  waOpen(o.customer_phone, ttLang(orderLang, 'messages.drvNoGps', {
     customer_name: o.customer_name,
     order_number: o.number
   }));
@@ -770,4 +779,4 @@ syncLangUI();
 </script>
 </body>
 </html>
-<!-- ===== END driver.html (v2.5.1) ===== -->
+<!-- ===== END driver.html (v3.0) ===== -->
