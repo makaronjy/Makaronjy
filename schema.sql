@@ -1,13 +1,13 @@
 -- ═══════════════════════════════════════════
---  مكرونجي — نظام طلبات المطعم السحابي
+--  مكرونجي — نظام الطلبات السحابي
 --  قاعدة البيانات (Cloudflare D1)
---  الإصدار: 2.0
---  تاريخ التحديث: نوفمبر 2026
---  متوافق مع: Worker v1.6 + جميع واجهات v17.7
+--  الإصدار: 2.1
+--  v2.1: عمود lang في orders (لغة العميل عند الطلب)
+--        ← مرجع ثابت لترجمة الرسائل طوال دورة الطلب
 -- ═══════════════════════════════════════════
 
 -- ───────────────────────────────────────────
---  1) جدول الفروع (مطاعم/منافذ بيع)
+--  1) جدول الفروع
 -- ───────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS branches (
   id TEXT PRIMARY KEY,
@@ -50,8 +50,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 -- ───────────────────────────────────────────
 --  3) جدول الطلبات
---  v1.6: إضافة order_type لتفريق الاستلام عن التوصيل
---  أرقام عشوائية بصيغة 58392K (5 أرقام + حرف)
+--  v2.1: lang = لغة العميل لحظة إنشاء الطلب ('ar' أو 'en')
 -- ───────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS orders (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,6 +58,8 @@ CREATE TABLE IF NOT EXISTS orders (
   branch_id TEXT NOT NULL,
   order_type TEXT NOT NULL DEFAULT 'delivery'
     CHECK(order_type IN ('delivery', 'pickup')),
+  lang TEXT NOT NULL DEFAULT 'ar'
+    CHECK(lang IN ('ar', 'en')),
   customer_name TEXT NOT NULL,
   customer_phone TEXT NOT NULL,
   customer_address TEXT,
@@ -111,7 +112,7 @@ CREATE TABLE IF NOT EXISTS order_tracking (
 );
 
 -- ───────────────────────────────────────────
---  5) جدول مواقع السائقين (محدّث كل 30 ثانية)
+--  5) جدول مواقع السائقين
 -- ───────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS driver_locations (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -127,8 +128,7 @@ CREATE TABLE IF NOT EXISTS driver_locations (
 );
 
 -- ───────────────────────────────────────────
---  6) جدول الأرقام المستخدمة (لمنع التكرار)
---     الحجز لمدة سنة كاملة قبل إعادة الاستخدام
+--  6) جدول الأرقام المستخدمة (منع التكرار)
 -- ───────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS used_order_numbers (
   order_number TEXT PRIMARY KEY,
@@ -139,7 +139,7 @@ CREATE TABLE IF NOT EXISTS used_order_numbers (
 );
 
 -- ───────────────────────────────────────────
---  7) جدول جلسات الدخول (JWT + session tokens)
+--  7) جدول جلسات الدخول
 -- ───────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS sessions (
   token TEXT PRIMARY KEY,
@@ -151,28 +151,14 @@ CREATE TABLE IF NOT EXISTS sessions (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- ═══════════════════════════════════════════
---  8) الدفتر المحاسبي الدائم (جديد في v1.6)
---  ─────────────────────────────────────────
---  يحفظ أثراً محاسبياً دائماً لكل طلب حتى
---  بعد حذفه من جدول orders.
---
---  kind:
---    'delivered'  → طلب مسلّم (إيراد فعلي)
---    'cancelled'  → طلب ملغى (لا إيرادات)
---    'abandoned'  → طلب مهجور (حذف تلقائي بعد ساعة)
---
---  يُستعمل في:
---    • التقارير المحاسبية (accounting)
---    • إحصائيات الإلغاء
---    • تحليل الأداء السنوي
--- ═══════════════════════════════════════════
+-- ───────────────────────────────────────────
+--  8) الدفتر المحاسبي الدائم
+-- ───────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS order_ledger (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   order_number TEXT NOT NULL,
   branch_id TEXT,
-  order_type TEXT NOT NULL DEFAULT 'delivery'
-    CHECK(order_type IN ('delivery', 'pickup')),
+  order_type TEXT NOT NULL DEFAULT 'delivery',
   kind TEXT NOT NULL
     CHECK(kind IN ('delivered', 'cancelled', 'abandoned')),
   gross REAL NOT NULL DEFAULT 0,
@@ -181,58 +167,34 @@ CREATE TABLE IF NOT EXISTS order_ledger (
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   closed_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
-
--- فهرس فريد يمنع تسجيل نفس الطلب بنفس الحالة مرتين
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ledger_unique
   ON order_ledger(order_number, kind);
 
 -- ───────────────────────────────────────────
 --  فهرسة للسرعة
 -- ───────────────────────────────────────────
-CREATE INDEX IF NOT EXISTS idx_orders_branch
-  ON orders(branch_id);
-CREATE INDEX IF NOT EXISTS idx_orders_status
-  ON orders(status);
-CREATE INDEX IF NOT EXISTS idx_orders_driver
-  ON orders(driver_id);
-CREATE INDEX IF NOT EXISTS idx_orders_number
-  ON orders(order_number);
-CREATE INDEX IF NOT EXISTS idx_orders_created
-  ON orders(created_at);
-CREATE INDEX IF NOT EXISTS idx_orders_delivered
-  ON orders(delivered_at);
-CREATE INDEX IF NOT EXISTS idx_orders_type
-  ON orders(order_type);
-CREATE INDEX IF NOT EXISTS idx_tracking_order
-  ON order_tracking(order_id);
-CREATE INDEX IF NOT EXISTS idx_locations_order
-  ON driver_locations(order_id);
-CREATE INDEX IF NOT EXISTS idx_locations_driver
-  ON driver_locations(driver_id);
-CREATE INDEX IF NOT EXISTS idx_locations_created
-  ON driver_locations(created_at);
-CREATE INDEX IF NOT EXISTS idx_sessions_user
-  ON sessions(user_id);
-CREATE INDEX IF NOT EXISTS idx_sessions_expires
-  ON sessions(expires_at);
-CREATE INDEX IF NOT EXISTS idx_users_branch
-  ON users(branch_id);
-CREATE INDEX IF NOT EXISTS idx_users_role
-  ON users(role);
-CREATE INDEX IF NOT EXISTS idx_used_numbers_expires
-  ON used_order_numbers(expires_at);
-
--- فهارس الدفتر المحاسبي
-CREATE INDEX IF NOT EXISTS idx_ledger_closed
-  ON order_ledger(closed_at);
-CREATE INDEX IF NOT EXISTS idx_ledger_branch
-  ON order_ledger(branch_id);
-CREATE INDEX IF NOT EXISTS idx_ledger_kind
-  ON order_ledger(kind);
-CREATE INDEX IF NOT EXISTS idx_ledger_driver
-  ON order_ledger(driver_id);
-CREATE INDEX IF NOT EXISTS idx_ledger_type
-  ON order_ledger(order_type);
+CREATE INDEX IF NOT EXISTS idx_orders_branch ON orders(branch_id);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_orders_driver ON orders(driver_id);
+CREATE INDEX IF NOT EXISTS idx_orders_number ON orders(order_number);
+CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at);
+CREATE INDEX IF NOT EXISTS idx_orders_delivered ON orders(delivered_at);
+CREATE INDEX IF NOT EXISTS idx_orders_type ON orders(order_type);
+CREATE INDEX IF NOT EXISTS idx_orders_lang ON orders(lang);
+CREATE INDEX IF NOT EXISTS idx_tracking_order ON order_tracking(order_id);
+CREATE INDEX IF NOT EXISTS idx_locations_order ON driver_locations(order_id);
+CREATE INDEX IF NOT EXISTS idx_locations_driver ON driver_locations(driver_id);
+CREATE INDEX IF NOT EXISTS idx_locations_created ON driver_locations(created_at);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_users_branch ON users(branch_id);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_used_numbers_expires ON used_order_numbers(expires_at);
+CREATE INDEX IF NOT EXISTS idx_ledger_closed ON order_ledger(closed_at);
+CREATE INDEX IF NOT EXISTS idx_ledger_branch ON order_ledger(branch_id);
+CREATE INDEX IF NOT EXISTS idx_ledger_kind ON order_ledger(kind);
+CREATE INDEX IF NOT EXISTS idx_ledger_driver ON order_ledger(driver_id);
+CREATE INDEX IF NOT EXISTS idx_ledger_type ON order_ledger(order_type);
 
 -- ═══════════════════════════════════════════
 --  بيانات أولية: الفروع الخمسة
@@ -245,25 +207,21 @@ VALUES
    'Al Cheikh Abd Al Aziz, Dhahrat Al Badi''ah, Riyadh 11461',
    '966561296463', 24.591045, 46.647204,
    'https://maps.app.goo.gl/qwS3kpF2JUeHBCrH6', 10),
-
   ('b-malqa', 2, 'فرع الملقا', 'Al Malqa Branch',
    'الأماسي، الملقا، الرياض 13525',
    'Al Amasi, Al Malqa, Riyadh 13525',
    '966568183145', 24.801454, 46.597488,
    'https://maps.app.goo.gl/VjqWsGHn3xZgWoGu9', 10),
-
   ('b-yasmeen', 3, 'فرع الياسمين', 'Al Yasmeen Branch',
    'القادسية، الياسمين، الرياض 13322',
    'Al Qadisiyah, Al Yasmeen, Riyadh 13322',
    '966561203593', 24.817399, 46.656308,
    'https://maps.app.goo.gl/59Rpm3zbqfFzstev8', 10),
-
   ('b-suwaidi', 4, 'فرع السويدي الغربي', 'Al Suwaidi Al Gharabi Branch',
    'الفجر، السويدي الغربي، الرياض 12992',
    'Al Fajar St, As Suwaidi Al Gharabi, Riyadh 12992',
    '966544030086', 24.572362, 46.621672,
    'https://maps.app.goo.gl/tCieuNxohr4kyVrK7', 10),
-
   ('b-rawabi', 5, 'فرع الروابي', 'Al-Rawabi Branch',
    'الزبير بن العوام , الروابي , الرياض 11461',
    'Al-Zubayr bin Al-Awwam, Al-Rawabi, Riyadh 11461',
@@ -271,10 +229,8 @@ VALUES
    'https://maps.app.goo.gl/AxGgzM4JUFSfciyu7', 10);
 
 -- ═══════════════════════════════════════════
---  بيانات أولية: حساب المالك (Super Admin)
---  اسم المستخدم: owner
---  كلمة المرور الافتراضية: admin123
---  ⚠️ يجب تغييرها عند أول دخول
+--  بيانات أولية: حساب المالك
+--  كلمة المرور الافتراضية: admin123 (تُغيَّر أول دخول)
 -- ═══════════════════════════════════════════
 INSERT OR IGNORE INTO users
   (name, phone, username, password_hash, password_salt, role, must_change_password)
@@ -289,5 +245,5 @@ VALUES (
 );
 
 -- ═══════════════════════════════════════════
---  نهاية schema.sql (v2.0)
+--  نهاية schema.sql (v2.1)
 -- ═══════════════════════════════════════════
