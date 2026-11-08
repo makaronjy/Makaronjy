@@ -1,9 +1,11 @@
 /* ═══════════════════════════════════════════
    مكرونجي — نظام الترجمة المركزي للصفحات الإدارية
-   i18n-staff.js  v1.0
-   
+   i18n-staff.js  v2.1
    يُستخدم في: login / supervisor / driver / track / admin
    (تطبيق العميل index.html يحتفظ بقاموسه الخاص في app.js)
+   v2.1: قاموس v1.0 كامل بدون أي حذف +
+         عزل ذاكرة اللغة لكل صفحة + ttLang() بلغة الطلب +
+         حذف "عزيزنا" (رسائل محايدة للجنسين)
    ═══════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════
@@ -218,7 +220,8 @@ window.STAFF_I18N = {
         amountToCollect: 'استلم عند التسليم',
         deliveryFee: 'أجرة',
         noGpsWarning: '⚠️ بدون موقع GPS — تواصل مع العميل',
-        branchName: 'فرع'
+        branchName: 'فرع',
+        orderLangTag: 'لغة الطلب'
       },
       empty: {
         noActive: 'لا يوجد توصيل نشط حالياً — بانتظار إسناد طلب جديد 🕐',
@@ -426,12 +429,10 @@ window.STAFF_I18N = {
       }
     },
 
-    /* ─── الرسائل المُرسَلة للعملاء (عربية فقط) ─── */
+    /* ─── الرسائل المُرسَلة للعملاء (v2.1: محايدة للجنسين) ─── */
     messages: {
-      /* ملاحظة: هذه الرسائل عربية دائماً حتى لو كانت واجهة الموظف بالإنجليزية */
-
       /* 1) رسالة المشرف — تأكيد الاستلام */
-      supConfirm: 'أهلاً بك عزيزنا *{customer_name}* 🍝\n' +
+      supConfirm: 'أهلاً بك *{customer_name}* 🍝\n' +
                   'معك {supervisor_name} — مشرف فرع {branch_name} في مكرونجي\n' +
                   'نؤكد استلام طلبك رقم *{order_number}* ✅\n' +
                   'الإجمالي: {total} ريال — الدفع عند الاستلام\n' +
@@ -440,7 +441,7 @@ window.STAFF_I18N = {
                   '✨ شكراً لثقتك بنا — نسعد دائماً بخدمتك',
 
       /* 2) رسالة السائق — في الطريق */
-      drvOnWay: 'أهلاً بك عزيزنا *{customer_name}* 🍝\n' +
+      drvOnWay: 'أهلاً بك *{customer_name}* 🍝\n' +
                 'معك {driver_name} من فريق توصيل مكرونجي\n' +
                 'طلبك رقم *{order_number}* في الطريق إليك 🛵\n' +
                 'المبلغ المستحق عند التسليم: {total} ريال\n' +
@@ -449,7 +450,7 @@ window.STAFF_I18N = {
                 'مسافة السكة 😊',
 
       /* 3) رسالة السائق — بعد التسليم */
-      drvThanks: 'عزيزنا *{customer_name}* 🍝\n' +
+      drvThanks: 'أهلاً بك *{customer_name}* 🍝\n' +
                  'تم تسليم طلبك رقم *{order_number}* بنجاح 🎉\n' +
                  'بالعافية والهناء 😋\n' +
                  'شكراً لثقتك بمكرونجي — سعدنا بخدمتك\n' +
@@ -565,7 +566,7 @@ window.STAFF_I18N = {
       actions: {
         confirm: '✅ Confirm',
         reject: '❌ Reject',
-        preparing: '👨‍🍳 Preparing',
+        preparing: '👨‍ Preparing',
         ready: '📦 Order Ready',
         readyForPickup: '📦 Ready for Pickup',
         sendToPool: '📦 Send to Drivers',
@@ -685,7 +686,8 @@ window.STAFF_I18N = {
         amountToCollect: 'Collect on delivery',
         deliveryFee: 'Fee',
         noGpsWarning: '⚠️ No GPS — contact customer',
-        branchName: 'Branch'
+        branchName: 'Branch',
+        orderLangTag: 'Order language'
       },
       empty: {
         noActive: 'No active delivery — waiting for new order 🕐',
@@ -891,9 +893,9 @@ window.STAFF_I18N = {
       }
     },
 
-    /* ملاحظة: الرسائل تبقى عربية حتى في الواجهة الإنجليزية */
+    /* Messages for EN orders */
     messages: {
-      supConfirm: 'Hello dear *{customer_name}* 🍝\n' +
+      supConfirm: 'Hello *{customer_name}* 🍝\n' +
                   'This is {supervisor_name} — supervisor of {branch_name} branch at Makaronjy\n' +
                   'We confirm your order *{order_number}* ✅\n' +
                   'Total: {total} SAR — Cash on pickup\n' +
@@ -901,7 +903,7 @@ window.STAFF_I18N = {
                   "We're here for any request or inquiry\n" +
                   '✨ Thank you for your trust — we are always happy to serve you',
 
-      drvOnWay: 'Hello dear *{customer_name}* 🍝\n' +
+      drvOnWay: 'Hello *{customer_name}* 🍝\n' +
                 'This is {driver_name} from Makaronjy delivery team\n' +
                 'Your order *{order_number}* is on the way 🛵\n' +
                 'Amount due on delivery: {total} SAR\n' +
@@ -909,7 +911,7 @@ window.STAFF_I18N = {
                 '{track_url}\n' +
                 'See you soon 😊',
 
-      drvThanks: 'Dear *{customer_name}* 🍝\n' +
+      drvThanks: 'Hello *{customer_name}* 🍝\n' +
                  'Your order *{order_number}* has been delivered 🎉\n' +
                  'Bon appétit 😋\n' +
                  'Thank you for choosing Makaronjy — happy to serve you\n' +
@@ -940,26 +942,50 @@ window.STAFF_I18N = {
 };
 
 /* ═══════════════════════════════════════════
-   الدوال العامة
+   v2: عزل ذاكرة اللغة لكل صفحة
    ═══════════════════════════════════════════ */
+function staffPageName() {
+  var p = (location.pathname || '').toLowerCase();
+  if (p.indexOf('track') >= 0) return 'track';
+  if (p.indexOf('driver') >= 0) return 'driver';
+  if (p.indexOf('supervisor') >= 0) return 'sup';
+  if (p.indexOf('login') >= 0) return 'login';
+  return 'staff';
+}
+const STAFF_LANG_KEY = 'mk_lang_' + staffPageName();
 
-/* اللغة الحالية */
+/* ترحيل اللغة القديمة mk_staff_lang مرة واحدة لكل صفحة */
+(function migrateOldLangKey() {
+  try {
+    if (!localStorage.getItem(STAFF_LANG_KEY)) {
+      var old = localStorage.getItem('mk_staff_lang');
+      if (old === 'ar' || old === 'en') localStorage.setItem(STAFF_LANG_KEY, old);
+    }
+  } catch (e) {}
+})();
+
+/* اللغة الحالية — لهذه الصفحة فقط */
 function getStaffLang() {
   try {
-    const saved = localStorage.getItem('mk_staff_lang');
+    const saved = localStorage.getItem(STAFF_LANG_KEY);
     if (saved === 'ar' || saved === 'en') return saved;
   } catch (e) {}
   return 'ar';
 }
 
+/* هل اختار المستخدم لغة لهذه الصفحة من قبل؟ (تستخدمها track لضبط لغة الطلب) */
+function hasStaffLangChoice() {
+  try { return !!localStorage.getItem(STAFF_LANG_KEY); } catch (e) { return false; }
+}
+
 function setStaffLang(lang) {
   if (lang !== 'ar' && lang !== 'en') lang = 'ar';
-  try { localStorage.setItem('mk_staff_lang', lang); } catch (e) {}
+  try { localStorage.setItem(STAFF_LANG_KEY, lang); } catch (e) {}
   document.documentElement.lang = lang;
   document.documentElement.dir = (lang === 'ar') ? 'rtl' : 'ltr';
   applyStaffI18n();
   updateLangToggleUI();
-  /* إطلاق حدث لإعلام الصفحات المفتوحة */
+  /* إطلاق حدث لإعلام الصفحة الحالية فقط */
   try {
     window.dispatchEvent(new CustomEvent('staff-lang-changed', { detail: { lang: lang } }));
   } catch (e) {}
@@ -979,26 +1005,34 @@ function getStaffTranslation(key, lang) {
   return (typeof node === 'string') ? node : null;
 }
 
-/* دالة الترجمة الرئيسية مع دعم المتغيرات */
+/* تعبئة المتغيرات {name} */
+function fillVars(text, params) {
+  if (!params || typeof params !== 'object') return text;
+  return text.replace(/\{(\w+)\}/g, function(match, varName) {
+    return (params[varName] !== undefined && params[varName] !== null)
+      ? String(params[varName])
+      : match;
+  });
+}
+
+/* دالة الترجمة الرئيسية — بلغة هذه الصفحة */
 function tt(key, params, fallbackLang) {
   let text = getStaffTranslation(key, getStaffLang());
   if (text == null) {
-    /* fallback للعربية */
     text = getStaffTranslation(key, 'ar');
   }
   if (text == null) {
-    /* fallback للمفتاح نفسه */
     return key;
   }
-  if (params && typeof params === 'object') {
-    /* استبدال {var} بالقيم */
-    text = text.replace(/\{(\w+)\}/g, function(match, varName) {
-      return (params[varName] !== undefined && params[varName] !== null)
-        ? String(params[varName])
-        : match;
-    });
-  }
-  return text;
+  return fillVars(text, params);
+}
+
+/* v2: ترجمة بلغة محددة (لغة الطلب) — للرسائل الموجهة للعميل */
+function ttLang(lang, key, params) {
+  let text = getStaffTranslation(key, (lang === 'en') ? 'en' : 'ar');
+  if (text == null) text = getStaffTranslation(key, 'ar');
+  if (text == null) return key;
+  return fillVars(text, params);
 }
 
 /* تطبيق الترجمات على عناصر data-t */
@@ -1008,7 +1042,6 @@ function applyStaffI18n() {
     const key = el.getAttribute('data-t');
     const text = tt(key);
     if (text !== key) {
-      /* دعم data-t-attr لترجمة السمات (placeholder/title) */
       el.textContent = text;
     }
   });
@@ -1088,23 +1121,26 @@ function initStaffI18n(options) {
     renderLangToggle(hostId);
   }
 
-  /* مزامنة بين التبويبات */
+  /* مزامنة بين تبويبات نفس الصفحة فقط (نفس المفتاح) */
   window.addEventListener('storage', function(e) {
-    if (e.key === 'mk_staff_lang') {
+    if (e.key === STAFF_LANG_KEY) {
       setStaffLang(e.newValue || 'ar');
     }
   });
 }
 
 /* جعل الدوال متاحة عالمياً */
+window.staffPageName = staffPageName;
 window.getStaffLang = getStaffLang;
 window.setStaffLang = setStaffLang;
+window.hasStaffLangChoice = hasStaffLangChoice;
 window.getStaffTranslation = getStaffTranslation;
 window.tt = tt;
+window.ttLang = ttLang;
 window.applyStaffI18n = applyStaffI18n;
 window.renderLangToggle = renderLangToggle;
 window.initStaffI18n = initStaffI18n;
 
 /* ═══════════════════════════════════════════
-   نهاية i18n-staff.js (v1.0)
+   نهاية i18n-staff.js (v2.1)
    ═══════════════════════════════════════════ */
