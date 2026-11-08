@@ -1,12 +1,13 @@
 // ═══════════════════════════════════════════
 //  مكرونجي - Cloudflare Worker API (كامل)
-//  الإصدار: 1.9
-//  v1.9: إصلاح محاسبي جوهري — الإيراد والرسوم والضريبة
-//        تُحتسب من المسلّم فقط (كانت تجمع الملغي والمهجور)
-//  يحتوي كل ميزات v1.8:
-//  • تتبع يرسل إحداثيات العميل + آخر إشارة للسائق
-//  • حذف كسول فوري + دفتر محاسبي + accounting
-//  • حوض + claim + صورة إثبات + GET صورة
+//  الإصدار: 2.0
+//  v2.0: لغة العميل تُحفظ مع الطلب (orders.lang)
+//        وتُرجع في كل المسارات: تتبع/مشرف/حوض/سائق/مالك
+//        ← أساس عزل اللغات وترجمة الرسائل بلغة الطلب
+//  يحتوي كل ميزات v1.9:
+//  • الإيراد = المسلّم فقط في accounting
+//  • حذف كسول فوري + دفتر محاسبي + GET صورة الإثبات
+//  • حوض الطلبات + claim + أرقام عشوائية بدون #
 // ═══════════════════════════════════════════
 
 const CORS_HEADERS = {
@@ -98,6 +99,10 @@ function error(message, status = 400, details = null) {
 function sanitize(str) {
   if (!str || typeof str !== 'string') return '';
   return str.replace(/[<>]/g, '').replace(/javascript:/gi, '').replace(/on\w+=/gi, '').trim().slice(0, 1000);
+}
+/* v2.0: تطبيع لغة الطلب */
+function normLang(v) {
+  return (v === 'en') ? 'en' : 'ar';
 }
 function getIP(request) {
   return request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown';
@@ -341,7 +346,7 @@ async function handleChangePassword(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  4) إنشاء طلب
+//  4) إنشاء طلب (v2.0: + lang)
 // ═══════════════════════════════════════════
 async function handleCreateOrder(request, env) {
   const ip = getIP(request);
@@ -355,6 +360,7 @@ async function handleCreateOrder(request, env) {
   const items = Array.isArray(body.items) ? body.items : [];
   const notes = sanitize(body.notes || '');
   const orderType = body.order_type === 'pickup' ? 'pickup' : 'delivery';
+  const orderLang = normLang(body.lang);
   if (!customerName || customerName.length < 2) return error('الاسم مطلوب (حرفان على الأقل)');
   if (!customerPhone || !/^\d{9,15}$/.test(customerPhone.replace(/[^0-9]/g, ''))) return error('رقم الجوال غير صحيح');
   if (!branchId) return error('الفرع مطلوب');
@@ -381,22 +387,22 @@ async function handleCreateOrder(request, env) {
   const customerAddress = orderType === 'delivery' ? sanitize(body.customer_address || '') : '';
   const result = await env.DB.prepare(`
     INSERT INTO orders (
-      order_number, branch_id, order_type, customer_name, customer_phone, customer_address,
+      order_number, branch_id, order_type, lang, customer_name, customer_phone, customer_address,
       customer_lat, customer_lng, items_json, subtotal,
       delivery_fee, total, payment_method, status, notes
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'cod', 'pending', ?)
-  `).bind(orderNumber, branchId, orderType, customerName, customerPhone, customerAddress, customerLat, customerLng, JSON.stringify(cleanItems), subtotal, deliveryFee, total, notes).run();
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'cod', 'pending', ?)
+  `).bind(orderNumber, branchId, orderType, orderLang, customerName, customerPhone, customerAddress, customerLat, customerLng, JSON.stringify(cleanItems), subtotal, deliveryFee, total, notes).run();
   const orderId = result.meta.last_row_id;
   await env.DB.prepare(`INSERT INTO order_tracking (order_id, status, notes) VALUES (?, 'pending', ?)`).bind(orderId, orderType === 'pickup' ? 'تم استلام الطلب — استلام من الفرع 🏪' : 'تم استلام الطلب 🛵').run();
   return json({
-    success: true, order_number: orderNumber, order_id: orderId, order_type: orderType,
+    success: true, order_number: orderNumber, order_id: orderId, order_type: orderType, lang: orderLang,
     total, delivery_fee: deliveryFee, branch_name: branch.name_ar, branch_phone: branch.phone,
     track_url: `${env.SITE_URL || ''}/track.html?order=${encodeURIComponent(orderNumber)}`,
   }, 201);
 }
 
 // ═══════════════════════════════════════════
-//  5) تتبع الطلب (إحداثيات العميل + آخر إشارة سائق)
+//  5) تتبع الطلب (v2.0: + lang)
 // ═══════════════════════════════════════════
 async function handleTrackOrder(orderNumber, env) {
   const order = await env.DB.prepare(`
@@ -422,6 +428,7 @@ async function handleTrackOrder(orderNumber, env) {
       status: order.status,
       status_text: statusTextFor(order),
       order_type: order.order_type || 'delivery',
+      lang: order.lang || 'ar',
       customer_name: order.customer_name,
       customer_address: order.customer_address || '',
       customer_lat: order.customer_lat,
@@ -447,7 +454,7 @@ async function handleTrackOrder(orderNumber, env) {
 }
 
 // ═══════════════════════════════════════════
-//  6) طلبات المشرف (+ purge)
+//  6) طلبات المشرف (v2.0: + lang)
 // ═══════════════════════════════════════════
 async function handleSupervisorOrders(request, env) {
   const auth = await requireAuth(request, env, ['supervisor', 'super_admin']);
@@ -461,7 +468,9 @@ async function handleSupervisorOrders(request, env) {
   query += ' ORDER BY o.created_at DESC LIMIT 100';
   const result = await env.DB.prepare(query).bind(...params).all();
   const orders = result.results.map(o => ({
-    id: o.id, number: o.order_number, order_type: o.order_type || 'delivery', branch_name: o.branch_name,
+    id: o.id, number: o.order_number, order_type: o.order_type || 'delivery',
+    lang: o.lang || 'ar',
+    branch_name: o.branch_name,
     customer_name: o.customer_name, customer_phone: o.customer_phone, customer_address: o.customer_address,
     customer_lat: o.customer_lat, customer_lng: o.customer_lng, items: JSON.parse(o.items_json),
     subtotal: o.subtotal, delivery_fee: o.delivery_fee, total: o.total, payment_method: o.payment_method,
@@ -484,7 +493,7 @@ async function handleSupervisorDrivers(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  8) حوض طلبات الفرع (+ purge)
+//  8) حوض طلبات الفرع (v2.0: + lang)
 // ═══════════════════════════════════════════
 async function handleBranchPool(request, env) {
   const auth = await requireAuth(request, env, ['driver', 'supervisor', 'super_admin']);
@@ -505,6 +514,7 @@ async function handleBranchPool(request, env) {
   `).bind(branchId).all();
   const orders = result.results.map(o => ({
     id: o.id, number: o.order_number, branch_name: o.branch_name, branch_lat: o.branch_lat, branch_lng: o.branch_lng,
+    lang: o.lang || 'ar',
     customer_name: o.customer_name, customer_phone: o.customer_phone, customer_address: o.customer_address,
     customer_lat: o.customer_lat, customer_lng: o.customer_lng, items: JSON.parse(o.items_json),
     subtotal: o.subtotal, delivery_fee: o.delivery_fee, total: o.total, payment_method: o.payment_method,
@@ -536,11 +546,11 @@ async function handleClaim(orderId, request, env) {
   `).bind(auth.user.id, orderId).run();
   if (result.meta.changes === 0) return error('الطلب لم يعد متاحاً — استلمه سائق آخر', 409);
   await env.DB.prepare(`INSERT INTO order_tracking (order_id, status, notes) VALUES (?, 'driver_assigned', ?)`).bind(orderId, `تم تعيين السائق: ${auth.user.name}`).run();
-  return json({ success: true, order_id: orderId, order_number: order.order_number, driver_id: auth.user.id, driver_name: auth.user.name });
+  return json({ success: true, order_id: orderId, order_number: order.order_number, lang: order.lang || 'ar', driver_id: auth.user.id, driver_name: auth.user.name });
 }
 
 // ═══════════════════════════════════════════
-//  10) توصيلات السائق (+ purge)
+//  10) توصيلات السائق (v2.0: + lang)
 // ═══════════════════════════════════════════
 async function handleDriverOrders(request, env) {
   const auth = await requireAuth(request, env, ['driver']);
@@ -554,6 +564,7 @@ async function handleDriverOrders(request, env) {
   `).bind(auth.user.id).all();
   const orders = result.results.map(o => ({
     id: o.id, number: o.order_number, branch_name: o.branch_name,
+    lang: o.lang || 'ar',
     customer_name: o.customer_name, customer_phone: o.customer_phone, customer_address: o.customer_address,
     customer_lat: o.customer_lat, customer_lng: o.customer_lng, items: JSON.parse(o.items_json),
     total: o.total, delivery_fee: o.delivery_fee, status: o.status, status_text: statusTextFor(o), created_at: o.created_at,
@@ -592,7 +603,7 @@ async function handleUpdateStatus(orderId, request, env) {
     }
   }
   await env.DB.prepare(`INSERT INTO order_tracking (order_id, status, notes) VALUES (?, ?, ?)`).bind(orderId, newStatus, sanitize(body.notes || '')).run();
-  return json({ success: true, order_id: orderId, old_status: order.status, new_status: newStatus });
+  return json({ success: true, order_id: orderId, old_status: order.status, new_status: newStatus, lang: order.lang || 'ar' });
 }
 
 // ═══════════════════════════════════════════
@@ -612,7 +623,7 @@ async function handleAssignDriver(orderId, request, env) {
   if (!driver) return error('السائق غير موجود في هذا الفرع أو معطل', 404);
   await env.DB.prepare(`UPDATE orders SET status = 'driver_assigned', driver_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).bind(driver.id, orderId).run();
   await env.DB.prepare(`INSERT INTO order_tracking (order_id, status, notes) VALUES (?, 'driver_assigned', ?)`).bind(orderId, `تم تعيين السائق: ${driver.name}`).run();
-  return json({ success: true, order_id: orderId, driver_id: driver.id, driver_name: driver.name, driver_phone: driver.phone });
+  return json({ success: true, order_id: orderId, lang: order.lang || 'ar', driver_id: driver.id, driver_name: driver.name, driver_phone: driver.phone });
 }
 
 // ═══════════════════════════════════════════
@@ -694,7 +705,7 @@ async function handleGetPhoto(orderId, request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  16) كل الطلبات (المالك) (+ purge)
+//  16) كل الطلبات (المالك) (v2.0: + lang)
 // ═══════════════════════════════════════════
 async function handleAdminOrders(request, env) {
   const auth = await requireAuth(request, env, ['super_admin']);
@@ -719,6 +730,7 @@ async function handleAdminOrders(request, env) {
   const result = await env.DB.prepare(query).bind(...params).all();
   const orders = result.results.map(o => ({
     id: o.id, number: o.order_number, branch_name: o.branch_name, order_type: o.order_type || 'delivery',
+    lang: o.lang || 'ar',
     customer_name: o.customer_name, customer_phone: o.customer_phone, total: o.total, delivery_fee: o.delivery_fee,
     payment_method: o.payment_method, payment_status: o.payment_status, status: o.status, status_text: statusTextFor(o),
     driver_name: o.driver_name, created_at: o.created_at, has_photo: !!o.delivery_photo,
@@ -870,8 +882,7 @@ async function handleReportsSummary(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  19) التقرير المحاسبي
-//  v1.9: الإيراد والرسوم والضريبة = المسلّم فقط
+//  19) التقرير المحاسبي (الإيراد = المسلّم فقط)
 // ═══════════════════════════════════════════
 async function handleReportsAccounting(request, env) {
   const auth = await requireAuth(request, env, ['super_admin', 'supervisor']);
@@ -892,23 +903,17 @@ async function handleReportsAccounting(request, env) {
     GROUP BY ym, kind, order_type, branch_id, driver_id
     ORDER BY ym
   `).bind(from, to, branchId, branchId).all();
-
   const totals = { orders: 0, delivered: 0, cancelled: 0, abandoned: 0, gross: 0, fees: 0, pickup_gross: 0, delivery_gross: 0 };
   const monthsMap = {};
   const branchesMap = {};
   const driversMap = {};
-
   for (const r of rows.results) {
     const g = r.gross || 0;
     const f = r.fees || 0;
     const m = monthsMap[r.ym] || (monthsMap[r.ym] = { ym: r.ym, orders: 0, delivered: 0, cancelled: 0, abandoned: 0, gross: 0, fees: 0 });
-
-    /* العدادات: كل الأنواع */
     m.orders += r.n; totals.orders += r.n;
     if (r.kind === 'cancelled')  { m.cancelled  += r.n; totals.cancelled  += r.n; }
     if (r.kind === 'abandoned')  { m.abandoned  += r.n; totals.abandoned  += r.n; }
-
-    /* v1.9: المال يدخل من المسلّم فقط */
     if (r.kind === 'delivered') {
       m.delivered += r.n; totals.delivered += r.n;
       m.gross += g;       totals.gross += g;
@@ -921,15 +926,12 @@ async function handleReportsAccounting(request, env) {
         d.earnings += f;
       }
     }
-
-    /* الفروع: عدد الطلبات لكل الأنواع، والإيراد للمسلّم فقط */
     if (r.branch_id) {
       const b = branchesMap[r.branch_id] || (branchesMap[r.branch_id] = { branch_id: r.branch_id, orders: 0, delivered: 0, gross: 0 });
       b.orders += r.n;
       if (r.kind === 'delivered') { b.delivered += r.n; b.gross += g; }
     }
   }
-
   const months = Object.values(monthsMap).sort((a, b) => a.ym.localeCompare(b.ym));
   totals.gross = Math.round(totals.gross * 100) / 100;
   totals.fees = Math.round(totals.fees * 100) / 100;
@@ -937,7 +939,6 @@ async function handleReportsAccounting(request, env) {
   totals.delivery_gross = Math.round(totals.delivery_gross * 100) / 100;
   totals.avg = totals.delivered ? Math.round(totals.gross / totals.delivered) : 0;
   totals.cancel_rate = totals.orders ? Math.round(((totals.cancelled + totals.abandoned) / totals.orders) * 100) : 0;
-
   const branches = [];
   if (Object.keys(branchesMap).length) {
     const brs = await env.DB.prepare('SELECT id, name_ar, name_en FROM branches').all();
@@ -960,7 +961,6 @@ async function handleReportsAccounting(request, env) {
     }
     drivers.sort((a, b) => b.deliveries - a.deliveries);
   }
-
   let topItems = [];
   try {
     const ti = await env.DB.prepare(`
@@ -975,7 +975,6 @@ async function handleReportsAccounting(request, env) {
     `).bind(from, to, branchId, branchId).all();
     topItems = ti.results;
   } catch (e) { topItems = []; }
-
   return json({ from, to, totals, months, branches, drivers, top_items: topItems });
 }
 
@@ -988,7 +987,7 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
     try {
-      if (path === '/api/health' && request.method === 'GET') return json({ status: 'ok', version: '1.9', live_mode: env.LIVE_MODE || 'polling' });
+      if (path === '/api/health' && request.method === 'GET') return json({ status: 'ok', version: '2.0', live_mode: env.LIVE_MODE || 'polling' });
       if (path === '/api/auth/login' && request.method === 'POST') return await handleLogin(request, env);
       if (path === '/api/auth/admin-bridge' && request.method === 'POST') return await handleAdminBridge(request, env);
       if (path === '/api/auth/change-password' && request.method === 'POST') return await handleChangePassword(request, env);
@@ -1085,5 +1084,5 @@ export default {
 };
 
 // ═══════════════════════════════════════════
-//  نهاية worker/index.js (v1.9)
+//  نهاية worker/index.js (v2.0)
 // ═══════════════════════════════════════════
