@@ -1,8 +1,13 @@
 /* =====================================================
-مكرونجي — الطبقة السحابية (cloud.js)
-v17.7: قفل الطلب المكرر + سلة Minimal + نافذة بيانات
-       لكل ما عدا ذلك مطابق لـ v17.6
-===================================================== */
+   مكرونجي — الطبقة السحابية (cloud.js)
+   v17.8: لغة العميل تُرسل مع الطلب (orders.lang)
+          + كل ميزات v17.7 كما هي بدون أي حذف:
+          • قفل الطلب المكرر
+          • سلة Minimal
+          • نافذة بيانات العميل
+          • فرض توفر التوصيل
+          • دليل الموقع للأجهزة المختلفة
+   ===================================================== */
 
 const CLOUD_API = 'https://makaronjy-api.makaronjy.workers.dev';
 
@@ -496,7 +501,7 @@ function showOrderSuccess(res, waMsg, br, orderType){
 }
 
 /* =====================================================
-   checkout() السحابي v17.7
+   checkout() السحابي v17.8
    ===================================================== */
 let CHECKOUT_BUSY = false;
 
@@ -633,6 +638,9 @@ async function doCheckoutFlow(TT, br, btn, btnLabel){
     '━━━━━━━━━━━━\n' +
     brandize(TT.waThanks);
 
+  /* v17.8: إضافة لغة العميل إلى حمولة الطلب (orders.lang) */
+  const orderLang = (typeof currentLang !== 'undefined' && currentLang === 'en') ? 'en' : 'ar';
+
   const cloud = await createCloudOrder({
     customer_name: cname,
     customer_phone: cphone,
@@ -645,7 +653,8 @@ async function doCheckoutFlow(TT, br, btn, btnLabel){
     customer_lng: loc ? loc.lng : null,
     customer_address: isPickup ? '' : addrText,
     notes: notes,
-    order_type: isPickup ? 'pickup' : 'delivery'
+    order_type: isPickup ? 'pickup' : 'delivery',
+    lang: orderLang
   });
 
   const finalNum = cloud ? cloud.order_number : invoiceID;
@@ -665,4 +674,4 @@ async function doCheckoutFlow(TT, br, btn, btnLabel){
     toast(TT.orderSent);
   }
 }
-/* ===== END cloud.js (v17.7) ===== */
+/* ===== END cloud.js (v17.8) ===== */
