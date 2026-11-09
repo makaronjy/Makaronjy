@@ -1,6 +1,6 @@
-/* ===== admin-core.js — النواة: دخول + GitHub + نوافذ (v3.6) ===== */
-/* v3.6: تعطيل الدخول المحلي (ADMIN_USER/ADMIN_PASS) للأمان
-         — كل دخول الآن يتطلب توكن GitHub صالح
+/* ===== admin-core.js — النواة: دخول + GitHub + نوافذ (v3.7) ===== */
+/* v3.7: إصلاح معالج التبويبات (add hidden بدل remove hidden)
+   v3.6: تعطيل الدخول المحلي للأمان
    v3.5: كسر كاش المتصفح/Service Worker في قراءات GitHub
    v3.4: نشر صلب 4 محاولات + التقاط SHA
    v3.2: حذف البانر الفعلي + تنظيف اليتيمة
@@ -688,7 +688,7 @@ msg.className=`wa-preview bad`;
 msg.textContent = L(`waBad`);
 }
 }
-/* ===== التبويبات ===== */
+/* ===== التبويبات (v3.7: إصلاح الإخفاء) ===== */
 document.querySelectorAll(`.tab`).forEach(function(t){
 t.addEventListener(`click`, function(){
 document.querySelectorAll(`.tab`).forEach(function(x){
@@ -696,7 +696,7 @@ x.classList.remove(`active`);
 });
 t.classList.add(`active`);
 document.querySelectorAll(`main > section`).forEach(
-function(s){ s.classList.remove(`hidden`); });
+function(s){ s.classList.add(`hidden`); });
 el(`tab-` + t.dataset.tab).classList.remove(`hidden`);
 });
 });
@@ -1366,4 +1366,4 @@ ensureV15Cards();
 renderBannersAdmin();
 return r;
 };
-/* ===== END admin-core.js (v3.6) ===== */
+/* ===== END admin-core.js (v3.7) ===== */
