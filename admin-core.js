@@ -1,6 +1,7 @@
-/* ===== admin-core.js — النواة: دخول + GitHub + نوافذ (v3.5) ===== */
-/* v3.5: كسر كاش المتصفح/Service Worker في قراءات GitHub
-   (حل نهائي لخطأ "does not match" عند النشر المتتالي)
+/* ===== admin-core.js — النواة: دخول + GitHub + نوافذ (v3.6) ===== */
+/* v3.6: تعطيل الدخول المحلي (ADMIN_USER/ADMIN_PASS) للأمان
+         — كل دخول الآن يتطلب توكن GitHub صالح
+   v3.5: كسر كاش المتصفح/Service Worker في قراءات GitHub
    v3.4: نشر صلب 4 محاولات + التقاط SHA
    v3.2: حذف البانر الفعلي + تنظيف اليتيمة
    v3.1: try-catch شامل + هجرات */
@@ -22,8 +23,6 @@ function(e){ e.preventDefault(); });
 document.addEventListener(`dblclick`,
 function(e){ e.preventDefault(); });
 /* ===== ثوابت الدخول والنشر ===== */
-const ADMIN_USER = `mahmoud`;
-const ADMIN_PASS = `123456`;
 const GH_OWNER = `makaronjy`;
 const GH_REPO = `Makaronjy`;
 const GH_BRANCH = `main`;
@@ -697,7 +696,7 @@ x.classList.remove(`active`);
 });
 t.classList.add(`active`);
 document.querySelectorAll(`main > section`).forEach(
-function(s){ s.classList.add(`hidden`); });
+function(s){ s.classList.remove(`hidden`); });
 el(`tab-` + t.dataset.tab).classList.remove(`hidden`);
 });
 });
@@ -796,9 +795,8 @@ var pat1 = `^(github_pat_|ghp_|`;
 var pat2 = `gho_|ghu_|ghs_|ghr_)`;
 var tokenLike =
 new RegExp(pat1 + pat2, `i`).test(token);
-var isLocal =
-(owner.toLowerCase() === ADMIN_USER.toLowerCase()) &&
-(token === ADMIN_PASS);
+/* v3.6: تم تعطيل الدخول المحلي للأمان */
+var isLocal = false;
 var isEmbed =
 (GH_TOKEN !== ``) && (token === GH_TOKEN);
 if(!isLocal && !tokenLike && !isEmbed){
@@ -1368,4 +1366,4 @@ ensureV15Cards();
 renderBannersAdmin();
 return r;
 };
-/* ===== END admin-core.js (v3.5) ===== */
+/* ===== END admin-core.js (v3.6) ===== */
