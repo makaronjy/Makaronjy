@@ -1,6 +1,7 @@
 /* =====================================================
 مكرونجي — سكربت التطبيق الرئيسي (app.js)
-v15.8: سطر واحد للعنوان + تأكيد عند اختيار الفرع + فقاعة فوق الدبوس
+v15.9: كل ميزات v15.8 كما هي بدون أي حذف +
+       دمج v16 داخل نفس الملف: التنبيهات Push + بياناتي + سياسة الخصوصية
 ===================================================== */
 /* ===== استعادة لقطة محلية عند فشل تحميل الملفات ===== */
 (function(){
@@ -29,7 +30,7 @@ function pushGuard(){
 }
 /* ===== Stack للنوافذ: حالة تاريخ + موضع تمرير لكل نافذة ===== */
 let overlayStack = [];
-const LOCK_TYPES = ['detail','featured','sidemenu','fav','slot','welcome'];
+const LOCK_TYPES = ['detail','featured','sidemenu','fav','slot','welcome','notif','data','privacy'];
 function restoreScroll(y){
   setTimeout(()=>{ window.scrollTo({top:y, behavior:'instant'}); }, 30);
 }
@@ -69,6 +70,9 @@ function closeByType(t){
     el('welcome').classList.remove('show');
     document.body.style.overflow='';
   }
+  else if(t==='notif') closeNotifModal();
+  else if(t==='data') closeDataModal();
+  else if(t==='privacy') closePrivacyModal();
 }
 pushGuard();
 document.addEventListener('DOMContentLoaded', pushGuard);
@@ -91,6 +95,9 @@ function confirmShown(){ return el('confirmModal').classList.contains('show'); }
 function adShown(){ return el('adModal').classList.contains('show'); }
 function closedShown(){ return el('closedModal').classList.contains('show'); }
 function detailShown(){ const d = el('detail'); return !!d && d.classList.contains('show'); }
+function notifShown(){ const m = el('notifModal'); return !!m && m.classList.contains('show'); }
+function dataShown(){ const m = el('dataModal'); return !!m && m.classList.contains('show'); }
+function privacyShown(){ const m = el('privacyModal'); return !!m && m.classList.contains('show'); }
 function tt(key, ar, en){
   const v = (window.I18N && T()[key] !== undefined) ? T()[key] : undefined;
   return (v !== undefined && typeof v !== 'function') ? v : (currentLang==='ar' ? ar : en);
@@ -549,6 +556,7 @@ function applyLang(lang){
   updateCart();
   updateFavBadge();
   if(el('favSheet').classList.contains('show')) renderFavSheet();
+  if(typeof updateNotifStatus === 'function') updateNotifStatus();
   setTimeout(()=>{ catsSign = 0; catsPos = 0; cats.scrollLeft = 0; }, 50);
 }
 function toggleLang(){ applyLang(currentLang==='ar' ? 'en' : 'ar'); }
@@ -1059,6 +1067,9 @@ document.addEventListener('keydown', e=>{
   if(e.key==='Escape' && actionToastShown()){ hideActionToast(); return; }
   if(e.key==='Escape' && searchModeOn()){ closeSearchMode(); return; }
   if(e.key==='Escape' && gateShown()){ closeGate(); return; }
+  if(e.key==='Escape' && notifShown()){ closeNotifModal(); return; }
+  if(e.key==='Escape' && dataShown()){ closeDataModal(); return; }
+  if(e.key==='Escape' && privacyShown()){ closePrivacyModal(); return; }
   if(!featuredShown()) return;
   if(e.key==='Escape') closeFeatured();
   else if(e.key==='ArrowLeft') manualNav(1);
@@ -1075,7 +1086,7 @@ window.addEventListener('popstate', ()=>{
     return;
   }
   guardOn = false;
-  const anyOverlay = welcomeShown() || sheetShown() || drawerShown() || featuredShown() || adShown() || gateShown() || closedShown() || detailShown() || actionToastShown() || el('favSheet').classList.contains('show') || el('slotPicker').classList.contains('show') || confirmShown();
+  const anyOverlay = welcomeShown() || sheetShown() || drawerShown() || featuredShown() || adShown() || gateShown() || closedShown() || detailShown() || actionToastShown() || el('favSheet').classList.contains('show') || el('slotPicker').classList.contains('show') || confirmShown() || notifShown() || dataShown() || privacyShown();
   if(anyOverlay){
     goHome();
     pushGuard();
@@ -1184,7 +1195,7 @@ function buildMenu(){
                onerror="this.onerror=null;this.src='${ph}'">
           ${badge}
           <div class="step ${(sold||gray)?'disabled':''}" data-si="${si}" data-ii="${ii}">
-            <button class="st inc" aria-label="إضافة"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+            <button class="st inc" aria-label="إضافة"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-line-cap="round"><path d="M12 5v14M5 12h14"/></svg></button>
             <span class="qnum">0</span>
             <button class="st dec" aria-label="إنقاص"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
           </div>
@@ -1792,6 +1803,7 @@ function openSideMenu(){
   el('sideMenuBack').hidden = false;
   el('sideMenu').setAttribute('aria-hidden','false');
   updateFavBadge();
+  if(typeof updateNotifStatus === 'function') updateNotifStatus();
 }
 function closeSideMenu(){
   document.body.classList.remove('sm-open');
@@ -2337,6 +2349,9 @@ function goHome(){
   if(el('favSheet').classList.contains('show')) closeFavSheet();
   if(el('slotPicker').classList.contains('show')) closeSlotPicker();
   if(confirmShown()) resolveConfirm(false);
+  if(notifShown()) closeNotifModal();
+  if(dataShown()) closeDataModal();
+  if(privacyShown()) closePrivacyModal();
   overlayStack.length = 0;
 }
 
@@ -2391,4 +2406,65 @@ function goHome(){
       urls.forEach(u=>{ fetch(u).catch(()=>{}); });
     })();
   }
+  loadUserData();
+  updateNotifStatus();
 })();
+
+/* =====================================================
+   ===== v16 المدمج: التنبيهات + بياناتي + الخصوصية =====
+   ===== (داخل نفس الملف — بدون ملف جديد) =====
+   ===================================================== */
+
+/* ===== فراغات بين أزرار القائمة الجانبية (إصلاح الالتصاق) ===== */
+(function injectV16Css(){
+  if(el('v16Css')) return;
+  const st = document.createElement('style');
+  st.id = 'v16Css';
+  st.textContent =
+    '#sideMenu .sm-item{margin-bottom:10px}' +
+    '#sideMenu .sm-item:last-of-type{margin-bottom:0}' +
+    '.sm-notif-status{margin-inline-start:auto;min-width:auto;height:24px;padding:0 10px;border-radius:50px;' +
+    'font-weight:900;font-size:.68rem;display:flex;align-items:center;justify-content:center;' +
+    'background:rgba(255,255,255,.18);color:#ffffffb0}' +
+    '.sm-notif-status.on{background:#dcf5e8;color:#186a3a}';
+  document.head.appendChild(st);
+})();
+
+/* ===== بيانات المستخدم (محلية فقط) ===== */
+const USER_DATA_KEY = 'mk_user_data';
+function getUserData(){
+  try{ return JSON.parse(localStorage.getItem(USER_DATA_KEY)) || {name:'',phone:''}; }
+  catch(e){ return {name:'',phone:''}; }
+}
+function saveUserDataToStorage(d){
+  try{ localStorage.setItem(USER_DATA_KEY, JSON.stringify(d)); }catch(e){}
+}
+function loadUserData(){
+  const d = getUserData();
+  const n = el('cName'), p = el('cPhone');
+  if(n && d.name) n.value = d.name;
+  if(p && d.phone) p.value = d.phone;
+}
+function saveUserData(){
+  const name = el('dataName') ? el('dataName').value.trim() : '';
+  const phone = el('dataPhone') ? el('dataPhone').value.trim() : '';
+  saveUserDataToStorage({name:name, phone:phone});
+  const n = el('cName'), p = el('cPhone');
+  if(n) n.value = name;
+  if(p) p.value = phone;
+  toast(tt('dataSaved','✔ تم حفظ بياناتك','✔ Your data has been saved'));
+  closeDataModal();
+}
+
+/* ===== Web Push ===== */
+const VAPID_PUBLIC_KEY = 'PLACEHOLDER_VAPID_KEY';
+let pushSubscription = null;
+function urlBase64ToUint8Array(b){
+  const padding = '='.repeat((4 - b.length % 4) % 4);
+  const s = (b + padding).replace(/-/g,'+').replace(/_/g,'/');
+  const raw = window.atob(s);
+  const out = new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+async function
