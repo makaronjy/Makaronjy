@@ -249,6 +249,12 @@
 <aside id="sideMenu" aria-hidden="true">
   <div class="sm-head"><b data-i18n="sideMenuTitle">القائمة</b><button onclick="closeSideMenu()">✕</button></div>
   <button class="sm-item" id="smFav" onclick="openFavsFromMenu()">❤️ <span data-i18n="sideFav">وجباتي المفضلة</span> <span class="sm-badge" id="smFavCount">0</span></button>
+  
+  <!-- v16: الأزرار الثلاثة الجديدة -->
+  <button class="sm-item notif-btn-item" id="smNotif" onclick="openNotifModal()">🔔 <span data-i18n="sideNotifications">تفعيل التنبيهات</span> <span class="sm-notif-status" id="smNotifStatus"></span></button>
+  <button class="sm-item" id="smData" onclick="openDataModal()">👤 <span data-i18n="sideData">بياناتي</span></button>
+  <button class="sm-item" id="smPrivacy" onclick="openPrivacyModal()">🛡️ <span data-i18n="sidePrivacy">سياسة الخصوصية</span></button>
+  
   <div class="sm-social-title" id="smSocialTitle">تابعنا على</div>
   <div class="sm-social" id="smSocial"></div>
 </aside>
@@ -287,6 +293,90 @@
 </div>
 
 <div id="toast"><span id="toastMsg"></span></div>
+
+<!-- ===== v16: نوافذ التنبيهات، بياناتي، وسياسة الخصوصية ===== -->
+
+<!-- نافذة التنبيهات -->
+<div class="mk-modal" id="notifModal" onclick="if(event.target===this) closeNotifModal()">
+  <div class="mk-modal-card">
+    <button class="mk-modal-close" onclick="closeNotifModal()">✕</button>
+    <div class="notif-ico">🔔</div>
+    <h3 class="mk-modal-title" data-i18n="notifTitle">تفعيل التنبيهات</h3>
+    <p class="mk-modal-desc" data-i18n="notifDesc">ابقَ على اطلاع دائم بحالة طلبك — من التأكيد إلى التسليم.</p>
+    <div class="notif-status" id="notifStatus"></div>
+    <div class="notif-hint" id="notifHint" style="display:none"></div>
+    <button class="notif-btn" id="notifBtn" onclick="toggleNotifications()"></button>
+  </div>
+</div>
+
+<!-- نافذة بياناتي -->
+<div class="mk-modal" id="dataModal" onclick="if(event.target===this) closeDataModal()">
+  <div class="mk-modal-card">
+    <button class="mk-modal-close" onclick="closeDataModal()">✕</button>
+    <h3 class="mk-modal-title" data-i18n="dataTitle">بياناتي</h3>
+    <p class="mk-modal-desc" data-i18n="dataDesc">بياناتك محفوظة على جهازك فقط ولا تُرسل إلا ضمن طلبك الحالي.</p>
+    <div class="data-field">
+      <label for="dataName" data-i18n="dataNameLbl">الاسم</label>
+      <input type="text" id="dataName" data-i18n-ph="dataNamePh" placeholder="الاسم الكامل" autocomplete="name">
+    </div>
+    <div class="data-field">
+      <label for="dataPhone" data-i18n="dataPhoneLbl">رقم الجوال</label>
+      <input type="tel" id="dataPhone" data-i18n-ph="dataPhonePh" placeholder="05XXXXXXXX" inputmode="tel" autocomplete="tel" dir="ltr" style="text-align:left">
+    </div>
+    <div class="data-hint" id="dataHint">
+      💡 هذه البيانات ستُحفظ محلياً وستظهر تلقائياً في السلة عند طلبك القادم
+    </div>
+    <button class="data-save" onclick="saveUserData()" data-i18n="dataSave">حفظ</button>
+  </div>
+</div>
+
+<!-- نافذة سياسة الخصوصية -->
+<div class="mk-modal" id="privacyModal" onclick="if(event.target===this) closePrivacyModal()">
+  <div class="mk-modal-card">
+    <button class="mk-modal-close" onclick="closePrivacyModal()">✕</button>
+    <h3 class="mk-modal-title" data-i18n="privacyTitle">خصوصيتك وأمان بياناتك</h3>
+    <div class="priv-intro" data-i18n="privacyIntro">
+      خصوصيتك مسؤوليتنا، وثقتك أولويتنا. نحرص في مكرونجي على حماية بياناتك واستخدامها بالحد الأدنى اللازم لتقديم تجربة طلب آمنة وسلسة.
+    </div>
+    
+    <div class="priv-section">
+      <h5 data-i18n="privacy1Title">1. البيانات الشخصية</h5>
+      <p data-i18n="privacy1Text">نجمع اسمك ورقم هاتفك فقط لمعالجة طلبك والتواصل معك بشأنه.</p>
+    </div>
+    
+    <div class="priv-section">
+      <h5 data-i18n="privacy2Title">2. بيانات الموقع</h5>
+      <p data-i18n="privacy2Text">نطلب الوصول إلى موقعك عند اختيار التوصيل فقط، لتحديد موقع الاستلام ومساعدة السائق في الوصول إليك.</p>
+    </div>
+    
+    <div class="priv-section">
+      <h5 data-i18n="privacy3Title">3. الإشعارات ومتابعة الطلب</h5>
+      <p data-i18n="privacy3Text">ننصحك بتفعيل الإشعارات لتبقى على اطلاع دائم بحالة طلبك، بدءاً من تأكيد استلامه والموافقة عليه، مروراً بمرحلة التجهيز، وحتى خروجه للتوصيل واكتمال التسليم. تفعيل الإشعارات يمنحك تجربة أفضل ويضمن لك معرفة آخر تحديثات طلبك أولاً بأول. الإشعارات اختيارية بالكامل، ويمكنك تفعيلها أو إيقافها في أي وقت.</p>
+    </div>
+    
+    <div class="priv-section">
+      <h5 data-i18n="privacy4Title">4. تخزين البيانات</h5>
+      <p data-i18n="privacy4Text">يُحفظ اسمك ورقم هاتفك محلياً على جهازك، ولا تُرسل هذه البيانات إلى خوادمنا إلا بالقدر اللازم لتنفيذ طلبك الحالي.</p>
+    </div>
+    
+    <div class="priv-section">
+      <h5 data-i18n="privacy5Title">5. عدم مشاركة البيانات</h5>
+      <p data-i18n="privacy5Text">لا نبيع بياناتك الشخصية أو نستخدمها لأغراض إعلانية، ولا نشاركها مع جهات خارجية.</p>
+    </div>
+    
+    <div class="priv-section">
+      <h5 data-i18n="privacy6Title">6. صور إثبات التسليم</h5>
+      <p data-i18n="privacy6Text">تكون صور إثبات التسليم متاحة للفرع المختص فقط، وتُحذف بشكل دوري وفق سياسة الاحتفاظ بالبيانات.</p>
+    </div>
+    
+    <div class="priv-footer">
+      <p data-i18n="privacyFooter">خصوصيتك ليست خياراً إضافياً، بل جزء أساسي من تجربتك مع مكرونجي.</p>
+      <p class="rights" data-i18n="privacyRights">© مكرونجي | جميع الحقوق محفوظة</p>
+    </div>
+    
+    <button class="priv-close-btn" onclick="closePrivacyModal()" data-i18n="privacyClose">إغلاق</button>
+  </div>
+</div>
 
 <script src="i18n.js"></script>
 <script src="menu.js"></script>
