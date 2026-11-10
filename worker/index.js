@@ -1,14 +1,7 @@
 // ═══════════════════════════════════════════
 //  مكرونجي - Cloudflare Worker API (كامل)
-//  الإصدار: 2.0
-//  v2.0: لغة العميل تُحفظ مع الطلب (orders.lang)
-//        وتُرجع في كل المسارات: تتبع/مشرف/حوض/سائق/مالك
-//        ← أساس عزل اللغات وترجمة الرسائل بلغة الطلب
-//  يحتوي كل ميزات v1.9:
-//  • الإيراد = المسلّم فقط في accounting
-//  • حذف كسول فوري + دفتر محاسبي + GET صورة الإثبات
-//  • حوض الطلبات + claim + أرقام عشوائية بدون #
-//  • Bootstrap: إنشاء حساب المالك الأول تلقائياً
+//  الإصدار: 2.0.1
+//  v2.0.1: إضافة Bootstrap + إصلاح كلمة مرور المالك
 // ═══════════════════════════════════════════
 
 const CORS_HEADERS = {
@@ -101,7 +94,6 @@ function sanitize(str) {
   if (!str || typeof str !== 'string') return '';
   return str.replace(/[<>]/g, '').replace(/javascript:/gi, '').replace(/on\w+=/gi, '').trim().slice(0, 1000);
 }
-/* v2.0: تطبيع لغة الطلب */
 function normLang(v) {
   return (v === 'en') ? 'en' : 'ar';
 }
@@ -137,7 +129,7 @@ async function ledgerInsert(env, order, kind) {
 }
 
 // ═══════════════════════════════════════════
-//  الحذف الكسول (طلب غير مسلّم متوقف ساعة)
+//  الحذف الكسول
 // ═══════════════════════════════════════════
 async function purgeStaleOrders(env) {
   try {
@@ -164,7 +156,7 @@ async function purgeStaleOrders(env) {
 }
 
 // ═══════════════════════════════════════════
-//  توليد رقم طلب عشوائي (بدون #)
+//  توليد رقم طلب عشوائي
 // ═══════════════════════════════════════════
 async function generateOrderNumber(db) {
   const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -252,7 +244,6 @@ async function requireAuth(request, env, allowedRoles) {
 // ═══════════════════════════════════════════
 async function handleBootstrap(env) {
   try {
-    // التحقق من وجود حساب super_admin بالفعل
     const existing = await env.DB.prepare("SELECT id, username FROM users WHERE role = 'super_admin' LIMIT 1").first();
     if (existing) {
       return json({ 
@@ -262,7 +253,6 @@ async function handleBootstrap(env) {
       }, 409);
     }
     
-    // إنشاء حساب المالك
     const username = 'owner';
     const password = '123456';
     const salt = generateSalt();
@@ -282,6 +272,38 @@ async function handleBootstrap(env) {
     }, 201);
   } catch (e) {
     console.error('Bootstrap error:', e);
+    return json({ success: false, error: e.message }, 500);
+  }
+}
+
+// ═══════════════════════════════════════════
+//  0.5) إصلاح كلمة مرور المالك (PBKDF2)
+// ═══════════════════════════════════════════
+async function handleFixOwnerPassword(env) {
+  try {
+    const user = await env.DB.prepare("SELECT id FROM users WHERE username = 'owner' AND role = 'super_admin'").first();
+    if (!user) {
+      return json({ success: false, error: 'حساب المالك غير موجود' }, 404);
+    }
+    
+    const password = '123456';
+    const salt = generateSalt();
+    const hash = await hashPassword(password, salt);
+    
+    await env.DB.prepare(`
+      UPDATE users SET password_hash = ?, password_salt = ?, must_change_password = 0
+      WHERE id = ?
+    `).bind(hash, salt, user.id).run();
+    
+    return json({
+      success: true,
+      message: 'تم تحديث كلمة المرور بنجاح',
+      username: 'owner',
+      password: '123456',
+      note: 'يمكنك الآن تسجيل الدخول'
+    });
+  } catch (e) {
+    console.error('Fix password error:', e);
     return json({ success: false, error: e.message }, 500);
   }
 }
@@ -386,7 +408,7 @@ async function handleChangePassword(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  4) إنشاء طلب (v2.0: + lang)
+//  4) إنشاء طلب
 // ═══════════════════════════════════════════
 async function handleCreateOrder(request, env) {
   const ip = getIP(request);
@@ -442,7 +464,7 @@ async function handleCreateOrder(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  5) تتبع الطلب (v2.0: + lang)
+//  5) تتبع الطلب
 // ═══════════════════════════════════════════
 async function handleTrackOrder(orderNumber, env) {
   const order = await env.DB.prepare(`
@@ -494,7 +516,7 @@ async function handleTrackOrder(orderNumber, env) {
 }
 
 // ═══════════════════════════════════════════
-//  6) طلبات المشرف (v2.0: + lang)
+//  6) طلبات المشرف
 // ═══════════════════════════════════════════
 async function handleSupervisorOrders(request, env) {
   const auth = await requireAuth(request, env, ['supervisor', 'super_admin']);
@@ -533,7 +555,7 @@ async function handleSupervisorDrivers(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  8) حوض طلبات الفرع (v2.0: + lang)
+//  8) حوض طلبات الفرع
 // ═══════════════════════════════════════════
 async function handleBranchPool(request, env) {
   const auth = await requireAuth(request, env, ['driver', 'supervisor', 'super_admin']);
@@ -590,7 +612,7 @@ async function handleClaim(orderId, request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  10) توصيلات السائق (v2.0: + lang)
+//  10) توصيلات السائق
 // ═══════════════════════════════════════════
 async function handleDriverOrders(request, env) {
   const auth = await requireAuth(request, env, ['driver']);
@@ -614,7 +636,7 @@ async function handleDriverOrders(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  11) تغيير الحالة (+ دفتر)
+//  11) تغيير الحالة
 // ═══════════════════════════════════════════
 async function handleUpdateStatus(orderId, request, env) {
   const auth = await requireAuth(request, env, null);
@@ -745,7 +767,7 @@ async function handleGetPhoto(orderId, request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  16) كل الطلبات (المالك) (v2.0: + lang)
+//  16) كل الطلبات (المالك)
 // ═══════════════════════════════════════════
 async function handleAdminOrders(request, env) {
   const auth = await requireAuth(request, env, ['super_admin']);
@@ -922,7 +944,7 @@ async function handleReportsSummary(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  19) التقرير المحاسبي (الإيراد = المسلّم فقط)
+//  19) التقرير المحاسبي
 // ═══════════════════════════════════════════
 async function handleReportsAccounting(request, env) {
   const auth = await requireAuth(request, env, ['super_admin', 'supervisor']);
@@ -1027,8 +1049,9 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
     try {
-      if (path === '/api/health' && request.method === 'GET') return json({ status: 'ok', version: '2.0', live_mode: env.LIVE_MODE || 'polling' });
+      if (path === '/api/health' && request.method === 'GET') return json({ status: 'ok', version: '2.0.1', live_mode: env.LIVE_MODE || 'polling' });
       if (path === '/api/bootstrap' && request.method === 'POST') return await handleBootstrap(env);
+      if (path === '/api/fix-password' && request.method === 'POST') return await handleFixOwnerPassword(env);
       if (path === '/api/auth/login' && request.method === 'POST') return await handleLogin(request, env);
       if (path === '/api/auth/admin-bridge' && request.method === 'POST') return await handleAdminBridge(request, env);
       if (path === '/api/auth/change-password' && request.method === 'POST') return await handleChangePassword(request, env);
@@ -1125,5 +1148,5 @@ export default {
 };
 
 // ═══════════════════════════════════════════
-//  نهاية worker/index.js (v2.0)
+//  نهاية worker/index.js (v2.0.1)
 // ═══════════════════════════════════════════
