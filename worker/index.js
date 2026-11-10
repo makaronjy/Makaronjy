@@ -8,6 +8,7 @@
 //  • الإيراد = المسلّم فقط في accounting
 //  • حذف كسول فوري + دفتر محاسبي + GET صورة الإثبات
 //  • حوض الطلبات + claim + أرقام عشوائية بدون #
+//  • Bootstrap: إنشاء حساب المالك الأول تلقائياً
 // ═══════════════════════════════════════════
 
 const CORS_HEADERS = {
@@ -244,6 +245,45 @@ async function requireAuth(request, env, allowedRoles) {
   if (!user) return { error: error('الحساب معطل أو غير موجود', 403) };
   if (allowedRoles && !allowedRoles.includes(user.role)) return { error: error('صلاحيات غير كافية', 403) };
   return { user };
+}
+
+// ═══════════════════════════════════════════
+//  0) Bootstrap - إنشاء حساب المالك الأول
+// ═══════════════════════════════════════════
+async function handleBootstrap(env) {
+  try {
+    // التحقق من وجود حساب super_admin بالفعل
+    const existing = await env.DB.prepare("SELECT id, username FROM users WHERE role = 'super_admin' LIMIT 1").first();
+    if (existing) {
+      return json({ 
+        success: false, 
+        error: 'حساب المالك موجود بالفعل',
+        existing_username: existing.username
+      }, 409);
+    }
+    
+    // إنشاء حساب المالك
+    const username = 'owner';
+    const password = '123456';
+    const salt = generateSalt();
+    const hash = await hashPassword(password, salt);
+    
+    await env.DB.prepare(`
+      INSERT INTO users (name, phone, username, password_hash, password_salt, role, is_active, must_change_password)
+      VALUES (?, ?, ?, ?, ?, ?, 1, 0)
+    `).bind('مالك النظام', '966500000000', username, hash, salt, 'super_admin').run();
+    
+    return json({
+      success: true,
+      message: 'تم إنشاء حساب المالك بنجاح',
+      username: username,
+      password: password,
+      note: 'يمكنك الآن تسجيل الدخول باستخدام هذه البيانات'
+    }, 201);
+  } catch (e) {
+    console.error('Bootstrap error:', e);
+    return json({ success: false, error: e.message }, 500);
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -988,6 +1028,7 @@ export default {
     const path = url.pathname;
     try {
       if (path === '/api/health' && request.method === 'GET') return json({ status: 'ok', version: '2.0', live_mode: env.LIVE_MODE || 'polling' });
+      if (path === '/api/bootstrap' && request.method === 'POST') return await handleBootstrap(env);
       if (path === '/api/auth/login' && request.method === 'POST') return await handleLogin(request, env);
       if (path === '/api/auth/admin-bridge' && request.method === 'POST') return await handleAdminBridge(request, env);
       if (path === '/api/auth/change-password' && request.method === 'POST') return await handleChangePassword(request, env);
