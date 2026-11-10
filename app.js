@@ -1,7 +1,6 @@
 /* =====================================================
 مكرونجي — سكربت التطبيق الرئيسي (app.js)
-v15.8.1: سطر واحد للعنوان + تأكيد عند اختيار الفرع + فقاعة فوق الدبوس
-         + v16: handlers التنبيهات، بياناتي، وسياسة الخصوصية + Web Push
+v15.8: سطر واحد للعنوان + تأكيد عند اختيار الفرع + فقاعة فوق الدبوس
 ===================================================== */
 /* ===== استعادة لقطة محلية عند فشل تحميل الملفات ===== */
 (function(){
@@ -30,7 +29,7 @@ function pushGuard(){
 }
 /* ===== Stack للنوافذ: حالة تاريخ + موضع تمرير لكل نافذة ===== */
 let overlayStack = [];
-const LOCK_TYPES = ['detail','featured','sidemenu','fav','slot','welcome','notif','data','privacy'];
+const LOCK_TYPES = ['detail','featured','sidemenu','fav','slot','welcome'];
 function restoreScroll(y){
   setTimeout(()=>{ window.scrollTo({top:y, behavior:'instant'}); }, 30);
 }
@@ -70,9 +69,6 @@ function closeByType(t){
     el('welcome').classList.remove('show');
     document.body.style.overflow='';
   }
-  else if(t==='notif') closeNotifModal();
-  else if(t==='data') closeDataModal();
-  else if(t==='privacy') closePrivacyModal();
 }
 pushGuard();
 document.addEventListener('DOMContentLoaded', pushGuard);
@@ -95,9 +91,6 @@ function confirmShown(){ return el('confirmModal').classList.contains('show'); }
 function adShown(){ return el('adModal').classList.contains('show'); }
 function closedShown(){ return el('closedModal').classList.contains('show'); }
 function detailShown(){ const d = el('detail'); return !!d && d.classList.contains('show'); }
-function notifShown(){ const m = el('notifModal'); return !!m && m.classList.contains('show'); }
-function dataShown(){ const m = el('dataModal'); return !!m && m.classList.contains('show'); }
-function privacyShown(){ const m = el('privacyModal'); return !!m && m.classList.contains('show'); }
 function tt(key, ar, en){
   const v = (window.I18N && T()[key] !== undefined) ? T()[key] : undefined;
   return (v !== undefined && typeof v !== 'function') ? v : (currentLang==='ar' ? ar : en);
@@ -556,7 +549,6 @@ function applyLang(lang){
   updateCart();
   updateFavBadge();
   if(el('favSheet').classList.contains('show')) renderFavSheet();
-  updateNotifStatus();
   setTimeout(()=>{ catsSign = 0; catsPos = 0; cats.scrollLeft = 0; }, 50);
 }
 function toggleLang(){ applyLang(currentLang==='ar' ? 'en' : 'ar'); }
@@ -1067,9 +1059,6 @@ document.addEventListener('keydown', e=>{
   if(e.key==='Escape' && actionToastShown()){ hideActionToast(); return; }
   if(e.key==='Escape' && searchModeOn()){ closeSearchMode(); return; }
   if(e.key==='Escape' && gateShown()){ closeGate(); return; }
-  if(e.key==='Escape' && notifShown()){ closeNotifModal(); return; }
-  if(e.key==='Escape' && dataShown()){ closeDataModal(); return; }
-  if(e.key==='Escape' && privacyShown()){ closePrivacyModal(); return; }
   if(!featuredShown()) return;
   if(e.key==='Escape') closeFeatured();
   else if(e.key==='ArrowLeft') manualNav(1);
@@ -1086,7 +1075,7 @@ window.addEventListener('popstate', ()=>{
     return;
   }
   guardOn = false;
-  const anyOverlay = welcomeShown() || sheetShown() || drawerShown() || featuredShown() || adShown() || gateShown() || closedShown() || detailShown() || actionToastShown() || el('favSheet').classList.contains('show') || el('slotPicker').classList.contains('show') || confirmShown() || notifShown() || dataShown() || privacyShown();
+  const anyOverlay = welcomeShown() || sheetShown() || drawerShown() || featuredShown() || adShown() || gateShown() || closedShown() || detailShown() || actionToastShown() || el('favSheet').classList.contains('show') || el('slotPicker').classList.contains('show') || confirmShown();
   if(anyOverlay){
     goHome();
     pushGuard();
@@ -1803,7 +1792,6 @@ function openSideMenu(){
   el('sideMenuBack').hidden = false;
   el('sideMenu').setAttribute('aria-hidden','false');
   updateFavBadge();
-  updateNotifStatus();
 }
 function closeSideMenu(){
   document.body.classList.remove('sm-open');
@@ -2349,9 +2337,6 @@ function goHome(){
   if(el('favSheet').classList.contains('show')) closeFavSheet();
   if(el('slotPicker').classList.contains('show')) closeSlotPicker();
   if(confirmShown()) resolveConfirm(false);
-  if(notifShown()) closeNotifModal();
-  if(dataShown()) closeDataModal();
-  if(privacyShown()) closePrivacyModal();
   overlayStack.length = 0;
 }
 
@@ -2406,315 +2391,4 @@ function goHome(){
       urls.forEach(u=>{ fetch(u).catch(()=>{}); });
     })();
   }
-  loadUserData();
-  updateNotifStatus();
 })();
-
-/* =====================================================
-   ===== v16: نوافذ التنبيهات، بياناتي، وسياسة الخصوصية =====
-   ===== + Web Push API + حفظ البيانات المحلية =====
-   ===================================================== */
-
-/* ===== حفظ بيانات المستخدم (الاسم والجوال) ===== */
-const USER_DATA_KEY = 'mk_user_data';
-function getUserData(){
-  try{ return JSON.parse(localStorage.getItem(USER_DATA_KEY)) || {name:'',phone:''}; }
-  catch(e){ return {name:'',phone:''}; }
-}
-function saveUserDataToStorage(data){
-  try{ localStorage.setItem(USER_DATA_KEY, JSON.stringify(data)); }catch(e){}
-}
-function loadUserData(){
-  const data = getUserData();
-  const cName = el('cName'), cPhone = el('cPhone');
-  if(cName && data.name) cName.value = data.name;
-  if(cPhone && data.phone) cPhone.value = data.phone;
-}
-function saveUserData(){
-  const name = el('dataName') ? el('dataName').value.trim() : '';
-  const phone = el('dataPhone') ? el('dataPhone').value.trim() : '';
-  saveUserDataToStorage({name, phone});
-  const cName = el('cName'), cPhone = el('cPhone');
-  if(cName) cName.value = name;
-  if(cPhone) cPhone.value = phone;
-  toast(tt('dataSaved','✔ تم حفظ بياناتك','✔ Your data has been saved'));
-  closeDataModal();
-}
-
-/* ===== Web Push Notifications ===== */
-const VAPID_PUBLIC_KEY = 'PLACEHOLDER_VAPID_KEY'; // سيُستبدل بعد توليد المفاتيح
-let pushSubscription = null;
-
-function urlBase64ToUint8Array(base64String){
-  const padding = '='.repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for(let i = 0; i < rawData.length; ++i){
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
-}
-
-async function getPushPermission(){
-  if(!('Notification' in window)) return 'unsupported';
-  if(!('serviceWorker' in navigator)) return 'unsupported';
-  if(Notification.permission === 'granted') return 'granted';
-  if(Notification.permission === 'denied') return 'denied';
-  try{
-    const permission = await Notification.requestPermission();
-    return permission;
-  }catch(e){
-    return 'denied';
-  }
-}
-
-async function subscribeToPush(){
-  try{
-      /* =====================================================
-   ===== v16: نوافذ التنبيهات، بياناتي، وسياسة الخصوصية =====
-   ===== + Web Push API + حفظ البيانات المحلية =====
-   ===================================================== */
-
-/* ===== حفظ بيانات المستخدم (الاسم والجوال) ===== */
-const USER_DATA_KEY = 'mk_user_data';
-function getUserData(){
-  try{ return JSON.parse(localStorage.getItem(USER_DATA_KEY)) || {name:'',phone:''}; }
-  catch(e){ return {name:'',phone:''}; }
-}
-function saveUserDataToStorage(data){
-  try{ localStorage.setItem(USER_DATA_KEY, JSON.stringify(data)); }catch(e){}
-}
-function loadUserData(){
-  const data = getUserData();
-  const cName = el('cName'), cPhone = el('cPhone');
-  if(cName && data.name) cName.value = data.name;
-  if(cPhone && data.phone) cPhone.value = data.phone;
-}
-function saveUserData(){
-  const name = el('dataName') ? el('dataName').value.trim() : '';
-  const phone = el('dataPhone') ? el('dataPhone').value.trim() : '';
-  saveUserDataToStorage({name, phone});
-  const cName = el('cName'), cPhone = el('cPhone');
-  if(cName) cName.value = name;
-  if(cPhone) cPhone.value = phone;
-  toast(tt('dataSaved','✔ تم حفظ بياناتك','✔ Your data has been saved'));
-  closeDataModal();
-}
-
-/* ===== Web Push Notifications ===== */
-const VAPID_PUBLIC_KEY = 'PLACEHOLDER_VAPID_KEY';
-let pushSubscription = null;
-
-function urlBase64ToUint8Array(base64String){
-  const padding = '='.repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for(let i = 0; i < rawData.length; ++i){
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
-}
-
-async function getPushPermission(){
-  if(!('Notification' in window)) return 'unsupported';
-  if(!('serviceWorker' in navigator)) return 'unsupported';
-  if(Notification.permission === 'granted') return 'granted';
-  if(Notification.permission === 'denied') return 'denied';
-  try{
-    const permission = await Notification.requestPermission();
-    return permission;
-  }catch(e){ return 'denied'; }
-}
-
-async function subscribeToPush(){
-  try{
-    if(VAPID_PUBLIC_KEY === 'PLACEHOLDER_VAPID_KEY'){
-      console.warn('VAPID key not configured yet');
-      return false;
-    }
-    const registration = await navigator.serviceWorker.ready;
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-    });
-    pushSubscription = subscription;
-    localStorage.setItem('mk_push_sub', JSON.stringify(subscription));
-    return true;
-  }catch(e){
-    console.error('Push subscription failed:', e);
-    return false;
-  }
-}
-
-async function unsubscribeFromPush(){
-  try{
-    if(pushSubscription){
-      await pushSubscription.unsubscribe();
-      pushSubscription = null;
-      localStorage.removeItem('mk_push_sub');
-    }
-    return true;
-  }catch(e){ return false; }
-}
-
-async function toggleNotifications(){
-  const hint = el('notifHint');
-  const permission = await getPushPermission();
-  
-  if(permission === 'unsupported'){
-    if(hint){
-      hint.textContent = tt('notifHintUnsupported','متصفحك لا يدعم التنبيهات.','Your browser does not support notifications.');
-      hint.style.display = '';
-    }
-    updateNotifStatus();
-    return;
-  }
-  
-  if(permission === 'denied'){
-    if(hint){
-      hint.textContent = tt('notifHintDenied','التنبيهات محظورة حالياً — يمكنك تفعيلها من إعدادات المتصفح/الجهاز.','Notifications are currently blocked — enable them from browser/device settings.');
-      hint.style.display = '';
-    }
-    updateNotifStatus();
-    return;
-  }
-  
-  if(hint) hint.style.display = 'none';
-  
-  if(pushSubscription){
-    await unsubscribeFromPush();
-    toast(tt('notifDisabledOk','تم تعطيل التنبيهات','Notifications disabled'));
-  } else {
-    const ok = await subscribeToPush();
-    if(ok) toast(tt('notifSuccess','✔ تم تفعيل التنبيهات بنجاح','✔ Notifications enabled successfully'));
-    else toast('تعذر تفعيل التنبيهات');
-  }
-  updateNotifStatus();
-}
-
-function updateNotifStatus(){
-  const status = el('notifStatus');
-  const btn = el('notifBtn');
-  const smStatus = el('smNotifStatus');
-  const isSubscribed = !!pushSubscription;
-  const isDenied = ('Notification' in window) && Notification.permission === 'denied';
-  
-  if(status){
-    status.classList.remove('on','denied');
-    if(isSubscribed){
-      status.textContent = tt('notifEnabled','التنبيهات مفعّلة ✓','Notifications Enabled ✓');
-      status.classList.add('on');
-    } else if(isDenied){
-      status.textContent = tt('notifDisabled','التنبيهات معطّلة','Notifications Disabled');
-      status.classList.add('denied');
-    } else {
-      status.textContent = tt('notifDisabled','التنبيهات معطّلة','Notifications Disabled');
-    }
-  }
-  
-  if(btn){
-    btn.classList.remove('off');
-    if(isSubscribed){
-      btn.textContent = tt('notifDisable','تعطيل','Disable');
-      btn.classList.add('off');
-      btn.disabled = false;
-    } else if(isDenied){
-      btn.textContent = tt('notifEnable','تفعيل','Enable');
-      btn.disabled = true;
-    } else {
-      btn.textContent = tt('notifEnable','تفعيل','Enable');
-      btn.disabled = false;
-    }
-  }
-  
-  if(smStatus){
-    smStatus.textContent = isSubscribed ? (currentLang==='ar'?'مفعّلة ✓':'On') : (currentLang==='ar'?'معطّلة':'Off');
-    smStatus.classList.toggle('on', isSubscribed);
-  }
-}
-
-/* ===== نوافذ التنبيهات، بياناتي، وسياسة الخصوصية ===== */
-function notifShown(){ const m = el('notifModal'); return !!m && m.classList.contains('show'); }
-function dataShown(){ const m = el('dataModal'); return !!m && m.classList.contains('show'); }
-function privacyShown(){ const m = el('privacyModal'); return !!m && m.classList.contains('show'); }
-
-function openNotifModal(){
-  closeSideMenu();
-  pushOverlay('notif');
-  el('notifModal').classList.add('show');
-  document.body.style.overflow = 'hidden';
-  updateNotifStatus();
-}
-function closeNotifModal(){
-  if(!notifShown()) return;
-  el('notifModal').classList.remove('show');
-  document.body.style.overflow = '';
-  settleOverlay('notif');
-}
-
-function openDataModal(){
-  closeSideMenu();
-  pushOverlay('data');
-  const data = getUserData();
-  const nameField = el('dataName'), phoneField = el('dataPhone');
-  if(nameField) nameField.value = data.name || '';
-  if(phoneField) phoneField.value = data.phone || '';
-  el('dataModal').classList.add('show');
-  document.body.style.overflow = 'hidden';
-}
-function closeDataModal(){
-  if(!dataShown()) return;
-  el('dataModal').classList.remove('show');
-  document.body.style.overflow = '';
-  settleOverlay('data');
-}
-
-function openPrivacyModal(){
-  closeSideMenu();
-  pushOverlay('privacy');
-  el('privacyModal').classList.add('show');
-  document.body.style.overflow = 'hidden';
-}
-function closePrivacyModal(){
-  if(!privacyShown()) return;
-  el('privacyModal').classList.remove('show');
-  document.body.style.overflow = '';
-  settleOverlay('privacy');
-}
-
-/* ربط الأزرار */
-(function bindV16Buttons(){
-  const smNotif = el('smNotif'), smData = el('smData'), smPrivacy = el('smPrivacy');
-  if(smNotif) smNotif.addEventListener('click', openNotifModal);
-  if(smData) smData.addEventListener('click', openDataModal);
-  if(smPrivacy) smPrivacy.addEventListener('click', openPrivacyModal);
-  
-  const notifBtn = el('notifBtn');
-  if(notifBtn) notifBtn.addEventListener('click', toggleNotifications);
-  
-  const dataSaveBtn = document.querySelector('#dataModal .data-save');
-  if(dataSaveBtn) dataSaveBtn.addEventListener('click', saveUserData);
-  
-  const privacyCloseBtn = document.querySelector('#privacyModal .priv-close-btn');
-  if(privacyCloseBtn) privacyCloseBtn.addEventListener('click', closePrivacyModal);
-})();
-
-/* تهيئة حالة التنبيهات عند الإقلاع */
-(function initPushState(){
-  try{
-    const saved = localStorage.getItem('mk_push_sub');
-    if(saved){
-      pushSubscription = JSON.parse(saved);
-      if(!pushSubscription || !pushSubscription.endpoint){
-        pushSubscription = null;
-        localStorage.removeItem('mk_push_sub');
-      }
-    }
-  }catch(e){ pushSubscription = null; }
-  updateNotifStatus();
-  loadUserData();
-})();
-
-/* ===== END v16 additions ===== */
