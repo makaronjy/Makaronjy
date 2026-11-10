@@ -378,6 +378,23 @@ html[dir="ltr"] .fav-badge{left:auto;right:-4px}
 .closed-btn{width:100%;border:none;border-radius:12px;padding:.85rem;background:linear-gradient(135deg,var(--gold),var(--gold2));
   color:var(--dark);font-family:inherit;font-weight:900;font-size:.95rem;cursor:pointer;transition:.2s;
   box-shadow:0 6px 16px rgba(224,145,47,.4)}
+/* ===== نمط القائمة ===== */
+.listwrap{display:flex;flex-direction:column;gap:.8rem}
+.lrow{display:flex;gap:.8rem;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:.7rem;cursor:pointer;transition:.2s;box-shadow:0 2px 8px rgba(90,24,48,.06)}
+.lrow:active{transform:scale(.99)}
+.lrow.card-gray{opacity:.6;filter:grayscale(.85);border-style:dashed}
+.l-img{width:96px;height:96px;flex-shrink:0;border-radius:14px;overflow:hidden;background-color:var(--phbg);background-image:url('img/bg.png');background-size:cover;background-position:center}
+.l-img img{width:100%;height:100%;object-fit:contain;padding:6%;display:block}
+.l-img img.full{object-fit:cover;padding:0}
+.l-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:.3rem}
+.l-body h4{font-size:.95rem;font-weight:900;color:var(--ink);line-height:1.5}
+.l-desc{color:var(--muted);font-size:.72rem;font-weight:700;line-height:1.6;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.l-badges{display:flex;gap:.4rem;flex-wrap:wrap}
+.l-badge{background:#eef0f2;color:#5f6b74;border-radius:50px;padding:.15rem .6rem;font-size:.66rem;font-weight:900}
+.l-badge.cal{background:#fff6e6;color:#a06b1c}
+.l-badge.sold{background:#fee2e2;color:#b91c1c}
+.l-badge.best{background:#dcf5e8;color:#186a3a;cursor:pointer}
+.l-price{margin-top:auto;font-weight:900;color:var(--ink);font-size:.95rem}
 /* ===== صفحة تفاصيل الصنف ===== */
 .detail{position:fixed;inset:0;z-index:2600;background:var(--cream);display:flex;flex-direction:column;opacity:0;pointer-events:none;transition:.35s;transform:translateY(4%)}
 .detail.show{opacity:1;pointer-events:auto;transform:translateY(0)}
@@ -502,18 +519,11 @@ body.sm-open #sideMenu{ transform:none !important; }
 body.sm-open{ overflow:hidden; }
 .sm-head{ display:flex; align-items:center; justify-content:space-between; color:var(--gold2); font-size:1.15rem; margin-bottom:14px; }
 .sm-head button{ width:36px; height:36px; border:none; cursor:pointer; border-radius:12px; background:rgba(255,255,255,.12); color:#fff; font-size:1rem; }
-/* ★ تعديل v16.1: فصل أزرار القائمة عن بعضها (كانت ملتصقة) ★ */
 .sm-item{
   width:100%; border:none; cursor:pointer; display:flex; align-items:center; gap:10px;
   background:rgba(255,255,255,.1); color:#fff; font-weight:800; font-size:.95rem;
-  border-radius:16px; padding:14px 16px;
-  margin-bottom:10px;                                   /* ★ الفصل بين الأزرار ★ */
-  box-shadow:0 2px 8px -4px rgba(0,0,0,.35);            /* ★ ظل خفيف يبرز كل زر ★ */
-  transition:background .2s, transform .15s;
+  border-radius:16px; padding:14px 16px; transition:background .2s;
 }
-.sm-item:last-of-type{ margin-bottom:0; }               /* ★ بدون مسافة زائدة بعد آخر زر ★ */
-.sm-item:active{ transform:scale(.985); }
-.sm-item:hover{ background:rgba(255,255,255,.18); }
 .sm-badge{ margin-inline-start:auto; min-width:24px; height:24px; padding:0 7px; border-radius:50px;
   background:var(--gold); color:var(--dark); font-weight:900; font-size:.8rem;
   display:flex; align-items:center; justify-content:center; }
@@ -676,179 +686,10 @@ body.cb-on footer{ padding-bottom:86px; }
 #actionToast .at-no{border:none;cursor:pointer;background:transparent;color:var(--gold2);
   border:1.5px solid #ffffff33;border-radius:50px;padding:6px 14px;font-weight:900;font-size:.75rem;font-family:inherit}
 
-/* ═════════════════════════════════════════════════════════════════
-   ===== v16: نوافذ التنبيهات، بياناتي، وسياسة الخصوصية =====
-   ═════════════════════════════════════════════════════════════════ */
-
-/* --- الحاوية المشتركة للنوافذ الثلاث (modal) --- */
-.mk-modal{
-  position:fixed; inset:0; z-index:2500;
-  background:rgba(40,10,22,.72); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
-  display:flex; align-items:center; justify-content:center;
-  padding:1rem; opacity:0; pointer-events:none; transition:.35s;
-}
-.mk-modal.show{ opacity:1; pointer-events:auto; }
-.mk-modal-card{
-  width:min(420px,92vw); max-height:88vh; overflow-y:auto;
-  background:var(--cream); border-radius:24px;
-  padding:1.6rem 1.3rem 1.4rem; position:relative;
-  border:2px solid var(--gold);
-  box-shadow:0 24px 70px rgba(0,0,0,.55);
-  transform:translateY(30px) scale(.94);
-  transition:.4s cubic-bezier(.2,.9,.3,1.15);
-}
-.mk-modal.show .mk-modal-card{ transform:translateY(0) scale(1); }
-.mk-modal-close{
-  position:absolute; top:12px; left:12px;
-  width:34px; height:34px; border-radius:50%; border:none;
-  background:#00000012; color:var(--brown);
-  font-weight:900; cursor:pointer; font-size:1rem; transition:.2s;
-}
-.mk-modal-close:hover{ background:#00000022; transform:rotate(90deg); }
-
-/* --- عنوان النافذة المشترك --- */
-.mk-modal-title{
-  color:var(--brown); font-weight:900; font-size:1.2rem;
-  text-align:center; margin:0 0 .3rem; line-height:1.5;
-}
-.mk-modal-desc{
-  color:var(--muted); font-weight:700; font-size:.82rem;
-  text-align:center; line-height:1.8; margin:0 0 1rem;
-}
-
-/* ═══ نافذة التنبيهات ═══ */
-#notifModal .mk-modal-card{ text-align:center; }
-.notif-ico{
-  width:80px; height:80px; border-radius:50%;
-  background:linear-gradient(135deg,var(--gold),var(--gold2));
-  display:grid; place-items:center; margin:0 auto .9rem;
-  font-size:2.3rem; box-shadow:0 8px 22px rgba(224,145,47,.45);
-  animation:confirmPop .45s cubic-bezier(.2,.9,.3,1.4);
-}
-.notif-status{
-  display:inline-block; margin:.5rem 0 1rem;
-  padding:.5rem 1.2rem; border-radius:50px;
-  font-weight:900; font-size:.85rem;
-  border:1.5px solid var(--line); background:#fff; color:var(--muted);
-}
-.notif-status.on{
-  background:#dcf5e8; color:#186a3a; border-color:#186a3a33;
-}
-.notif-status.denied{
-  background:#fee2e2; color:#b91c1c; border-color:#b91c1c33;
-}
-.notif-hint{
-  background:#fff6e6; border:1px dashed var(--gold); border-radius:12px;
-  padding:.7rem .9rem; font-size:.78rem; font-weight:700;
-  color:#a06b1c; line-height:1.8; margin:.6rem 0 1rem; text-align:start;
-}
-.notif-btn{
-  width:100%; border:none; border-radius:14px;
-  padding:.95rem; font-family:inherit; font-weight:900; font-size:.98rem;
-  cursor:pointer; transition:.2s;
-  background:linear-gradient(135deg,var(--gold),var(--gold2));
-  color:var(--dark);
-  box-shadow:0 6px 16px rgba(224,145,47,.4);
-}
-.notif-btn:active{ transform:scale(.98); }
-.notif-btn.off{
-  background:#fff; color:var(--brown);
-  border:1.5px solid var(--line); box-shadow:none;
-}
-.notif-btn:disabled{ opacity:.5; cursor:not-allowed; }
-
-/* ═══ نافذة بياناتي ═══ */
-#dataModal .mk-modal-card{ text-align:start; }
-.data-field{ margin-bottom:1rem; }
-.data-field label{
-  display:block; color:var(--brown); font-weight:900;
-  font-size:.85rem; margin-bottom:.35rem;
-}
-.data-field input{
-  width:100%; border:2px solid rgba(90,24,48,.18); border-radius:14px;
-  background:#fff; padding:.85rem 1rem;
-  font-family:inherit; font-weight:700; color:var(--ink); font-size:.95rem;
-  outline:none; transition:border-color .2s;
-}
-.data-field input:focus{ border-color:var(--gold); }
-.data-field input[dir="ltr"]{ text-align:left; }
-.data-hint{
-  background:#e8f5e9; border:1px solid #128c5e33; border-radius:10px;
-  padding:.55rem .8rem; font-size:.75rem; font-weight:700;
-  color:#2d6a4f; line-height:1.7; margin:.5rem 0 1rem;
-}
-.data-save{
-  width:100%; border:none; border-radius:14px;
-  padding:.95rem; font-family:inherit; font-weight:900; font-size:.98rem;
-  cursor:pointer; transition:.2s;
-  background:linear-gradient(135deg,var(--gold),var(--gold2));
-  color:var(--dark);
-  box-shadow:0 6px 16px rgba(224,145,47,.4);
-}
-.data-save:active{ transform:scale(.98); }
-
-/* ═══ نافذة سياسة الخصوصية ═══ */
-#privacyModal .mk-modal-card{ text-align:start; }
-.priv-intro{
-  background:linear-gradient(135deg,#fffdf8,#fff6e6);
-  border:1.5px dashed var(--gold); border-radius:14px;
-  padding:.85rem 1rem; margin-bottom:1.1rem;
-  font-size:.82rem; font-weight:700; color:var(--muted);
-  line-height:1.9; text-align:center;
-}
-.priv-section{
-  background:#fff; border:1.5px solid var(--line); border-radius:14px;
-  padding:.85rem 1rem; margin-bottom:.7rem;
-  transition:border-color .2s;
-}
-.priv-section:hover{ border-color:var(--gold); }
-.priv-section h5{
-  color:var(--brown); font-size:.92rem; font-weight:900;
-  margin:0 0 .35rem; line-height:1.5;
-}
-.priv-section p{
-  color:var(--ink); font-size:.8rem; font-weight:700;
-  line-height:1.8; margin:0;
-}
-.priv-footer{
-  text-align:center; margin-top:1.1rem;
-  padding-top:.8rem; border-top:1px dashed var(--line);
-}
-.priv-footer p{
-  color:var(--muted); font-size:.75rem; font-weight:700;
-  line-height:1.7; margin:0 0 .3rem;
-}
-.priv-footer .rights{
-  color:var(--brown); font-weight:900; font-size:.78rem;
-  margin-top:.4rem;
-}
-.priv-close-btn{
-  width:100%; border:none; border-radius:14px;
-  padding:.85rem; font-family:inherit; font-weight:900; font-size:.95rem;
-  cursor:pointer; transition:.2s; margin-top:.8rem;
-  background:var(--brown); color:#fff;
-}
-.priv-close-btn:active{ transform:scale(.98); }
-
-/* --- زر التنبيهات في القائمة الجانبية (badge on/off) --- */
-.sm-item.notif-btn-item .sm-notif-status{
-  margin-inline-start:auto; min-width:auto; height:24px;
-  padding:0 10px; border-radius:50px;
-  font-weight:900; font-size:.68rem;
-  display:flex; align-items:center; justify-content:center;
-  background:rgba(255,255,255,.18); color:#ffffffb0;
-}
-.sm-item.notif-btn-item .sm-notif-status.on{
-  background:#dcf5e8; color:#186a3a;
-}
-
 @media (max-width:360px){
   .ot-head{ font-size:.88rem; }
   .ot-sub{ font-size:.72rem; }
   .cb-total b{ font-size:.95rem; }
   .cb-view{ padding:11px 16px; font-size:.85rem; }
   .otp-zone-title{ font-size:.8rem; }
-  .mk-modal-title{ font-size:1.05rem; }
-  .mk-modal-card{ padding:1.3rem 1rem 1.1rem; }
-  .priv-section h5{ font-size:.86rem; }
 }
