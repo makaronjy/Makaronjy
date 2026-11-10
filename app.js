@@ -1,7 +1,6 @@
 /* =====================================================
 مكرونجي — سكربت التطبيق الرئيسي (app.js)
-v15.9: كل ميزات v15.8 كما هي بدون أي حذف +
-       دمج v16 داخل نفس الملف: التنبيهات Push + بياناتي + سياسة الخصوصية
+v15.9: كل ميزات v15.8 + v16 (التنبيهات + بياناتي + الخصوصية)
 ===================================================== */
 /* ===== استعادة لقطة محلية عند فشل تحميل الملفات ===== */
 (function(){
@@ -510,8 +509,7 @@ function ensureAppsAccordion(){
     collapseAppsPanel();
   }, true);
 }
-ensureAppsAccordion();
-/* ===== اللغة ===== */
+ensureAppsAccordion();/* ===== اللغة ===== */
 function applyLang(lang){
   currentLang = lang;
   localStorage.setItem('mk_lang', lang);
@@ -1195,7 +1193,7 @@ function buildMenu(){
                onerror="this.onerror=null;this.src='${ph}'">
           ${badge}
           <div class="step ${(sold||gray)?'disabled':''}" data-si="${si}" data-ii="${ii}">
-            <button class="st inc" aria-label="إضافة"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-line-cap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+            <button class="st inc" aria-label="إضافة"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
             <span class="qnum">0</span>
             <button class="st dec" aria-label="إنقاص"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14"/></svg></button>
           </div>
@@ -2412,32 +2410,12 @@ function goHome(){
 
 /* =====================================================
    ===== v16 المدمج: التنبيهات + بياناتي + الخصوصية =====
-   ===== (داخل نفس الملف — بدون ملف جديد) =====
    ===================================================== */
 
-/* ===== فراغات بين أزرار القائمة الجانبية (إصلاح الالتصاق) ===== */
-(function injectV16Css(){
-  if(el('v16Css')) return;
-  const st = document.createElement('style');
-  st.id = 'v16Css';
-  st.textContent =
-    '#sideMenu .sm-item{margin-bottom:10px}' +
-    '#sideMenu .sm-item:last-of-type{margin-bottom:0}' +
-    '.sm-notif-status{margin-inline-start:auto;min-width:auto;height:24px;padding:0 10px;border-radius:50px;' +
-    'font-weight:900;font-size:.68rem;display:flex;align-items:center;justify-content:center;' +
-    'background:rgba(255,255,255,.18);color:#ffffffb0}' +
-    '.sm-notif-status.on{background:#dcf5e8;color:#186a3a}';
-  document.head.appendChild(st);
-})();
-
-/* ===== بيانات المستخدم (محلية فقط) ===== */
-const USER_DATA_KEY = 'mk_user_data';
+/* ===== بيانات المستخدم (محلية فقط — نفس مفتاح cloud.js) ===== */
 function getUserData(){
-  try{ return JSON.parse(localStorage.getItem(USER_DATA_KEY)) || {name:'',phone:''}; }
+  try{ return JSON.parse(localStorage.getItem('mk_customer')) || {name:'',phone:''}; }
   catch(e){ return {name:'',phone:''}; }
-}
-function saveUserDataToStorage(d){
-  try{ localStorage.setItem(USER_DATA_KEY, JSON.stringify(d)); }catch(e){}
 }
 function loadUserData(){
   const d = getUserData();
@@ -2448,23 +2426,31 @@ function loadUserData(){
 function saveUserData(){
   const name = el('dataName') ? el('dataName').value.trim() : '';
   const phone = el('dataPhone') ? el('dataPhone').value.trim() : '';
-  saveUserDataToStorage({name:name, phone:phone});
+  try{ localStorage.setItem('mk_customer', JSON.stringify({name:name, phone:phone})); }catch(e){}
   const n = el('cName'), p = el('cPhone');
   if(n) n.value = name;
   if(p) p.value = phone;
-  toast(tt('dataSaved','✔ تم حفظ بياناتك','✔ Your data has been saved'));
   closeDataModal();
+  toast(tt('dataSaved','✔ تم حفظ بياناتك','✔ Your data has been saved'));
 }
 
-/* ===== Web Push ===== */
-const VAPID_PUBLIC_KEY = 'PLACEHOLDER_VAPID_KEY';
-let pushSubscription = null;
-function urlBase64ToUint8Array(b){
-  const padding = '='.repeat((4 - b.length % 4) % 4);
-  const s = (b + padding).replace(/-/g,'+').replace(/_/g,'/');
-  const raw = window.atob(s);
-  const out = new Uint8Array(raw.length);
-  for(let i=0;i<raw.length;i++) out[i] = raw.charCodeAt(i);
-  return out;
-}
-async function
+/* ===== التنبيهات ===== */
+var mkPushOn = localStorage.getItem('mk_push_on') === '1';
+function updateNotifStatus(){
+  const status = el('notifStatus');
+  const btn = el('notifBtn');
+  const sm = el('smNotifStatus');
+  const denied = ('Notification' in window) && Notification.permission === 'denied';
+  if(status){
+    status.classList.remove('on','denied');
+    if(mkPushOn){ status.textContent = tt('notifEnabled','التنبيهات مفعّلة ✓','Notifications On ✓'); status.classList.add('on'); }
+    else if(denied){ status.textContent = tt('notifDisabled','التنبيهات معطّلة','Notifications Off'); status.classList.add('denied'); }
+    else{ status.textContent = tt('notifDisabled','التنبيهات معطّلة','Notifications Off'); }
+  }
+  if(btn){
+    btn.classList.remove('off');
+    btn.disabled = denied;
+    btn.textContent = mkPushOn ? tt('notifDisable','تعطيل','Disable') : tt('notifEnable','تفعيل','Enable');
+    if(mkPushOn) btn.classList.add('off');
+  }
+  if(sm){
