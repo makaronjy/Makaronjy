@@ -1,6 +1,6 @@
 /* =====================================================
 مكرونجي — سكربت التطبيق الرئيسي (app.js)
-v15.9: كل ميزات v15.8 + v16 (التنبيهات + بياناتي + الخصوصية)
+v15.8: سطر واحد للعنوان + تأكيد عند اختيار الفرع + فقاعة فوق الدبوس
 ===================================================== */
 /* ===== استعادة لقطة محلية عند فشل تحميل الملفات ===== */
 (function(){
@@ -29,7 +29,7 @@ function pushGuard(){
 }
 /* ===== Stack للنوافذ: حالة تاريخ + موضع تمرير لكل نافذة ===== */
 let overlayStack = [];
-const LOCK_TYPES = ['detail','featured','sidemenu','fav','slot','welcome','notif','data','privacy'];
+const LOCK_TYPES = ['detail','featured','sidemenu','fav','slot','welcome'];
 function restoreScroll(y){
   setTimeout(()=>{ window.scrollTo({top:y, behavior:'instant'}); }, 30);
 }
@@ -69,9 +69,6 @@ function closeByType(t){
     el('welcome').classList.remove('show');
     document.body.style.overflow='';
   }
-  else if(t==='notif') closeNotifModal();
-  else if(t==='data') closeDataModal();
-  else if(t==='privacy') closePrivacyModal();
 }
 pushGuard();
 document.addEventListener('DOMContentLoaded', pushGuard);
@@ -94,9 +91,6 @@ function confirmShown(){ return el('confirmModal').classList.contains('show'); }
 function adShown(){ return el('adModal').classList.contains('show'); }
 function closedShown(){ return el('closedModal').classList.contains('show'); }
 function detailShown(){ const d = el('detail'); return !!d && d.classList.contains('show'); }
-function notifShown(){ const m = el('notifModal'); return !!m && m.classList.contains('show'); }
-function dataShown(){ const m = el('dataModal'); return !!m && m.classList.contains('show'); }
-function privacyShown(){ const m = el('privacyModal'); return !!m && m.classList.contains('show'); }
 function tt(key, ar, en){
   const v = (window.I18N && T()[key] !== undefined) ? T()[key] : undefined;
   return (v !== undefined && typeof v !== 'function') ? v : (currentLang==='ar' ? ar : en);
@@ -509,7 +503,8 @@ function ensureAppsAccordion(){
     collapseAppsPanel();
   }, true);
 }
-ensureAppsAccordion();/* ===== اللغة ===== */
+ensureAppsAccordion();
+/* ===== اللغة ===== */
 function applyLang(lang){
   currentLang = lang;
   localStorage.setItem('mk_lang', lang);
@@ -554,7 +549,6 @@ function applyLang(lang){
   updateCart();
   updateFavBadge();
   if(el('favSheet').classList.contains('show')) renderFavSheet();
-  if(typeof updateNotifStatus === 'function') updateNotifStatus();
   setTimeout(()=>{ catsSign = 0; catsPos = 0; cats.scrollLeft = 0; }, 50);
 }
 function toggleLang(){ applyLang(currentLang==='ar' ? 'en' : 'ar'); }
@@ -1065,9 +1059,6 @@ document.addEventListener('keydown', e=>{
   if(e.key==='Escape' && actionToastShown()){ hideActionToast(); return; }
   if(e.key==='Escape' && searchModeOn()){ closeSearchMode(); return; }
   if(e.key==='Escape' && gateShown()){ closeGate(); return; }
-  if(e.key==='Escape' && notifShown()){ closeNotifModal(); return; }
-  if(e.key==='Escape' && dataShown()){ closeDataModal(); return; }
-  if(e.key==='Escape' && privacyShown()){ closePrivacyModal(); return; }
   if(!featuredShown()) return;
   if(e.key==='Escape') closeFeatured();
   else if(e.key==='ArrowLeft') manualNav(1);
@@ -1084,7 +1075,7 @@ window.addEventListener('popstate', ()=>{
     return;
   }
   guardOn = false;
-  const anyOverlay = welcomeShown() || sheetShown() || drawerShown() || featuredShown() || adShown() || gateShown() || closedShown() || detailShown() || actionToastShown() || el('favSheet').classList.contains('show') || el('slotPicker').classList.contains('show') || confirmShown() || notifShown() || dataShown() || privacyShown();
+  const anyOverlay = welcomeShown() || sheetShown() || drawerShown() || featuredShown() || adShown() || gateShown() || closedShown() || detailShown() || actionToastShown() || el('favSheet').classList.contains('show') || el('slotPicker').classList.contains('show') || confirmShown();
   if(anyOverlay){
     goHome();
     pushGuard();
@@ -1801,7 +1792,6 @@ function openSideMenu(){
   el('sideMenuBack').hidden = false;
   el('sideMenu').setAttribute('aria-hidden','false');
   updateFavBadge();
-  if(typeof updateNotifStatus === 'function') updateNotifStatus();
 }
 function closeSideMenu(){
   document.body.classList.remove('sm-open');
@@ -2347,9 +2337,6 @@ function goHome(){
   if(el('favSheet').classList.contains('show')) closeFavSheet();
   if(el('slotPicker').classList.contains('show')) closeSlotPicker();
   if(confirmShown()) resolveConfirm(false);
-  if(notifShown()) closeNotifModal();
-  if(dataShown()) closeDataModal();
-  if(privacyShown()) closePrivacyModal();
   overlayStack.length = 0;
 }
 
@@ -2404,53 +2391,4 @@ function goHome(){
       urls.forEach(u=>{ fetch(u).catch(()=>{}); });
     })();
   }
-  loadUserData();
-  updateNotifStatus();
 })();
-
-/* =====================================================
-   ===== v16 المدمج: التنبيهات + بياناتي + الخصوصية =====
-   ===================================================== */
-
-/* ===== بيانات المستخدم (محلية فقط — نفس مفتاح cloud.js) ===== */
-function getUserData(){
-  try{ return JSON.parse(localStorage.getItem('mk_customer')) || {name:'',phone:''}; }
-  catch(e){ return {name:'',phone:''}; }
-}
-function loadUserData(){
-  const d = getUserData();
-  const n = el('cName'), p = el('cPhone');
-  if(n && d.name) n.value = d.name;
-  if(p && d.phone) p.value = d.phone;
-}
-function saveUserData(){
-  const name = el('dataName') ? el('dataName').value.trim() : '';
-  const phone = el('dataPhone') ? el('dataPhone').value.trim() : '';
-  try{ localStorage.setItem('mk_customer', JSON.stringify({name:name, phone:phone})); }catch(e){}
-  const n = el('cName'), p = el('cPhone');
-  if(n) n.value = name;
-  if(p) p.value = phone;
-  closeDataModal();
-  toast(tt('dataSaved','✔ تم حفظ بياناتك','✔ Your data has been saved'));
-}
-
-/* ===== التنبيهات ===== */
-var mkPushOn = localStorage.getItem('mk_push_on') === '1';
-function updateNotifStatus(){
-  const status = el('notifStatus');
-  const btn = el('notifBtn');
-  const sm = el('smNotifStatus');
-  const denied = ('Notification' in window) && Notification.permission === 'denied';
-  if(status){
-    status.classList.remove('on','denied');
-    if(mkPushOn){ status.textContent = tt('notifEnabled','التنبيهات مفعّلة ✓','Notifications On ✓'); status.classList.add('on'); }
-    else if(denied){ status.textContent = tt('notifDisabled','التنبيهات معطّلة','Notifications Off'); status.classList.add('denied'); }
-    else{ status.textContent = tt('notifDisabled','التنبيهات معطّلة','Notifications Off'); }
-  }
-  if(btn){
-    btn.classList.remove('off');
-    btn.disabled = denied;
-    btn.textContent = mkPushOn ? tt('notifDisable','تعطيل','Disable') : tt('notifEnable','تفعيل','Enable');
-    if(mkPushOn) btn.classList.add('off');
-  }
-  if(sm){
