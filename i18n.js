@@ -1,7 +1,6 @@
 /* =====================================================
 ملف اللغات — مكرونجي Makaronjy
-v15.8.1: مفاتيح طبقة الترقية كاملة (AR/EN) + حذف المهجور
-         + v16: مفاتيح التنبيهات وبياناتي وسياسة الخصوصية
+v15.3: مفاتيح طبقة الترقية كاملة (AR/EN) + حذف المهجور
 ===================================================== */
 window.I18N = {
 ar: {
@@ -283,7 +282,6 @@ chooseBranchFirst: '⚠️ Choose a branch first',
 pickupBranch: 'Choose pickup branch'
 }
 };
-
 /* ===== v15.8: مفاتيح النصوص الجديدة تُدمج تلقائياً في اللغتين ===== */
 (function(){
   var ADD = {
@@ -300,109 +298,6 @@ pickupBranch: 'Choose pickup branch'
       freeDeliveryPill: 'free delivery 🎉',
       feePerBranchPill: 'fee per branch',
       feeFixedPill: 'delivery '
-    }
-  };
-  if (window.I18N) {
-    Object.keys(ADD).forEach(function(lang){
-      if (window.I18N[lang]) {
-        Object.keys(ADD[lang]).forEach(function(k){
-          if (window.I18N[lang][k] === undefined) window.I18N[lang][k] = ADD[lang][k];
-        });
-      }
-    });
-  }
-})();
-
-/* ===== v16: مفاتيح التنبيهات وبياناتي وسياسة الخصوصية ===== */
-(function(){
-  var ADD = {
-    ar: {
-      /* ===== أزرار القائمة الجانبية ===== */
-      sideNotifications: 'تفعيل التنبيهات',
-      sideData: 'بياناتي',
-      sidePrivacy: 'سياسة الخصوصية',
-      /* ===== نافذة التنبيهات ===== */
-      notifTitle: '🔔 تفعيل التنبيهات',
-      notifDesc: 'ابقَ على اطلاع دائم بحالة طلبك — من التأكيد إلى التسليم.',
-      notifEnabled: 'التنبيهات مفعّلة ✓',
-      notifDisabled: 'التنبيهات معطّلة',
-      notifEnable: 'تفعيل',
-      notifDisable: 'تعطيل',
-      notifHintDenied: 'التنبيهات محظورة حالياً — يمكنك تفعيلها من إعدادات المتصفح/الجهاز.',
-      notifHintUnsupported: 'متصفحك لا يدعم التنبيهات.',
-      notifSuccess: '✔ تم تفعيل التنبيهات بنجاح',
-      notifDisabledOk: 'تم تعطيل التنبيهات',
-      /* ===== نافذة بياناتي ===== */
-      dataTitle: '👤 بياناتي',
-      dataDesc: 'بياناتك محفوظة على جهازك فقط ولا تُرسل إلا ضمن طلبك الحالي.',
-      dataNameLbl: 'الاسم',
-      dataPhoneLbl: 'رقم الجوال',
-      dataSave: 'حفظ',
-      dataSaved: '✔ تم حفظ بياناتك',
-      dataNamePh: 'الاسم الكامل',
-      dataPhonePh: '05XXXXXXXX',
-      /* ===== نافذة سياسة الخصوصية ===== */
-      privacyTitle: '🛡️ خصوصيتك وأمان بياناتك',
-      privacyIntro: 'خصوصيتك مسؤوليتنا، وثقتك أولويتنا. نحرص في مكرونجي على حماية بياناتك واستخدامها بالحد الأدنى اللازم لتقديم تجربة طلب آمنة وسلسة.',
-      privacy1Title: '1. البيانات الشخصية',
-      privacy1Text: 'نجمع اسمك ورقم هاتفك فقط لمعالجة طلبك والتواصل معك بشأنه.',
-      privacy2Title: '2. بيانات الموقع',
-      privacy2Text: 'نطلب الوصول إلى موقعك عند اختيار التوصيل فقط، لتحديد موقع الاستلام ومساعدة السائق في الوصول إليك.',
-      privacy3Title: '3. الإشعارات ومتابعة الطلب',
-      privacy3Text: 'ننصحك بتفعيل الإشعارات لتبقى على اطلاع دائم بحالة طلبك، بدءاً من تأكيد استلامه والموافقة عليه، مروراً بمرحلة التجهيز، وحتى خروجه للتوصيل واكتمال التسليم. تفعيل الإشعارات يمنحك تجربة أفضل ويضمن لك معرفة آخر تحديثات طلبك أولاً بأول. الإشعارات اختيارية بالكامل، ويمكنك تفعيلها أو إيقافها في أي وقت.',
-      privacy4Title: '4. تخزين البيانات',
-      privacy4Text: 'يُحفظ اسمك ورقم هاتفك محلياً على جهازك، ولا تُرسل هذه البيانات إلى خوادمنا إلا بالقدر اللازم لتنفيذ طلبك الحالي.',
-      privacy5Title: '5. عدم مشاركة البيانات',
-      privacy5Text: 'لا نبيع بياناتك الشخصية أو نستخدمها لأغراض إعلانية، ولا نشاركها مع جهات خارجية.',
-      privacy6Title: '6. صور إثبات التسليم',
-      privacy6Text: 'تكون صور إثبات التسليم متاحة للفرع المختص فقط، وتُحذف بشكل دوري وفق سياسة الاحتفاظ بالبيانات.',
-      privacyFooter: 'خصوصيتك ليست خياراً إضافياً، بل جزء أساسي من تجربتك مع مكرونجي.',
-      privacyRights: '© مكرونجي | جميع الحقوق محفوظة',
-      privacyClose: 'إغلاق'
-    },
-    en: {
-      /* ===== Side menu buttons ===== */
-      sideNotifications: 'Enable Notifications',
-      sideData: 'My Data',
-      sidePrivacy: 'Privacy Policy',
-      /* ===== Notifications modal ===== */
-      notifTitle: '🔔 Enable Notifications',
-      notifDesc: 'Stay updated on your order — from confirmation to delivery.',
-      notifEnabled: 'Notifications Enabled ✓',
-      notifDisabled: 'Notifications Disabled',
-      notifEnable: 'Enable',
-      notifDisable: 'Disable',
-      notifHintDenied: 'Notifications are currently blocked — enable them from browser/device settings.',
-      notifHintUnsupported: 'Your browser does not support notifications.',
-      notifSuccess: '✔ Notifications enabled successfully',
-      notifDisabledOk: 'Notifications disabled',
-      /* ===== My Data modal ===== */
-      dataTitle: '👤 My Data',
-      dataDesc: 'Your data is stored locally on your device and is only sent with your current order.',
-      dataNameLbl: 'Name',
-      dataPhoneLbl: 'Phone',
-      dataSave: 'Save',
-      dataSaved: '✔ Your data has been saved',
-      dataNamePh: 'Full name',
-      dataPhonePh: '05XXXXXXXX',
-      /* ===== Privacy Policy modal ===== */
-      privacyTitle: '🛡️ Your Privacy & Data Security',
-      privacyIntro: 'Your privacy is our responsibility, and your trust is our priority. At Makaronjy, we are committed to protecting your data and using only the minimum necessary to provide a safe and smooth ordering experience.',
-      privacy1Title: '1. Personal Data',
-      privacy1Text: 'We collect only your name and phone number to process your order and communicate with you about it.',
-      privacy2Title: '2. Location Data',
-      privacy2Text: 'We request access to your location only when you choose delivery, to identify the pickup location and help the driver reach you.',
-      privacy3Title: '3. Notifications & Order Tracking',
-      privacy3Text: 'We recommend enabling notifications to stay informed about your order status, from receipt confirmation and approval, through the preparation stage, until dispatch and delivery completion. Enabling notifications gives you a better experience and ensures you know the latest updates about your order in real time. Notifications are fully optional, and you can enable or disable them at any time.',
-      privacy4Title: '4. Data Storage',
-      privacy4Text: 'Your name and phone number are stored locally on your device, and this data is sent to our servers only as needed to fulfill your current order.',
-      privacy5Title: '5. No Data Sharing',
-      privacy5Text: 'We do not sell your personal data, use it for advertising, or share it with third parties.',
-      privacy6Title: '6. Delivery Proof Photos',
-      privacy6Text: 'Delivery proof photos are available only to the relevant branch and are periodically deleted according to our data retention policy.',
-      privacyFooter: 'Your privacy is not an optional add-on — it is an essential part of your Makaronjy experience.',
-      privacyRights: '© Makaronjy | All rights reserved',
-      privacyClose: 'Close'
     }
   };
   if (window.I18N) {
