@@ -50,7 +50,7 @@ RATE_LIMIT_PER_MINUTE = 100
 [[d1_databases]]
 binding = "DB"
 database_name = "makaronjy-db"
-database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # ⚠️ استبدل هذا بعد إنشاء الداتابيز
+database_id = "3f787004-ecef-4fee-8b6a-d46da70aca7a"
 
 # ───────────────────────────────────────────
 #  تخزين R2 (للصور والنسخ الاحتياطي)
@@ -70,7 +70,7 @@ preview_bucket_name = "makaronjy-backups-preview"
 # ───────────────────────────────────────────
 [[kv_namespaces]]
 binding = "KV"
-id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"  # ⚠️ استبدل هذا بعد إنشاء KV
+id = "51fcd19c06fc46e5a68dd5e429cd132f"
 
 # ───────────────────────────────────────────
 #  Cron Triggers (المهام المجدولة)
@@ -103,12 +103,6 @@ vars = { ENVIRONMENT = "production", LIVE_MODE = "polling" }
 #  هذه لا تُكتب هنا! تُضاف عبر الأمر:
 #
 #  npx wrangler secret put JWT_SECRET
-#  npx wrangler secret put BCRYPT_SALT
-#  npx wrangler secret put ADMIN_API_KEY
-#  npx wrangler secret put MOYASAR_SECRET_KEY
-#  npx wrangler secret put MOYASAR_WEBHOOK_SECRET
-#  npx wrangler secret put TAP_SECRET_KEY
-#  npx wrangler secret put TAP_WEBHOOK_SECRET
 #
 #  هذه الأسرار تُخزن مشفرة في Cloudflare
 #  ولا يمكن لأحد رؤيتها (حتى أنت)
