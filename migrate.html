@@ -1,91 +1,702 @@
 <!DOCTYPE html>
+<!-- migrate.html — مكرونجي · مركز نقل البيانات إلى D1 (v2.0) -->
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>نقل البيانات إلى D1</title>
-  <style>
-    body { font-family: Arial; padding: 20px; text-align: center; background: #f5f5f5; }
-    .btn { background: #b45309; color: white; padding: 20px 40px; font-size: 20px; border: none; border-radius: 12px; cursor: pointer; margin: 20px 0; }
-    .btn:disabled { background: #ccc; }
-    #status { margin-top: 20px; padding: 15px; border-radius: 8px; display: none; }
-    .success { background: #d4edda; color: #155724; }
-    .error { background: #f8d7da; color: #721c24; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>مكرونجي · نقل البيانات إلى D1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --dough:#FAF3E7; --crust:#F3E7D3; --card:#FFFBF4; --line:#EAD9BE;
+  --amber:#C2571B; --amber-deep:#9A3F0F; --tomato:#D63A2F;
+  --basil:#2E7D4F; --basil-deep:#1F5C38; --gold:#E9A13B;
+  --espresso:#2A1A10; --muted:#7A6A55; --steel:#3D6E9E;
+  --danger:#B3261E; --warn:#B7791F;
+  --grad-hot:linear-gradient(135deg,#C2571B 0%,#D63A2F 100%);
+  --grad-green:linear-gradient(135deg,#2E7D4F 0%,#1F5C38 100%);
+  --shadow:0 10px 30px rgba(154,63,15,.10),0 2px 6px rgba(42,26,16,.06);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Tajawal','Segoe UI',Tahoma,Arial,sans-serif;
+  background:var(--dough); color:var(--espresso);
+  min-height:100vh; overflow-x:hidden; line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+/* ===== خلفية طبقية: توهجات + حبيبات ===== */
+.bg{position:fixed;inset:0;z-index:-1;overflow:hidden;background:
+  radial-gradient(1200px 600px at 85% -10%,rgba(233,161,59,.16),transparent 60%),
+  radial-gradient(900px 500px at -10% 30%,rgba(214,58,47,.10),transparent 60%),
+  var(--dough);}
+.blob{position:absolute;border-radius:50%;filter:blur(70px);opacity:.5;will-change:transform}
+.blob.b1{width:340px;height:340px;background:radial-gradient(circle,#E9A13B,transparent 70%);top:-80px;right:-60px;animation:drift1 22s ease-in-out infinite alternate}
+.blob.b2{width:300px;height:300px;background:radial-gradient(circle,#D63A2F,transparent 70%);bottom:5%;left:-90px;animation:drift2 26s ease-in-out infinite alternate}
+.blob.b3{width:240px;height:240px;background:radial-gradient(circle,#2E7D4F,transparent 70%);top:45%;right:20%;opacity:.28;animation:drift3 30s ease-in-out infinite alternate}
+@keyframes drift1{to{transform:translate(-50px,60px) scale(1.12)}}
+@keyframes drift2{to{transform:translate(70px,-50px) scale(1.08)}}
+@keyframes drift3{to{transform:translate(-40px,-70px) scale(1.15)}}
+.grain{position:absolute;inset:0;opacity:.05;mix-blend-mode:multiply;pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");}
+/* ===== شريط تمرير بهوية العلامة ===== */
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:var(--crust)}
+::-webkit-scrollbar-thumb{background:linear-gradient(180deg,var(--amber),var(--tomato));border-radius:8px;border:2px solid var(--crust)}
+::-webkit-scrollbar-thumb:hover{background:var(--tomato)}
+/* ===== الترويسة ===== */
+.wrap{max-width:600px;margin:0 auto;padding:20px 16px 60px}
+.top{display:flex;align-items:center;gap:14px;padding:18px 0 8px;animation:rise .6s ease both}
+.logo{width:58px;height:58px;flex:0 0 auto;filter:drop-shadow(0 4px 8px rgba(154,63,15,.25))}
+.top h1{font-size:clamp(1.25rem,4.5vw,1.6rem);font-weight:900;letter-spacing:-.3px}
+.top .sub{font-size:.82rem;color:var(--muted);font-weight:500}
+.health{margin-inline-start:auto;display:flex;align-items:center;gap:7px;font-size:.72rem;font-weight:700;
+  padding:7px 12px;border-radius:99px;border:1.5px solid var(--line);background:var(--card);white-space:nowrap}
+.health .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.health.ok{color:var(--basil-deep);border-color:#BFE0CB}
+.health.ok .dot{background:var(--basil);box-shadow:0 0 0 4px rgba(46,125,79,.15);animation:pulse 2s infinite}
+.health.bad{color:var(--danger);border-color:#F0C4C0}
+.health.bad .dot{background:var(--danger)}
+@keyframes pulse{50%{box-shadow:0 0 0 7px rgba(46,125,79,0)}}
+/* ===== الخطوات ===== */
+.stepper{display:flex;list-style:none;margin:22px 0 18px;animation:rise .6s .1s ease both}
+.stepper li{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;font-size:.72rem;font-weight:700;color:var(--muted)}
+.stepper li::before{content:'';position:absolute;top:15px;right:calc(50% + 18px);width:calc(100% - 36px);height:3px;background:var(--line);border-radius:3px}
+.stepper li:first-child::before{display:none}
+.stepper .num{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--card);border:2px solid var(--line);font-weight:900;font-size:.85rem;z-index:1;transition:.3s}
+.stepper li.active{color:var(--amber-deep)}
+.stepper li.active .num{background:var(--grad-hot);border-color:transparent;color:#fff;box-shadow:0 4px 14px rgba(214,58,47,.35)}
+.stepper li.done{color:var(--basil-deep)}
+.stepper li.done .num{background:var(--grad-green);border-color:transparent;color:#fff}
+.stepper li.done::before,.stepper li.active::before{background:linear-gradient(90deg,var(--basil),var(--amber))}
+/* ===== البطاقات ===== */
+.card{background:var(--card);border:1.5px solid var(--line);border-radius:22px;box-shadow:var(--shadow);
+  padding:22px 20px;margin-bottom:16px;animation:rise .55s ease both;transition:opacity .3s,filter .3s}
+.card:nth-of-type(2){animation-delay:.15s}.card:nth-of-type(3){animation-delay:.22s}.card:nth-of-type(4){animation-delay:.3s}
+@keyframes rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+.card.locked{opacity:.5;filter:saturate(.6);pointer-events:none}
+.card.locked .locknote{display:flex}
+.locknote{display:none;align-items:center;gap:8px;font-size:.75rem;color:var(--muted);font-weight:700;margin-bottom:10px}
+.card h2{font-size:1.08rem;font-weight:900;display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.card h2 .ico{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;background:linear-gradient(135deg,#F6E3C8,#F0D3AE);color:var(--amber-deep);flex:0 0 auto}
+.card .desc{font-size:.82rem;color:var(--muted);margin-bottom:16px}
+.donebar{display:none;align-items:center;gap:10px;font-weight:800;color:var(--basil-deep);font-size:.9rem}
+.donebar .tick{width:26px;height:26px;border-radius:50%;background:var(--grad-green);color:#fff;display:grid;place-items:center;font-size:.8rem}
+.card.done .donebar{display:flex}
+.card.done .body{display:none}
+.card.done{padding:16px 20px}
+/* ===== الحقول ===== */
+.field{margin-bottom:14px}
+.field label{display:block;font-size:.8rem;font-weight:800;margin-bottom:6px;color:var(--espresso)}
+.inpwrap{position:relative}
+input[type=text],input[type=password]{
+  width:100%;padding:13px 14px;font-size:16px;font-family:inherit;font-weight:600;
+  border:1.5px solid var(--line);border-radius:14px;background:#fff;color:var(--espresso);
+  outline:none;transition:.2s}
+input:focus{border-color:var(--amber);box-shadow:0 0 0 4px rgba(194,87,27,.15)}
+.eye{position:absolute;left:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);padding:6px;display:grid;place-items:center}
+.eye:hover{color:var(--amber)}
+/* ===== الأزرار ===== */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;width:100%;
+  padding:15px 20px;font-size:1rem;font-weight:900;font-family:inherit;border:none;border-radius:15px;
+  cursor:pointer;transition:.18s;color:#fff;background:var(--grad-hot);
+  box-shadow:0 6px 18px rgba(214,58,47,.28)}
+.btn:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(214,58,47,.36);filter:brightness(1.05)}
+.btn:active{transform:scale(.98)}
+.btn:disabled{opacity:.6;cursor:not-allowed;transform:none;filter:grayscale(.3)}
+.btn.green{background:var(--grad-green);box-shadow:0 6px 18px rgba(46,125,79,.28)}
+.btn.ghost{background:#fff;color:var(--amber-deep);border:1.5px solid var(--line);box-shadow:none}
+.btn.ghost:hover{border-color:var(--amber);background:#FFF6EA}
+.btn.sm{width:auto;padding:10px 16px;font-size:.82rem;border-radius:11px}
+.spin{width:18px;height:18px;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:rot .7s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+/* ===== لافتات ===== */
+.banner{display:none;align-items:flex-start;gap:10px;padding:12px 14px;border-radius:13px;font-size:.82rem;font-weight:700;margin-bottom:14px}
+.banner.show{display:flex;animation:rise .3s ease}
+.banner.err{background:#FDECEA;color:var(--danger);border:1.5px solid #F0C4C0}
+.banner.warn{background:#FFF6E4;color:var(--warn);border:1.5px solid #EFD9A8}
+.banner.info{background:#EBF2F9;color:var(--steel);border:1.5px solid #C6D8EA}
+.sessionrow{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+/* ===== ملخص البيانات ===== */
+.chips{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:16px}
+.chip{background:linear-gradient(160deg,#FFF6EA,#FBEAD2);border:1.5px solid var(--line);border-radius:14px;padding:11px 8px;text-align:center}
+.chip b{display:block;font-size:1.35rem;font-weight:900;color:var(--amber-deep);line-height:1.2}
+.chip span{font-size:.68rem;font-weight:700;color:var(--muted)}
+.search{margin-bottom:12px}
+.acc{border:1.5px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:9px;background:#fff}
+.acc-h{display:flex;align-items:center;gap:10px;width:100%;padding:12px 14px;background:none;border:none;cursor:pointer;font-family:inherit;font-size:.88rem;font-weight:800;color:var(--espresso);text-align:right}
+.acc-h:hover{background:#FFF6EA}
+.acc-h .cnt{margin-inline-start:auto;font-size:.7rem;background:var(--crust);color:var(--amber-deep);padding:3px 9px;border-radius:99px;font-weight:800}
+.acc-h .chev{transition:.25s;color:var(--muted)}
+.acc.open .chev{transform:rotate(180deg)}
+.acc-b{display:none;border-top:1.5px solid var(--line);padding:6px 14px 12px}
+.acc.open .acc-b{display:block}
+.item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px dashed var(--line);font-size:.8rem}
+.item:last-child{border-bottom:none}
+.item .nm{font-weight:700}
+.item .en{color:var(--muted);font-size:.68rem;display:block}
+.item .pr{margin-inline-start:auto;font-weight:900;color:var(--amber-deep);white-space:nowrap}
+.item .hid{font-size:.62rem;background:#FDECEA;color:var(--danger);padding:2px 7px;border-radius:99px;font-weight:800}
+.reviewfoot{display:flex;gap:9px;margin-top:14px;flex-wrap:wrap}
+/* ===== التقدم والسجل ===== */
+.prog{height:14px;background:var(--crust);border-radius:99px;overflow:hidden;border:1.5px solid var(--line);margin:6px 0 8px}
+.prog .fill{height:100%;width:0%;background:var(--grad-hot);border-radius:99px;transition:width .5s ease;position:relative;overflow:hidden}
+.prog .fill::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);animation:shimmer 1.4s infinite}
+@keyframes shimmer{from{transform:translateX(100%)}to{transform:translateX(-100%)}}
+.proglbl{font-size:.78rem;font-weight:800;color:var(--amber-deep);margin-bottom:14px}
+.log{background:#241610;border-radius:14px;padding:12px 14px;max-height:220px;overflow-y:auto;font-size:.72rem;line-height:1.9;border:1.5px solid #3A2417}
+.log::-webkit-scrollbar-track{background:#241610}
+.log::-webkit-scrollbar-thumb{border-color:#241610}
+.logline{display:flex;gap:8px;align-items:baseline;color:#E8D9C4}
+.logline .t{color:#8A7358;font-size:.64rem;flex:0 0 auto;font-variant-numeric:tabular-nums}
+.logline .d{width:7px;height:7px;border-radius:50%;flex:0 0 auto;transform:translateY(-1px)}
+.logline.info .d{background:var(--steel)} .logline.ok .d{background:#4CAF7D}
+.logline.err .d{background:#E5645A} .logline.warn .d{background:var(--gold)}
+.logline.err{color:#F2B8B3}.logline.ok{color:#BFE3CD}
+bdi{unicode-bidi:isolate}
+/* ===== التحقق ===== */
+.check{display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px dashed var(--line);font-size:.85rem;font-weight:700}
+.check:last-child{border-bottom:none}
+.check .ci{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:.75rem;flex:0 0 auto}
+.check.pass .ci{background:var(--grad-green);color:#fff}
+.check.fail .ci{background:#FDECEA;color:var(--danger);border:1.5px solid #F0C4C0}
+.check.wait .ci{background:var(--crust);color:var(--muted)}
+.check .dt{margin-inline-start:auto;font-size:.7rem;color:var(--muted);font-weight:600}
+.success-hero{text-align:center;padding:10px 0 4px}
+.success-hero .big{width:74px;height:74px;margin:0 auto 12px;border-radius:50%;background:var(--grad-green);display:grid;place-items:center;color:#fff;font-size:2rem;box-shadow:0 10px 26px rgba(46,125,79,.35);animation:pop .5s cubic-bezier(.2,1.6,.4,1) both}
+@keyframes pop{from{transform:scale(0)}to{transform:scale(1)}}
+.success-hero h3{font-size:1.25rem;font-weight:900;color:var(--basil-deep)}
+.success-hero p{font-size:.82rem;color:var(--muted);margin-top:4px}
+.actions{display:grid;gap:9px;margin-top:16px}
+.note{display:flex;gap:9px;align-items:flex-start;background:#FFF6E4;border:1.5px solid #EFD9A8;color:#8A5A12;border-radius:13px;padding:12px 14px;font-size:.75rem;font-weight:700;margin-top:16px}
+footer{margin-top:26px;text-align:center;font-size:.7rem;color:var(--muted);font-weight:600;animation:rise .6s .4s ease both}
+footer .sec{display:inline-flex;align-items:center;gap:6px;background:var(--card);border:1.5px solid var(--line);padding:8px 14px;border-radius:99px;margin-bottom:10px}
+/* ===== توست ===== */
+#toasts{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:60;display:flex;flex-direction:column;gap:8px;width:min(92vw,420px)}
+.toast{display:flex;align-items:center;gap:10px;background:#241610;color:#F5E9D6;padding:12px 16px;border-radius:13px;font-size:.82rem;font-weight:700;box-shadow:0 10px 30px rgba(0,0,0,.3);animation:toastin .3s ease}
+.toast.ok{border-inline-start:4px solid #4CAF7D}.toast.err{border-inline-start:4px solid #E5645A}
+@keyframes toastin{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+#confetti{position:fixed;inset:0;pointer-events:none;z-index:50}
+@media (max-width:420px){.chips{grid-template-columns:repeat(3,1fr)}.chip b{font-size:1.1rem}}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  html{scroll-behavior:auto}
+}
+</style>
 </head>
 <body>
-  <h1>🚀 نقل بيانات مكرونجي إلى قاعدة البيانات</h1>
-  <p>اضغط الزر لنقل المنيو والإعدادات من GitHub إلى D1</p>
-  <button class="btn" id="migrateBtn" onclick="startMigration()">ابدأ النقل</button>
-  <div id="status"></div>
+<div class="bg"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="grain"></div></div>
 
-  <script>
-    async function startMigration() {
-      const btn = document.getElementById('migrateBtn');
-      const status = document.getElementById('status');
-      
-      btn.disabled = true;
-      btn.textContent = 'جاري النقل...';
-      status.style.display = 'block';
-      status.className = '';
-      status.textContent = '⏳ جاري الاتصال بالسيرفر...';
+<div class="wrap">
+  <header class="top">
+    <svg class="logo" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+      <path d="M8 34h48c0 12-10 20-24 20S8 46 8 34z" fill="#C2571B"/>
+      <path d="M8 34h48c0 3-1 6-3 8H11c-2-2-3-5-3-8z" fill="#9A3F0F"/>
+      <ellipse cx="32" cy="34" rx="24" ry="5" fill="#E9A13B"/>
+      <path d="M14 33c4-3 8 2 12-1s8 2 12-1 8 2 12-1" stroke="#D63A2F" stroke-width="3" stroke-linecap="round" fill="none"/>
+      <path d="M24 22c-2-4 2-6 0-10M32 22c-2-4 2-6 0-10M40 22c-2-4 2-6 0-10" stroke="#B7A98F" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+      <rect x="26" y="54" width="12" height="4" rx="2" fill="#9A3F0F"/>
+    </svg>
+    <div>
+      <h1>مكرونجي · مركز النقل</h1>
+      <div class="sub">نقل المنيو والإعدادات من GitHub إلى قاعدة بيانات D1</div>
+    </div>
+    <div class="health" id="healthPill"><span class="dot"></span><span id="healthTxt">فحص الاتصال…</span></div>
+  </header>
 
-      const data = {
-        "menu": [
-          {"id": "sec-pasta", "t": "باستا", "tEn": "Pasta", "i": "🍝", "items": [{"id": "pasta-red-half", "ar": "مكرونة حمراء سعودية نص حبة", "en": "Red Pasta Saudi Half Chicken", "prices": [32], "cal": 1900, "desc": "مكرونة أقلام حمراء مع نص حبة دجاج مشوي", "descEn": "Red penne pasta with half grilled chicken", "imgv": 1789344170794, "imgMode": "cut", "hidden": false, "mods": {"tAr": "", "tEn": "", "refs": ["side-sambosa", "drink-pepsi", "side-caesar", "drink-mirinda-citrus", "drink-7up-diet"]}}, {"id": "pasta-red-chest", "ar": "مكرونة حمراء صدر دجاج", "en": "Red Pasta Chicken Breast", "prices": [28], "cal": 1250, "desc": "مكرونة أقلام حمراء مع صدر دجاج مشوي", "descEn": "Red penne pasta with grilled chicken breast", "imgv": 1790589425380, "imgMode": "cut", "hidden": false, "mods": {"tAr": "", "tEn": "", "refs": ["side-potato", "side-sambosa", "side-caesar"]}}, {"id": "pasta-red-breasts", "ar": "مكرونة حمراء صدور دجاج - نفر", "en": "Red Pasta Chicken Breasts - Single", "prices": [24], "cal": 910, "desc": "مكرونة حمراء بصدور دجاج - حصة فردية", "descEn": "Red pasta with chicken breasts - single serving", "imgv": 1789360241176}, {"id": "pasta-bashamel", "ar": "مكرونة باشميل", "en": "Bashamel", "prices": [24], "cal": 1100, "desc": "مكرونة أقلام بصلصة البشاميل الكريمية والجبنة الذائبة", "descEn": "Penne pasta with creamy bashamel sauce and melted cheese", "imgv": 1789344594797}, {"id": "pasta-lasagna", "ar": "لازانيا", "en": "Lasagna", "prices": [24], "cal": 880, "desc": "طبقات من المكرونة مع اللحم والجبنة والبشاميل", "descEn": "Layers of pasta with meat, cheese, and bashamel", "imgv": 1789360328053}, {"id": "pasta-mosaqa", "ar": "مصقعة باذنجان", "en": "Moussaka", "prices": [24], "cal": 950, "desc": "مكرونة بصلصة الطماطم مع الباذنجان المشوي", "descEn": "Pasta with tomato sauce and roasted eggplant", "imgv": 1789344458500}], "hidden": false},
-          {"id": "sec-sides", "t": "مقبلات", "tEn": "Sides", "i": "🍟", "items": [{"id": "side-potato", "ar": "كرات بطاطس", "en": "Potato Balls", "prices": [24], "cal": 473, "desc": "كرات البطاطس المقلية ذهبية ومقرمشة", "descEn": "Golden crispy fried potato balls", "imgv": 1789344317578}, {"id": "side-sambosa", "ar": "سمبوسة دجاج", "en": "Chicken Sambosa", "prices": [11], "cal": 420, "desc": "سمبوسة مقلية بحشوة دجاج خاصة", "descEn": "Fried sambosa with special chicken filling", "imgv": 1789344864090}, {"id": "side-caesar", "ar": "سلطة سيزر", "en": "Caesar Salad", "prices": [14], "cal": 480, "desc": "خس طازج بصلصة السيزر والخبز المحمص", "descEn": "Fresh lettuce with caesar sauce and croutons", "imgv": 1789345024321}]},
-          {"id": "sec-desserts", "t": "حلويات", "tEn": "Desserts", "i": "🍰", "items": [{"id": "dessert-ummali", "ar": "أم علي", "en": "Umm Ali", "prices": [12], "cal": 520, "desc": "الخبز المحمص مع الحليب والكريمة والفستق", "descEn": "Toasted bread with milk, cream, and pistachio", "imgv": 1789344759867}, {"id": "dessert-caramel", "ar": "كريم كراميل", "en": "Cream Caramel", "prices": [12], "cal": 260, "desc": "كريم كراميل كريمي بصوص الكراميل", "descEn": "Creamy custard with caramel sauce", "imgv": 1789344676147}]},
-          {"id": "sec-sauces", "t": "صوصات وإضافات", "tEn": "Sauces & Extras", "i": "🥫", "items": [{"id": "sauce-daqqus", "ar": "دقوس", "en": "Daqqus", "prices": [3], "cal": 55, "desc": "صلصة الطماطم الحارة التقليدية", "descEn": "Traditional spicy tomato sauce", "imgv": 1789345213498}, {"id": "sauce-pepper", "ar": "فلفل مجروش", "en": "Crushed Pepper", "prices": [3], "cal": 18, "desc": "فلفل أحمر مجروش طازج", "descEn": "Fresh crushed red pepper", "imgv": 1789360942763}, {"id": "sauce-shatta", "ar": "شطة رنا", "en": "Rana Hot Sauce", "prices": [2], "cal": 50, "desc": "شطة حارة مميزة", "descEn": "Signature hot chili sauce", "imgv": 1789345140840}, {"id": "sauce-lemon", "ar": "ليمون أصفر", "en": "Yellow Lemon", "prices": [2], "cal": 6, "desc": "ليمون طازج", "descEn": "Fresh lemon", "imgv": 1789361032525}, {"id": "sauce-bozuhaira", "ar": "ليمون ابو زهيره", "en": "Bo Zuhaira Lemon", "prices": [2], "cal": 6, "desc": "ليمون حامض طازج", "descEn": "Fresh sour lemon", "imgv": 1789361186613}]},
-          {"id": "sec-drinks", "t": "مشروبات", "tEn": "Drinks", "i": "🥤", "items": [{"id": "drink-water", "ar": "ماء", "en": "Water", "prices": [1], "cal": 0, "desc": "مياه نقية", "descEn": "Pure water", "imgv": 1789349395713, "imgMode": "cut"}, {"id": "drink-pepsi", "ar": "بيبسي", "en": "Pepsi", "prices": [3], "cal": 105, "desc": "مشروب غازي بارد", "descEn": "Chilled soft drink", "imgv": 1790525822634, "imgMode": "cut"}, {"id": "drink-pepsi-diet", "ar": "بيبسي دايت", "en": "Pepsi Diet", "prices": [3], "cal": 0, "desc": "مشروب غازي خالي من السكر", "descEn": "Sugar-free soft drink", "imgv": 1789345608520}, {"id": "drink-7up", "ar": "سفن أب", "en": "7UP", "prices": [3], "cal": 105, "desc": "مشروب غازي بطعم الليمون", "descEn": "Lemon-lime soft drink", "imgv": 1789345683401}, {"id": "drink-7up-diet", "ar": "سفن أب دايت", "en": "7UP Diet", "prices": [3], "cal": 110, "desc": "مشروب غازي خالي من السكر", "descEn": "Sugar-free lemon-lime drink", "imgv": 1789346383841}, {"id": "drink-mirinda", "ar": "ميرندا برتقال", "en": "Mirinda Orange", "prices": [3], "cal": 105, "desc": "مشروب غازي بطعم البرتقال", "descEn": "Orange flavored soft drink", "imgv": 1789346557160}, {"id": "drink-mirinda-citrus", "ar": "ميرندا سيتروس", "en": "Mirinda Citrus", "prices": [3], "cal": 105, "desc": "مشروب غازي بطعم الحمضيات", "descEn": "Citrus flavored soft drink", "imgv": 1789346826814}, {"id": "sec-drinks-1789347283601", "ar": "ديو", "en": "Dew", "prices": [3], "cal": 110, "desc": "مشروب غازي بنكهة فريدة ومنعشة", "descEn": "A uniquely flavored and refreshing soft drink", "imgv": 1789347288680}, {"id": "sec-drinks-1789348056900", "ar": "لبن القرية", "en": "Alqarya Yogurt", "prices": [3], "cal": 110, "desc": "لبن شركة القرية", "descEn": "Alqarya Company Yogurt", "imgv": 1789348060953}, {"id": "sec-drinks-1789348386806", "ar": "لبن المراعي", "en": "Almarai Yogurt", "prices": [2], "cal": 100, "desc": "لبن شركة المراعي", "descEn": "Almarai Company Yogurt", "imgv": 1789348392194}]}
-        ],
-        "settings": {
-          "brand": {"nameAr": "مكرونجي", "nameEn": "Makaronjy", "tagAr": "باستا • مقبلات • حلويات", "tagEn": "Pasta • Sides • Desserts"},
-          "hours": {"open": {"h": 13, "m": 0}, "close": {"h": 2, "m": 0}},
-          "bestSellers": ["pasta-red-half", "pasta-red-chest", "pasta-red-breasts", "side-potato"],
-          "branches": [
-            {"id": "b-badiah", "num": 1, "nameAr": "فرع البديعة", "nameEn": "Al Badi'ah Branch", "addrAr": "الشيخ عبدالعزيز بن محمد، ظهرة البديعة، الرياض 11461", "addrEn": "Al Cheikh Abd Al Aziz, Dhahrat Al Badi'ah, Riyadh 11461", "wa": "966561296463", "lat": 24.591045, "lng": 46.647204, "map": "https://maps.app.goo.gl/qwS3kpF2JUeHBCrH6", "hours": [{"o": {"h": 10, "m": 0}, "c": {"h": 3, "m": 0}, "closed": false}, {"o": {"h": 11, "m": 0}, "c": {"h": 3, "m": 0}, "closed": false}, {"o": {"h": 3, "m": 0}, "c": {"h": 8, "m": 0}, "closed": false}, {"o": {"h": 13, "m": 0}, "c": {"h": 7, "m": 0}, "closed": false}, {"o": {"h": 15, "m": 0}, "c": {"h": 3, "m": 0}, "closed": false}, {"o": {"h": 13, "m": 0}, "c": {"h": 2, "m": 0}, "closed": false}, {"o": {"h": 13, "m": 0}, "c": {"h": 3, "m": 0}, "closed": false}], "deliveryFee": 10},
-            {"id": "b-malqa", "num": 2, "nameAr": "فرع الملقا", "nameEn": "Al Malqa Branch", "addrAr": "الأماسي، الملقا، الرياض 13525", "addrEn": "Al Amasi, Al Malqa, Riyadh 13525", "wa": "966568183145", "lat": 24.801454, "lng": 46.597488, "map": "https://maps.app.goo.gl/VjqWsGHn3xZgWoGu9", "hours": [{"o": {"h": 13, "m": 0}, "c": {"h": 2, "m": 0}, "closed": false}, {"o": {"h": 13, "m": 0}, "c": {"h": 2, "m": 0}, "closed": false}, {"o": {"h": 13, "m": 0}, "c": {"h": 2, "m": 0}, "closed": false}, {"o": {"h": 13, "m": 0}, "c": {"h": 2, "m": 0}, "closed": false}, {"o": {"h": 13, "m": 0}, "c": {"h": 2, "m": 0}, "closed": false}, {"o": {"h": 13, "m": 0}, "c": {"h": 2, "m": 0}, "closed": false}, {"o": {"h": 13, "m": 0}, "c": {"h": 2, "m": 0}, "closed": false}], "deliveryFee": 10},
-            {"id": "b-yasmeen", "num": 3, "nameAr": "فرع الياسمين", "nameEn": "Al Yasmeen Branch", "addrAr": "القادسية، الياسمين، الرياض 13322", "addrEn": "Al Qadisiyah, Al Yasmeen, Riyadh 13322", "wa": "966561203593", "lat": 24.817399, "lng": 46.656308, "map": "https://maps.app.goo.gl/59Rpm3zbqfFzstev8?g_st=ac", "hours": [{"o": {"h": 13, "m": 0}, "c": {"h": 2, "m": 0}, "closed": false}, {"o": {"h": 13, "m": 0}, "c": {"h": 2, "m": 0}, "closed": false}, {"o": {"h": 13, "m": 0}, "c": {"h": 2, "m": 0}, "closed": false}, {"o": {"h": 13, "m": 0}, "c": {"h": 2, "m": 0}, "closed": false}, {"o": {"h": 13, "m": 0}, "c": {"h": 2, "m": 0}, "closed": false}, {"o": {"h": 13, "m": 0}, "c": {"h": 2, "m": 0}, "closed": false}, {"o": {"h": 13, "m": 0}, "c": {"h": 2, "m": 0}, "closed": false}], "deliveryFee": 10},
-            {"id": "b-suwaidi", "num": 4, "nameAr": "فرع السويدي الغربي", "nameEn": "Al Suwaidi Al Gharabi Branch", "addrAr": "الفجر، السويدي الغربي، الرياض 12992", "addrEn": "Al Fajar St, As Suwaidi Al Gharabi, Riyadh 12992", "wa": "966544030086", "lat": 24.572362, "lng": 46.621672, "map": "https://maps.app.goo.gl/tCieuNxohr4kyVrK7", "hours": [{"o": {"h": 13, "m": 0}, "c": {"h": 2, "m": 30}, "closed": false}, {"o": {"h": 13, "m": 0}, "c": {"h": 2, "m": 30}, "closed": false}, {"o": {"h": 13, "m": 0}, "c": {"h": 2, "m": 30}, "closed": false}, {"o": {"h": 13, "m": 0}, "c": {"h": 2, "m": 30}, "closed": false}, {"o": {"h": 13, "m": 0}, "c": {"h": 2, "m": 30}, "closed": false}, {"o": {"h": 12, "m": 30}, "c": {"h": 2, "m": 30}, "closed": false}, {"o": {"h": 13, "m": 0}, "c": {"h": 2, "m": 30}, "closed": false}], "deliveryFee": 10},
-            {"id": "b-1791819751585", "num": 5, "nameAr": "فرع الروابي", "nameEn": "Al-Rawabi Branch", "addrAr": "الزبير بن العوام , الروابي , الرياض 11461", "addrEn": "Al-Zubayr bin Al-Awwam, Al-Rawabi, Riyadh 11461", "wa": "966567326558", "lat": 24.694382, "lng": 46.790105, "map": "https://maps.app.goo.gl/AxGgzM4JUFSfciyu7?g_st=ac", "hours": [{"o": {"h": 13, "m": 0}, "c": {"h": 2, "m": 0}, "closed": false}, {"o": {"h": 13, "m": 0}, "c": {"h": 2, "m": 0}, "closed": false}, {"o": {"h": 13, "m": 0}, "c": {"h": 2, "m": 0}, "closed": false}, {"o": {"h": 13, "m": 0}, "c": {"h": 2, "m": 0}, "closed": false}, {"o": {"h": 13, "m": 0}, "c": {"h": 2, "m": 0}, "closed": false}, {"o": {"h": 13, "m": 0}, "c": {"h": 2, "m": 0}, "closed": false}, {"o": {"h": 13, "m": 0}, "c": {"h": 2, "m": 0}, "closed": false}], "deliveryFee": 10}
-          ],
-          "delivery": [{"id": "d-jahez", "nameAr": "جاهز", "nameEn": "Jahez", "url": "https://jahez.go.link/avE5E", "color": "#e30613", "img": "img/d-jahez.png"}, {"id": "d-hungerstation", "nameAr": "هنقرستيشن", "nameEn": "HungerStation", "url": "https://hungerstation.go.link/?c=SA&s=c&v=96730&so=mls&adj_t=1sdhhuza_1spi9ypp&adj_og_title=%D9%85%D9%83%D8%B1%D9%88%D9%86%D8%AC%D9%8A&adj_og_image=https://images.deliveryhero.io/image/hungerstation/restaurant/logo_ar/f72851cd66e6b14e1bceee9156ddf6b2.jpg", "color": "#ffb700", "img": "img/d-hungerstation.png"}, {"id": "d-keeta", "nameAr": "كيتا", "nameEn": "Keeta", "url": "https://url.mykeeta.com/qXA45r7z", "color": "#ffd400", "img": "img/d-keeta.png"}],
-          "social": [{"id": "s-ig", "key": "instagram", "nameAr": "انستقرام", "nameEn": "Instagram", "url": "https://www.instagram.com/makaronjy"}, {"id": "s-tk", "key": "tiktok", "nameAr": "تيك توك", "nameEn": "TikTok", "url": "https://www.tiktok.com/@makaronjy"}],
-          "ad": {"enabled": false, "oncePerDay": true, "icon": "🍝", "titleAr": "افتتاح قريب", "titleEn": "Coming Soon", "textAr": "تابعونا على حساباتنا لمعرفة آخر العروض", "textEn": "Follow us on our accounts to stay updated on the latest offers", "btnAr": "حسناً 🍝", "btnEn": "Got it 🍝"},
-          "deliveryFee": 5,
-          "banners": [{"id": "bn-1791979657418", "img": "img/banners/bn-1791979651125.png", "v": 1791979657418, "titleAr": "", "titleEn": ""}, {"id": "bn-1791995655463", "img": "img/banners/bn-1791995649509.png", "v": 1791995655463, "titleAr": "", "titleEn": ""}],
-          "imagesVersion": 0,
-          "display": {"mode": "list", "showDesc": true, "showCal": true},
-          "deliveryFeeMode": "free",
-          "payments": {"cod": {"enabled": true}, "gateway": {"enabled": false, "provider": "moyasar", "publishableKey": ""}},
-          "deliveryAvailability": {"mode": "all", "branchIds": ["b-badiah"]}
-        }
-      };
+  <ol class="stepper" id="stepper">
+    <li class="active"><span class="num">1</span>الدخول</li>
+    <li><span class="num">2</span>المراجعة</li>
+    <li><span class="num">3</span>النقل</li>
+    <li><span class="num">4</span>التحقق</li>
+  </ol>
 
-      try {
-        const response = await fetch('https://makaronjy-api.makaronjy.workers.dev/api/migrate/github', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        });
-        
-        const result = await response.json();
-        
-        if (response.ok) {
-          status.className = 'success';
-          status.innerHTML = '✅ تم النقل بنجاح!<br><pre>' + JSON.stringify(result, null, 2) + '</pre>';
-        } else {
-          status.className = 'error';
-          status.innerHTML = '❌ فشل النقل:<br><pre>' + JSON.stringify(result, null, 2) + '</pre>';
-        }
-      } catch (error) {
-        status.className = 'error';
-        status.textContent = '❌ خطأ: ' + error.message;
-      }
-      
-      btn.disabled = false;
-      btn.textContent = 'ابدأ النقل';
+  <!-- الخطوة 1: الدخول -->
+  <section class="card" id="step1">
+    <div class="donebar"><span class="tick">✓</span><span id="doneUser">تم تسجيل الدخول</span></div>
+    <div class="body">
+      <h2><span class="ico">🔐</span>تسجيل دخول المالك</h2>
+      <p class="desc">النقل عملية محمية — سجّل الدخول بحساب المالك للحصول على تصريح آمن (JWT).</p>
+      <div class="banner info" id="sessionBanner">
+        <div class="sessionrow" style="width:100%">
+          <span>ℹ️ توجد جلسة سابقة محفوظة في هذا المتصفح.</span>
+          <button class="btn ghost sm" id="useSessionBtn" type="button">استخدام الجلسة</button>
+        </div>
+      </div>
+      <div class="banner err" id="loginErr"><span>⚠️</span><span id="loginErrTxt"></span></div>
+      <form id="loginForm">
+        <div class="field">
+          <label for="inUser">اسم المستخدم</label>
+          <input type="text" id="inUser" value="owner" autocomplete="username" autocapitalize="off" spellcheck="false">
+        </div>
+        <div class="field">
+          <label for="inPass">كلمة المرور</label>
+          <div class="inpwrap">
+            <input type="password" id="inPass" autocomplete="current-password" placeholder="••••••">
+            <button type="button" class="eye" id="eyeBtn" aria-label="إظهار كلمة المرور">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+        <button class="btn" id="loginBtn" type="submit"><span id="loginBtnTxt">دخول آمن</span></button>
+      </form>
+    </div>
+  </section>
+
+  <!-- الخطوة 2: المراجعة -->
+  <section class="card locked" id="step2">
+    <div class="locknote">🔒 أكمل الخطوة السابقة أولاً</div>
+    <div class="donebar"><span class="tick">✓</span><span>تمت مراجعة البيانات</span></div>
+    <div class="body">
+      <h2><span class="ico">📋</span>مراجعة البيانات قبل النقل</h2>
+      <p class="desc">هذه هي البيانات الكاملة التي ستُحفظ في D1. تصفّحها وتأكد منها.</p>
+      <div class="chips" id="chips"></div>
+      <div class="field search">
+        <input type="text" id="searchInp" placeholder="🔍 ابحث عن صنف بالاسم العربي أو الإنجليزي…">
+      </div>
+      <div id="reviewAcc"></div>
+      <div class="reviewfoot">
+        <button class="btn ghost sm" id="copyJsonBtn" type="button">📄 نسخ JSON الكامل</button>
+      </div>
+      <div style="margin-top:16px">
+        <button class="btn" id="migrateBtn" type="button">🚀 ابدأ النقل إلى D1</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- الخطوة 3: النقل -->
+  <section class="card locked" id="step3">
+    <div class="locknote">🔒 أكمل الخطوة السابقة أولاً</div>
+    <div class="donebar"><span class="tick">✓</span><span id="doneMigrate">تم حفظ البيانات في D1</span></div>
+    <div class="body">
+      <h2><span class="ico">🚀</span>جارٍ النقل</h2>
+      <p class="desc">يرسل البيانات إلى الخادم مع تصريح الدخول، ثم يتحقق من الحفظ.</p>
+      <div class="banner err" id="migrateErr"><span>⚠️</span><span id="migrateErrTxt"></span></div>
+      <div class="prog"><div class="fill" id="progFill"></div></div>
+      <div class="proglbl" id="progLbl">بانتظار البدء…</div>
+      <div class="log" id="logBox"></div>
+      <div style="margin-top:14px;display:none" id="migrateRetryWrap">
+        <button class="btn ghost" id="migrateRetryBtn" type="button">🔄 إعادة المحاولة</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- الخطوة 4: التحقق -->
+  <section class="card locked" id="step4">
+    <div class="locknote">🔒 أكمل الخطوة السابقة أولاً</div>
+    <div class="body">
+      <h2><span class="ico">✅</span>التحقق من قاعدة البيانات</h2>
+      <p class="desc">نقرأ البيانات обратно من D1 ونقارنها بالأصل للتأكد من سلامة النقل.</p>
+      <div id="checkList"></div>
+      <div class="banner warn" id="verifyWarn"><span>⚠️</span><span>بعض الفحوصات لم تتطابق. أعد التحقق أو راجع السجل.</span></div>
+      <div style="margin-top:12px;display:none" id="verifyRetryWrap">
+        <button class="btn ghost" id="verifyRetryBtn" type="button">🔄 إعادة التحقق</button>
+      </div>
+      <div id="successBlock" style="display:none">
+        <div class="success-hero">
+          <div class="big">✓</div>
+          <h3>تم النقل بنجاح!</h3>
+          <p>المنيو والإعدادات الآن في قاعدة بيانات D1 وجاهزة للاستخدام.</p>
+        </div>
+        <div class="actions">
+          <a class="btn green" href="admin.html" target="_blank" rel="noopener">🛠️ افتح لوحة التحكم</a>
+          <button class="btn ghost" id="copyReportBtn" type="button">📋 نسخ تقرير النقل</button>
+        </div>
+        <div class="note">🗑️ <span>لأمان نظامك: بعد التأكد من عمل كل شيء، احذف ملف <bdi>migrate.html</bdi> من المستودع — فهذه الصفحة أداة لمرة واحدة.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="sec">🔒 اتصال مشفّر · تصريح JWT · لا يُخزَّن أي توكن في الكود</div>
+    <div>مكرونجي © 2026 · أداة نقل لمرة واحدة · v2.0</div>
+  </footer>
+</div>
+
+<div id="toasts"></div>
+<canvas id="confetti"></canvas>
+
+<script>
+'use strict';
+/* ═══════════ الإعداد ═══════════ */
+var API = 'https://makaronjy-api.makaronjy.workers.dev';
+var $ = function(id){ return document.getElementById(id); };
+var state = { token:null, user:null, report:null };
+var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ═══════════ البيانات الكاملة (المنيو + الإعدادات) ═══════════ */
+var DATA = {
+  menu: [
+    { id:'sec-pasta', t:'باستا', tEn:'Pasta', i:'🍝', hidden:false, items:[
+      { id:'pasta-red-half', ar:'مكرونة حمراء سعودية نص حبة', en:'Red Pasta Saudi Half Chicken', prices:[32], cal:1900, desc:'مكرونة أقلام حمراء مع نص حبة دجاج مشوي', descEn:'Red penne pasta with half grilled chicken', imgv:1789344170794, imgMode:'cut', hidden:false, mods:{ tAr:'', tEn:'', refs:['side-sambosa','drink-pepsi','side-caesar','drink-mirinda-citrus','drink-7up-diet'] } },
+      { id:'pasta-red-chest', ar:'مكرونة حمراء صدر دجاج', en:'Red Pasta Chicken Breast', prices:[28], cal:1250, desc:'مكرونة أقلام حمراء مع صدر دجاج مشوي', descEn:'Red penne pasta with grilled chicken breast', imgv:1790589425380, imgMode:'cut', hidden:false, mods:{ tAr:'', tEn:'', refs:['side-potato','side-sambosa','side-caesar'] } },
+      { id:'pasta-red-breasts', ar:'مكرونة حمراء صدور دجاج - نفر', en:'Red Pasta Chicken Breasts - Single', prices:[24], cal:910, desc:'مكرونة حمراء بصدور دجاج - حصة فردية', descEn:'Red pasta with chicken breasts - single serving', imgv:1789360241176 },
+      { id:'pasta-bashamel', ar:'مكرونة باشميل', en:'Bashamel', prices:[24], cal:1100, desc:'مكرونة أقلام بصلصة البشاميل الكريمية والجبنة الذائبة', descEn:'Penne pasta with creamy bashamel sauce and melted cheese', imgv:1789344594797 },
+      { id:'pasta-lasagna', ar:'لازانيا', en:'Lasagna', prices:[24], cal:880, desc:'طبقات من المكرونة مع اللحم والجبنة والبشاميل', descEn:'Layers of pasta with meat, cheese, and bashamel', imgv:1789360328053 },
+      { id:'pasta-mosaqa', ar:'مصقعة باذنجان', en:'Moussaka', prices:[24], cal:950, desc:'مكرونة بصلصة الطماطم مع الباذنجان المشوي', descEn:'Pasta with tomato sauce and roasted eggplant', imgv:1789344458500 }
+    ]},
+    { id:'sec-sides', t:'مقبلات', tEn:'Sides', i:'🍟', items:[
+      { id:'side-potato', ar:'كرات بطاطس', en:'Potato Balls', prices:[24], cal:473, desc:'كرات البطاطس المقلية ذهبية ومقرمشة', descEn:'Golden crispy fried potato balls', imgv:1789344317578 },
+      { id:'side-sambosa', ar:'سمبوسة دجاج', en:'Chicken Sambosa', prices:[11], cal:420, desc:'سمبوسة مقلية بحشوة دجاج خاصة', descEn:'Fried sambosa with special chicken filling', imgv:1789344864090 },
+      { id:'side-caesar', ar:'سلطة سيزر', en:'Caesar Salad', prices:[14], cal:480, desc:'خس طازج بصلصة السيزر والخبز المحمص', descEn:'Fresh lettuce with caesar sauce and croutons', imgv:1789345024321 }
+    ]},
+    { id:'sec-desserts', t:'حلويات', tEn:'Desserts', i:'🍰', items:[
+      { id:'dessert-ummali', ar:'أم علي', en:'Umm Ali', prices:[12], cal:520, desc:'الخبز المحمص مع الحليب والكريمة والفستق', descEn:'Toasted bread with milk, cream, and pistachio', imgv:1789344759867 },
+      { id:'dessert-caramel', ar:'كريم كراميل', en:'Cream Caramel', prices:[12], cal:260, desc:'كريم كراميل كريمي بصوص الكراميل', descEn:'Creamy custard with caramel sauce', imgv:1789344676147 }
+    ]},
+    { id:'sec-sauces', t:'صوصات وإضافات', tEn:'Sauces & Extras', i:'🥫', items:[
+      { id:'sauce-daqqus', ar:'دقوس', en:'Daqqus', prices:[3], cal:55, desc:'صلصة الطماطم الحارة التقليدية', descEn:'Traditional spicy tomato sauce', imgv:1789345213498 },
+      { id:'sauce-pepper', ar:'فلفل مجروش', en:'Crushed Pepper', prices:[3], cal:18, desc:'فلفل أحمر مجروش طازج', descEn:'Fresh crushed red pepper', imgv:1789360942763 },
+      { id:'sauce-shatta', ar:'شطة رنا', en:'Rana Hot Sauce', prices:[2], cal:50, desc:'شطة حارة مميزة', descEn:'Signature hot chili sauce', imgv:1789345140840 },
+      { id:'sauce-lemon', ar:'ليمون أصفر', en:'Yellow Lemon', prices:[2], cal:6, desc:'ليمون طازج', descEn:'Fresh lemon', imgv:1789361032525 },
+      { id:'sauce-bozuhaira', ar:'ليمون ابو زهيره', en:'Bo Zuhaira Lemon', prices:[2], cal:6, desc:'ليمون حامض طازج', descEn:'Fresh sour lemon', imgv:1789361186613 }
+    ]},
+    { id:'sec-drinks', t:'مشروبات', tEn:'Drinks', i:'🥤', items:[
+      { id:'drink-water', ar:'ماء', en:'Water', prices:[1], cal:0, desc:'مياه نقية', descEn:'Pure water', imgv:1789349395713, imgMode:'cut' },
+      { id:'drink-pepsi', ar:'بيبسي', en:'Pepsi', prices:[3], cal:105, desc:'مشروب غازي بارد', descEn:'Chilled soft drink', imgv:1790525822634, imgMode:'cut' },
+      { id:'drink-pepsi-diet', ar:'بيبسي دايت', en:'Pepsi Diet', prices:[3], cal:0, desc:'مشروب غازي خالي من السكر', descEn:'Sugar-free soft drink', imgv:1789345608520 },
+      { id:'drink-7up', ar:'سفن أب', en:'7UP', prices:[3], cal:105, desc:'مشروب غازي بطعم الليمون', descEn:'Lemon-lime soft drink', imgv:1789345683401 },
+      { id:'drink-7up-diet', ar:'سفن أب دايت', en:'7UP Diet', prices:[3], cal:110, desc:'مشروب غازي خالي من السكر', descEn:'Sugar-free lemon-lime drink', imgv:1789346383841 },
+      { id:'drink-mirinda', ar:'ميرندا برتقال', en:'Mirinda Orange', prices:[3], cal:105, desc:'مشروب غازي بطعم البرتقال', descEn:'Orange flavored soft drink', imgv:1789346557160 },
+      { id:'drink-mirinda-citrus', ar:'ميرندا سيتروس', en:'Mirinda Citrus', prices:[3], cal:105, desc:'مشروب غازي بطعم الحمضيات', descEn:'Citrus flavored soft drink', imgv:1789346826814 },
+      { id:'sec-drinks-1789347283601', ar:'ديو', en:'Dew', prices:[3], cal:110, desc:'مشروب غازي بنكهة فريدة ومنعشة', descEn:'A uniquely flavored and refreshing soft drink', imgv:1789347288680 },
+      { id:'sec-drinks-1789348056900', ar:'لبن القرية', en:'Alqarya Yogurt', prices:[3], cal:110, desc:'لبن شركة القرية', descEn:'Alqarya Company Yogurt', imgv:1789348060953 },
+      { id:'sec-drinks-1789348386806', ar:'لبن المراعي', en:'Almarai Yogurt', prices:[2], cal:100, desc:'لبن شركة المراعي', descEn:'Almarai Company Yogurt', imgv:1789348392194 }
+    ]}
+  ],
+  settings: {
+    brand:{ nameAr:'مكرونجي', nameEn:'Makaronjy', tagAr:'باستا • مقبلات • حلويات', tagEn:'Pasta • Sides • Desserts' },
+    hours:{ open:{h:13,m:0}, close:{h:2,m:0} },
+    bestSellers:['pasta-red-half','pasta-red-chest','pasta-red-breasts','side-potato'],
+    branches:[
+      { id:'b-badiah', num:1, nameAr:'فرع البديعة', nameEn:"Al Badi'ah Branch", addrAr:'الشيخ عبدالعزيز بن محمد، ظهرة البديعة، الرياض 11461', addrEn:"Al Cheikh Abd Al Aziz, Dhahrat Al Badi'ah, Riyadh 11461", wa:'966561296463', lat:24.591045, lng:46.647204, map:'https://maps.app.goo.gl/qwS3kpF2JUeHBCrH6', deliveryFee:10, hours:[
+        {o:{h:10,m:0},c:{h:3,m:0},closed:false},{o:{h:11,m:0},c:{h:3,m:0},closed:false},{o:{h:3,m:0},c:{h:8,m:0},closed:false},{o:{h:13,m:0},c:{h:7,m:0},closed:false},{o:{h:15,m:0},c:{h:3,m:0},closed:false},{o:{h:13,m:0},c:{h:2,m:0},closed:false},{o:{h:13,m:0},c:{h:3,m:0},closed:false} ]},
+      { id:'b-malqa', num:2, nameAr:'فرع الملقا', nameEn:'Al Malqa Branch', addrAr:'الأماسي، الملقا، الرياض 13525', addrEn:'Al Amasi, Al Malqa, Riyadh 13525', wa:'966568183145', lat:24.801454, lng:46.597488, map:'https://maps.app.goo.gl/VjqWsGHn3xZgWoGu9', deliveryFee:10, hours:[
+        {o:{h:13,m:0},c:{h:2,m:0},closed:false},{o:{h:13,m:0},c:{h:2,m:0},closed:false},{o:{h:13,m:0},c:{h:2,m:0},closed:false},{o:{h:13,m:0},c:{h:2,m:0},closed:false},{o:{h:13,m:0},c:{h:2,m:0},closed:false},{o:{h:13,m:0},c:{h:2,m:0},closed:false},{o:{h:13,m:0},c:{h:2,m:0},closed:false} ]},
+      { id:'b-yasmeen', num:3, nameAr:'فرع الياسمين', nameEn:'Al Yasmeen Branch', addrAr:'القادسية، الياسمين، الرياض 13322', addrEn:'Al Qadisiyah, Al Yasmeen, Riyadh 13322', wa:'966561203593', lat:24.817399, lng:46.656308, map:'https://maps.app.goo.gl/59Rpm3zbqfFzstev8?g_st=ac', deliveryFee:10, hours:[
+        {o:{h:13,m:0},c:{h:2,m:0},closed:false},{o:{h:13,m:0},c:{h:2,m:0},closed:false},{o:{h:13,m:0},c:{h:2,m:0},closed:false},{o:{h:13,m:0},c:{h:2,m:0},closed:false},{o:{h:13,m:0},c:{h:2,m:0},closed:false},{o:{h:13,m:0},c:{h:2,m:0},closed:false},{o:{h:13,m:0},c:{h:2,m:0},closed:false} ]},
+      { id:'b-suwaidi', num:4, nameAr:'فرع السويدي الغربي', nameEn:'Al Suwaidi Al Gharabi Branch', addrAr:'الفجر، السويدي الغربي، الرياض 12992', addrEn:'Al Fajar St, As Suwaidi Al Gharabi, Riyadh 12992', wa:'966544030086', lat:24.572362, lng:46.621672, map:'https://maps.app.goo.gl/tCieuNxohr4kyVrK7', deliveryFee:10, hours:[
+        {o:{h:13,m:0},c:{h:2,m:30},closed:false},{o:{h:13,m:0},c:{h:2,m:30},closed:false},{o:{h:13,m:0},c:{h:2,m:30},closed:false},{o:{h:13,m:0},c:{h:2,m:30},closed:false},{o:{h:13,m:0},c:{h:2,m:30},closed:false},{o:{h:12,m:30},c:{h:2,m:30},closed:false},{o:{h:13,m:0},c:{h:2,m:30},closed:false} ]},
+      { id:'b-1791819751585', num:5, nameAr:'فرع الروابي', nameEn:'Al-Rawabi Branch', addrAr:'الزبير بن العوام , الروابي , الرياض 11461', addrEn:'Al-Zubayr bin Al-Awwam, Al-Rawabi, Riyadh 11461', wa:'966567326558', lat:24.694382, lng:46.790105, map:'https://maps.app.goo.gl/AxGgzM4JUFSfciyu7?g_st=ac', deliveryFee:10, hours:[
+        {o:{h:13,m:0},c:{h:2,m:0},closed:false},{o:{h:13,m:0},c:{h:2,m:0},closed:false},{o:{h:13,m:0},c:{h:2,m:0},closed:false},{o:{h:13,m:0},c:{h:2,m:0},closed:false},{o:{h:13,m:0},c:{h:2,m:0},closed:false},{o:{h:13,m:0},c:{h:2,m:0},closed:false},{o:{h:13,m:0},c:{h:2,m:0},closed:false} ]}
+    ],
+    delivery:[
+      { id:'d-jahez', nameAr:'جاهز', nameEn:'Jahez', url:'https://jahez.go.link/avE5E', color:'#e30613', img:'img/d-jahez.png' },
+      { id:'d-hungerstation', nameAr:'هنقرستيشن', nameEn:'HungerStation', url:'https://hungerstation.go.link/?c=SA&s=c&v=96730&so=mls&adj_t=1sdhhuza_1spi9ypp&adj_og_title=%D9%85%D9%83%D8%B1%D9%88%D9%86%D8%AC%D9%8A&adj_og_image=https://images.deliveryhero.io/image/hungerstation/restaurant/logo_ar/f72851cd66e6b14e1bceee9156ddf6b2.jpg', color:'#ffb700', img:'img/d-hungerstation.png' },
+      { id:'d-keeta', nameAr:'كيتا', nameEn:'Keeta', url:'https://url.mykeeta.com/qXA45r7z', color:'#ffd400', img:'img/d-keeta.png' }
+    ],
+    social:[
+      { id:'s-ig', key:'instagram', nameAr:'انستقرام', nameEn:'Instagram', url:'https://www.instagram.com/makaronjy' },
+      { id:'s-tk', key:'tiktok', nameAr:'تيك توك', nameEn:'TikTok', url:'https://www.tiktok.com/@makaronjy' }
+    ],
+    ad:{ enabled:false, oncePerDay:true, icon:'🍝', titleAr:'افتتاح قريب', titleEn:'Coming Soon', textAr:'تابعونا على حساباتنا لمعرفة آخر العروض', textEn:'Follow us on our accounts to stay updated on the latest offers', btnAr:'حسناً 🍝', btnEn:'Got it 🍝' },
+    deliveryFee:5,
+    banners:[
+      { id:'bn-1791979657418', img:'img/banners/bn-1791979651125.png', v:1791979657418, titleAr:'', titleEn:'' },
+      { id:'bn-1791995655463', img:'img/banners/bn-1791995649509.png', v:1791995655463, titleAr:'', titleEn:'' }
+    ],
+    imagesVersion:0,
+    display:{ mode:'list', showDesc:true, showCal:true },
+    deliveryFeeMode:'free',
+    payments:{ cod:{enabled:true}, gateway:{enabled:false, provider:'moyasar', publishableKey:''} },
+    deliveryAvailability:{ mode:'all', branchIds:['b-badiah'] }
+  }
+};
+
+/* ═══════════ أدوات ═══════════ */
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function now(){ var d=new Date(); return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+':'+('0'+d.getSeconds()).slice(-2); }
+function log(msg,type){
+  type=type||'info';
+  var box=$('logBox'), line=document.createElement('div');
+  line.className='logline '+type;
+  line.innerHTML='<span class="d"></span><span class="t">'+now()+'</span><span>'+msg+'</span>';
+  box.appendChild(line); box.scrollTop=box.scrollHeight;
+}
+function toast(msg,type){
+  var t=document.createElement('div'); t.className='toast '+(type||'ok'); t.textContent=msg;
+  $('toasts').appendChild(t);
+  setTimeout(function(){ t.style.opacity='0'; t.style.transition='opacity .3s'; setTimeout(function(){t.remove();},320); },3200);
+}
+function fetchT(url,opts,ms){
+  var ctrl=new AbortController(); var to=setTimeout(function(){ctrl.abort();},ms||20000);
+  opts=opts||{}; opts.signal=ctrl.signal;
+  return fetch(url,opts).finally(function(){clearTimeout(to);});
+}
+function setStep(n){
+  var lis=$('stepper').children;
+  for(var i=0;i<lis.length;i++){
+    lis[i].className = (i+1<n)?'done':(i+1===n?'active':'');
+    if(i+1<n) lis[i].querySelector('.num').textContent='✓';
+  }
+  for(var s=1;s<=4;s++){
+    var card=$('step'+s);
+    card.classList.remove('locked','done');
+    if(s<n) card.classList.add('done');
+    else if(s>n) card.classList.add('locked');
+  }
+  setTimeout(function(){ $('step'+n).scrollIntoView({behavior:reduced?'auto':'smooth',block:'start'}); },120);
+}
+function progress(pct,lbl){ $('progFill').style.width=pct+'%'; $('progLbl').textContent=lbl; }
+function showErr(id,txtId,msg){ $(txtId).textContent=msg; $(id).classList.add('show'); }
+function hideErr(id){ $(id).classList.remove('show'); }
+function copyText(txt,okMsg){
+  function done(){ toast(okMsg||'تم النسخ','ok'); }
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(done).catch(function(){fallback();}); }
+  else fallback();
+  function fallback(){ var ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy');done();}catch(e){toast('تعذر النسخ','err');} ta.remove(); }
+}
+
+/* ═══════════ فحص صحة الخادم ═══════════ */
+(function health(){
+  var t0=performance.now();
+  fetchT(API+'/api/health',{method:'GET'},12000).then(function(r){return r.json();}).then(function(j){
+    var ms=Math.round(performance.now()-t0);
+    $('healthPill').classList.add('ok');
+    $('healthTxt').textContent='متصل · v'+(j.version||'؟')+' · '+ms+'ms';
+  }).catch(function(){
+    $('healthPill').classList.add('bad'); $('healthTxt').textContent='الخادم غير متصل';
+  });
+})();
+
+/* ═══════════ الجلسة السابقة ═══════════ */
+(function(){
+  try{
+    var tk=sessionStorage.getItem('mk_admin_token');
+    if(tk) $('sessionBanner').classList.add('show');
+  }catch(e){}
+})();
+$('useSessionBtn').addEventListener('click',function(){
+  var tk=sessionStorage.getItem('mk_admin_token'), us=null;
+  try{ us=JSON.parse(sessionStorage.getItem('mk_admin_user')||'null'); }catch(e){}
+  if(!tk){ toast('لا توجد جلسة محفوظة','err'); return; }
+  completeLogin(tk, us||{name:'المالك',username:'owner'});
+  log('تم استخدام الجلسة المحفوظة مسبقاً','ok');
+});
+
+/* ═══════════ الخطوة 1: الدخول ═══════════ */
+$('eyeBtn').addEventListener('click',function(){
+  var p=$('inPass'); p.type = (p.type==='password')?'text':'password';
+  this.style.color = (p.type==='text')?'var(--amber)':'';
+});
+$('loginForm').addEventListener('submit',function(e){
+  e.preventDefault(); hideErr('loginErr');
+  var u=$('inUser').value.trim(), p=$('inPass').value;
+  if(!u||!p){ showErr('loginErr','loginErrTxt','أدخل اسم المستخدم وكلمة المرور'); return; }
+  var btn=$('loginBtn'); btn.disabled=true;
+  $('loginBtnTxt').innerHTML='<span class="spin"></span> جارٍ التحقق…';
+  fetchT(API+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})},20000)
+  .then(function(r){ return r.json().then(function(j){ return {ok:r.ok,status:r.status,j:j}; }); })
+  .then(function(res){
+    if(!res.ok){
+      var m = res.status===401?'بيانات الدخول غير صحيحة':
+              res.status===429?'محاولات كثيرة — انتظر 15 دقيقة ثم أعد المحاولة':
+              (res.j&&res.j.error)||('خطأ HTTP '+res.status);
+      throw new Error(m);
     }
-  </script>
+    completeLogin(res.j.token,res.j.user);
+    log('تم تسجيل الدخول باسم <bdi>'+esc(res.j.user.username)+'</bdi> — صلاحية '+esc(res.j.user.role),'ok');
+  })
+  .catch(function(err){
+    var m = err.name==='AbortError'?'انتهت مهلة الاتصال بالخادم':err.message;
+    showErr('loginErr','loginErrTxt',m); toast(m,'err');
+  })
+  .finally(function(){ btn.disabled=false; $('loginBtnTxt').textContent='دخول آمن'; });
+});
+function completeLogin(token,user){
+  state.token=token; state.user=user;
+  try{
+    sessionStorage.setItem('mk_admin_token',token);
+    sessionStorage.setItem('mk_admin_user',JSON.stringify(user));
+  }catch(e){}
+  $('doneUser').textContent='تم الدخول: '+(user.name||user.username||'المالك');
+  renderReview();
+  setStep(2);
+}
+
+/* ═══════════ الخطوة 2: المراجعة ═══════════ */
+function totals(){
+  var items=0; DATA.menu.forEach(function(s){items+=s.items.length;});
+  return { sections:DATA.menu.length, items:items, branches:DATA.settings.branches.length,
+           delivery:DATA.settings.delivery.length, banners:DATA.settings.banners.length,
+           keys:Object.keys(DATA.settings).length };
+}
+function renderReview(){
+  var t=totals();
+  $('chips').innerHTML =
+    '<div class="chip"><b>'+t.sections+'</b><span>أقسام</span></div>'+
+    '<div class="chip"><b>'+t.items+'</b><span>صنف</span></div>'+
+    '<div class="chip"><b>'+t.branches+'</b><span>فروع</span></div>'+
+    '<div class="chip"><b>'+t.delivery+'</b><span>تطبيقات توصيل</span></div>'+
+    '<div class="chip"><b>'+t.banners+'</b><span>بانر</span></div>'+
+    '<div class="chip"><b>'+t.keys+'</b><span>مفتاح إعدادات</span></div>';
+  var html='';
+  DATA.menu.forEach(function(sec,idx){
+    html+='<div class="acc'+(idx===0?' open':'')+'" data-acc>'+
+      '<button type="button" class="acc-h"><span>'+sec.i+'</span><span>'+esc(sec.t)+' · '+esc(sec.tEn)+'</span>'+
+      '<span class="cnt">'+sec.items.length+'</span><span class="chev">▾</span></button><div class="acc-b">';
+    sec.items.forEach(function(it){
+      html+='<div class="item" data-search="'+esc((it.ar+' '+it.en+' '+it.id).toLowerCase())+'">'+
+        '<div><span class="nm">'+esc(it.ar)+'</span><span class="en">'+esc(it.en)+'</span></div>'+
+        (it.hidden?'<span class="hid">مخفي</span>':'')+
+        '<span class="pr">'+it.prices[0]+' ر.س</span></div>';
+    });
+    html+='</div></div>';
+  });
+  html+='<div class="acc" data-acc><button type="button" class="acc-h"><span>🏪</span><span>الفروع</span><span class="cnt">'+t.branches+'</span><span class="chev">▾</span></button><div class="acc-b">';
+  DATA.settings.branches.forEach(function(b){
+    html+='<div class="item"><div><span class="nm">'+esc(b.nameAr)+'</span><span class="en">'+esc(b.nameEn)+'</span></div><span class="pr">فرع '+b.num+'</span></div>';
+  });
+  html+='</div></div>';
+  $('reviewAcc').innerHTML=html;
+  document.querySelectorAll('[data-acc] .acc-h').forEach(function(h){
+    h.addEventListener('click',function(){ h.parentElement.classList.toggle('open'); });
+  });
+}
+$('searchInp').addEventListener('input',function(){
+  var q=this.value.trim().toLowerCase();
+  document.querySelectorAll('#reviewAcc .item[data-search]').forEach(function(row){
+    row.style.display = (!q||row.getAttribute('data-search').indexOf(q)>=0)?'':'none';
+  });
+  if(q) document.querySelectorAll('#reviewAcc .acc').forEach(function(a){a.classList.add('open');});
+});
+$('copyJsonBtn').addEventListener('click',function(){ copyText(JSON.stringify(DATA,null,2),'تم نسخ JSON الكامل'); });
+
+/* ═══════════ الخطوة 3: النقل ═══════════ */
+$('migrateBtn').addEventListener('click',startMigration);
+$('migrateRetryBtn').addEventListener('click',startMigration);
+function startMigration(){
+  hideErr('migrateErr'); $('migrateRetryWrap').style.display='none';
+  setStep(3);
+  var btn=$('migrateBtn'); btn.disabled=true;
+  progress(8,'تجهيز البيانات…');
+  log('بدء النقل — '+totals().sections+' أقسام، '+totals().items+' صنف، '+totals().branches+' فروع');
+  setTimeout(function(){
+    progress(35,'إرسال البيانات إلى الخادم…');
+    log('POST <bdi>/api/migrate/github</bdi> مع تصريح JWT');
+    fetchT(API+'/api/migrate/github',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+state.token},
+      body:JSON.stringify(DATA)
+    },30000)
+    .then(function(r){ return r.json().then(function(j){return {ok:r.ok,status:r.status,j:j};}); })
+    .then(function(res){
+      progress(70,'استلام رد الخادم…');
+      if(res.status===401){
+        log('انتهت صلاحية الجلسة — أعد تسجيل الدخول','err');
+        try{sessionStorage.removeItem('mk_admin_token');}catch(e){}
+        state.token=null; setStep(1);
+        showErr('loginErr','loginErrTxt','انتهت الجلسة — سجّل الدخول من جديد ثم أعد النقل');
+        btn.disabled=false; return;
+      }
+      if(!res.ok) throw new Error((res.j&&res.j.error)||('HTTP '+res.status));
+      progress(88,'تم الحفظ في D1 ✔');
+      log('✔ '+esc(res.j.message||'تم الحفظ')+' — أقسام: '+res.j.menu_items+'، مفاتيح: '+res.j.settings_keys,'ok');
+      $('doneMigrate').textContent='تم الحفظ: '+res.j.menu_items+' أقسام · '+res.j.settings_keys+' مفتاح إعدادات';
+      state.report={ when:new Date().toLocaleString('ar-SA'), result:res.j };
+      btn.disabled=false;
+      setStep(4);
+      runVerify();
+    })
+    .catch(function(err){
+      var m=err.name==='AbortError'?'انتهت مهلة الاتصال':err.message;
+      progress(100,'فشل النقل'); $('progFill').style.background='var(--danger)';
+      log('✖ فشل: '+esc(m),'err');
+      showErr('migrateErr','migrateErrTxt',m);
+      $('migrateRetryWrap').style.display='block';
+      btn.disabled=false; toast('فشل النقل: '+m,'err');
+    });
+  },450);
+}
+
+/* ═══════════ الخطوة 4: التحقق ═══════════ */
+$('verifyRetryBtn').addEventListener('click',runVerify);
+function runVerify(){
+  $('verifyWarn').classList.remove('show'); $('verifyRetryWrap').style.display='none'; $('successBlock').style.display='none';
+  var checks=[
+    {label:'عدد أقسام المنيو', wait:true},
+    {label:'إجمالي عدد الأصناف', wait:true},
+    {label:'عدد الفروع', wait:true},
+    {label:'مفاتيح الإعدادات', wait:true},
+    {label:'اسم العلامة التجارية', wait:true}
+  ];
+  renderChecks(checks);
+  log('قراءة البيانات обратно من D1 للتحقق…');
+  Promise.all([
+    fetchT(API+'/api/data/menu',{method:'GET'},15000).then(function(r){return r.json();}),
+    fetchT(API+'/api/data/settings',{method:'GET'},15000).then(function(r){return r.json();})
+  ]).then(function(arr){
+    var rm=arr[0].menu||[], rs=arr[1].settings||{};
+    var rItems=0; rm.forEach(function(s){rItems+=(s.items||[]).length;});
+    var t=totals();
+    checks[0]={label:'عدد أقسام المنيو', pass:rm.length===t.sections, detail:rm.length+' / '+t.sections};
+    checks[1]={label:'إجمالي عدد الأصناف', pass:rItems===t.items, detail:rItems+' / '+t.items};
+    checks[2]={label:'عدد الفروع', pass:(rs.branches||[]).length===t.branches, detail:(rs.branches||[]).length+' / '+t.branches};
+    checks[3]={label:'مفاتيح الإعدادات', pass:Object.keys(rs).length===t.keys, detail:Object.keys(rs).length+' / '+t.keys};
+    checks[4]={label:'اسم العلامة التجارية', pass:rs.brand&&rs.brand.nameAr===DATA.settings.brand.nameAr, detail:rs.brand?rs.brand.nameAr:'—'};
+    renderChecks(checks);
+    var all=checks.every(function(c){return c.pass;});
+    checks.forEach(function(c){ log((c.pass?'✔ ':'✖ ')+c.label+' ('+c.detail+')', c.pass?'ok':'err'); });
+    if(all){
+      progress(100,'اكتمل النقل والتحقق ✔');
+      log('🎉 جميع الفحوصات مطابقة — النقل سليم 100%','ok');
+      $('successBlock').style.display='block';
+      confetti();
+      toast('تم النقل والتحقق بنجاح!','ok');
+    }else{
+      $('verifyWarn').classList.add('show'); $('verifyRetryWrap').style.display='block';
+      toast('بعض الفحوصات غير مطابقة','err');
+    }
+  }).catch(function(err){
+    log('✖ تعذر التحقق: '+esc(err.message),'err');
+    $('verifyWarn').classList.add('show'); $('verifyRetryWrap').style.display='block';
+  });
+}
+function renderChecks(checks){
+  $('checkList').innerHTML=checks.map(function(c){
+    var cls=c.wait?'wait':(c.pass?'pass':'fail');
+    var ic=c.wait?'…':(c.pass?'✓':'✕');
+    return '<div class="check '+cls+'"><span class="ci">'+ic+'</span><span>'+esc(c.label)+'</span>'+(c.detail?'<span class="dt"><bdi>'+esc(c.detail)+'</bdi></span>':'')+'</div>';
+  }).join('');
+}
+
+/* ═══════════ التقرير ═══════════ */
+$('copyReportBtn').addEventListener('click',function(){
+  var t=totals();
+  var txt='تقرير نقل مكرونجي إلى D1\n'+
+    'التاريخ: '+(state.report?state.report.when:new Date().toLocaleString('ar-SA'))+'\n'+
+    'الخادم: '+API+'\n'+
+    'الأقسام: '+t.sections+' | الأصناف: '+t.items+' | الفروع: '+t.branches+'\n'+
+    'تطبيقات التوصيل: '+t.delivery+' | البانرات: '+t.banners+' | مفاتيح الإعدادات: '+t.keys+'\n'+
+    'النتيجة: ✔ تم النقل والتحقق بنجاح — جميع الفحوصات مطابقة';
+  copyText(txt,'تم نسخ التقرير');
+});
+
+/* ═══════════ احتفال النجاح ═══════════ */
+function confetti(){
+  if(reduced) return;
+  var cv=$('confetti'), ctx=cv.getContext('2d');
+  cv.width=innerWidth; cv.height=innerHeight;
+  var colors=['#C2571B','#D63A2F','#E9A13B','#2E7D4F','#F3E7D3'];
+  var ps=[]; for(var i=0;i<90;i++){
+    ps.push({x:Math.random()*cv.width,y:-20-Math.random()*cv.height*.4,
+      w:6+Math.random()*7,h:8+Math.random()*8,c:colors[i%colors.length],
+      vy:2+Math.random()*3,vx:-1.5+Math.random()*3,r:Math.random()*Math.PI,vr:-.1+Math.random()*.2});
+  }
+  var start=performance.now();
+  (function frame(t){
+    ctx.clearRect(0,0,cv.width,cv.height);
+    ps.forEach(function(p){
+      p.y+=p.vy; p.x+=p.vx; p.r+=p.vr;
+      ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.r);
+      ctx.fillStyle=p.c; ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h); ctx.restore();
+    });
+    if(t-start<2800) requestAnimationFrame(frame);
+    else ctx.clearRect(0,0,cv.width,cv.height);
+  })(start);
+}
+</script>
 </body>
 </html>
