@@ -1,955 +1,616 @@
-/* ===== admin-core.js — النواة: دخول API + بيانات D1 + نوافذ (v5.1) =====
-   v5.1: إصلاح شامل — طبقة بيانات ذكية (menu.js/settings.js → D1 تلقائياً)
-         حراسة كل العناصر + توافق كامل مع admin-tabs.js و admin-i18n.js
-         إدارة الصور فقط تستخدم رمز GitHub اختيارياً يُحفظ في الجلسة
-   v5.0: المنيو والإعدادات من D1 بدون GitHub Token
-   v4.0: تسجيل الدخول عبر API (JWT)
-   v3.7: إصلاح معالج التبويبات
-   v3.5: كسر الكاش في القراءات
-   v3.4: نشر صلب + التقاط SHA
-   v3.2: حذف البانر الفعلي + تنظيف اليتيمة
-   v3.1: try-catch شامل + هجرات */
-
-/* ===== إيقاف التكبير ===== */
-document.addEventListener('touchstart', function(e){ if(e.touches.length > 1) e.preventDefault(); }, {passive:false});
-document.addEventListener('touchmove', function(e){ if(e.touches.length > 1) e.preventDefault(); }, {passive:false});
-['gesturestart','gesturechange','gestureend'].forEach(function(ev){
-  document.addEventListener(ev, function(e){ e.preventDefault(); });
-});
-document.addEventListener('dblclick', function(e){ e.preventDefault(); });
-
-/* ===== الثوابت ===== */
-const API_BASE = 'https://makaronjy-api.makaronjy.workers.dev';
-const GH_OWNER = 'makaronjy';
-const GH_REPO = 'Makaronjy';
-const GH_BRANCH = 'main';
-const GH_TOKEN = ''; /* متوافق مع الملفات القديمة — لا يُستخدم للدخول */
-window.MK_ADMIN_VERSION = '5.1';
-let CFG = null;
-let STATE = null;
-let modalOnSave = null;
-let ALANG = (localStorage.getItem('mk_admin_lang') === 'en') ? 'en' : 'ar';
-
-/* ===== أدوات عامة ===== */
-const el = function(id){ return document.getElementById(id); };
-function on(id, ev, fn){ var n = el(id); if(n) n.addEventListener(ev, fn); }
-function esc(s){
-  var v = String(s == null ? '' : s);
-  return v.replace(/[&<>"']/g, function(c){
-    var m = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
-    return m[c];
-  });
+<!DOCTYPE html>
+<!-- admin.html — لوحة تحكم مكرونجي (v6.0) · تعمل بالكامل مع D1 عبر admin-core.js v5.1 -->
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>لوحة تحكم مكرونجي</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --dough:#FAF3E7; --crust:#F3E7D3; --card:#FFFBF4; --line:#EAD9BE;
+  --ink:#2A1A10; --muted:#7A6A55;
+  --amber:#C2571B; --amber-deep:#9A3F0F; --tomato:#D63A2F;
+  --basil:#2E7D4F; --basil-deep:#1F5C38; --gold:#E9A13B; --gold2:#F2C063;
+  --dark:#241610; --wa:#25D366; --steel:#3D6E9E; --danger:#B3261E; --warn:#B7791F;
+  --grad-hot:linear-gradient(135deg,#C2571B,#D63A2F);
+  --grad-green:linear-gradient(135deg,#2E7D4F,#1F5C38);
+  --shadow:0 10px 30px rgba(154,63,15,.10),0 2px 6px rgba(42,26,16,.06);
 }
-function L(k, a){
-  var src = (typeof ASTR !== 'undefined') ? ASTR : {};
-  var d = src[ALANG] || src.ar || {};
-  var v = d[k];
-  if(v === undefined && src.ar) v = src.ar[k];
-  if(v === undefined) v = k;
-  if(typeof v === 'function') return v(a);
-  return v;
-}
-function LF(k){
-  var args = [].slice.call(arguments, 1);
-  var src = (typeof ASTR !== 'undefined') ? ASTR : {};
-  var d = src[ALANG] || src.ar || {};
-  var v = d[k];
-  if(v === undefined && src.ar) v = src.ar[k];
-  if(typeof v === 'function') return v.apply(null, args);
-  return v;
-}
-function mv(id){ var n = el(id); return n ? n.value : ''; }
-function radioVal(name, dflt){
-  var n = document.querySelector('input[name="' + name + '"]:checked');
-  return n ? n.value : dflt;
-}
-function checkedVals(cls){
-  var list = document.querySelectorAll('.' + cls + ':checked');
-  return [].slice.call(list).map(function(c){ return c.value; });
-}
-
-/* ===== حاجز زر الرجوع ===== */
-let guardDepth = 0;
-let suppressCount = 0;
-function modalOpen(){ var n = el('modal'); return n && !n.classList.contains('hidden'); }
-function confirmOpen(){ var n = el('confirmModal'); return n && !n.classList.contains('hidden'); }
-function pushGuard(){
-  try{ history.pushState({ mkAdminGuard: 1 }, ''); guardDepth++; }
-  catch(e){ guardDepth++; }
-}
-function consumeGuard(){
-  if(guardDepth <= 0) return;
-  guardDepth--; suppressCount++;
-  try{ history.back(); }catch(e){ suppressCount--; }
-  setTimeout(function(){ if(suppressCount > 0) suppressCount--; }, 600);
-}
-window.addEventListener('popstate', function(){
-  if(suppressCount > 0){ suppressCount--; return; }
-  if(guardDepth > 0) guardDepth--;
-  if(confirmOpen()){ settleConfirm(false, false); return; }
-  if(modalOpen()){ hideModalOnly(); return; }
-});
-document.addEventListener('keydown', function(e){
-  if(e.key !== 'Escape') return;
-  if(confirmOpen()){ settleConfirm(false); return; }
-  if(modalOpen()){ closeModal(); return; }
-});
-document.addEventListener('click', function(e){
-  var im = e.target.closest('.img-prev img');
-  if(im && im.getAttribute('src')) window.open(im.getAttribute('src'), '_blank');
-});
-
-/* ===== اللغة ===== */
-function applyAdminLang(){
-  document.documentElement.lang = ALANG;
-  document.querySelectorAll('[data-al]').forEach(function(n){
-    var k = n.getAttribute('data-al');
-    var v = L(k);
-    if(v !== k) n.textContent = v;
-  });
-  document.querySelectorAll('.lang-seg[data-alang]').forEach(function(s){
-    s.classList.toggle('active', s.getAttribute('data-alang') === ALANG);
-  });
-  localStorage.setItem('mk_admin_lang', ALANG);
-}
-on('adminLangBtn', 'click', function(e){
-  var s = e.target.closest('.lang-seg');
-  if(!s) return;
-  ALANG = s.getAttribute('data-alang');
-  applyAdminLang();
-  if(STATE && typeof renderAll === 'function') renderAll();
-});
-
-/* ===== التوستات ===== */
-let toastSeq = 0;
-function toast(title, kind, sub){
-  kind = kind || 'info';
-  var wrap = el('toasts');
-  if(!wrap) return;
-  var icons = { success:'✔', error:'✖', info:'ℹ', warn:'⚠' };
-  var div = document.createElement('div');
-  div.className = 'toast ' + kind;
-  div.innerHTML = '<div class="t-ico">' + (icons[kind] || 'ℹ') + '</div>' +
-    '<div class="t-body"><b>' + esc(title) + '</b>' + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</div>' +
-    '<div class="t-bar" style="animation-duration:3.5s"></div>';
-  wrap.appendChild(div);
-  setTimeout(function(){
-    div.classList.add('out');
-    setTimeout(function(){ div.remove(); }, 350);
-  }, 3400);
-}
-
-/* ===== نافذة التأكيد ===== */
-let confirmResolve = null;
-let cfRequireDelete = false;
-let cfDeleteInput = null;
-let cfDeleteHint = null;
-function ensureCfDelete(){
-  if(cfDeleteInput) return cfDeleteInput;
-  cfDeleteInput = document.createElement('input');
-  cfDeleteInput.id = 'cfDeleteInput';
-  cfDeleteInput.type = 'text';
-  cfDeleteInput.autocomplete = 'off';
-  cfDeleteInput.spellcheck = false;
-  cfDeleteInput.style.cssText = 'width:100%;margin:0 0 .5rem;border:1.5px solid var(--line);border-radius:12px;padding:.6rem .8rem;font-family:inherit;font-weight:800;font-size:.95rem;text-align:center;background:#fff;color:var(--ink);outline:none;direction:ltr;letter-spacing:1px';
-  cfDeleteHint = document.createElement('small');
-  cfDeleteHint.id = 'cfDeleteHintLbl';
-  cfDeleteHint.style.cssText = 'display:block;color:var(--muted);font-weight:700;font-size:.7rem;margin:0 0 .8rem;line-height:1.6';
-  var msgEl = el('cfMsg');
-  if(msgEl && msgEl.parentNode){
-    msgEl.parentNode.insertBefore(cfDeleteInput, msgEl.nextSibling);
-    msgEl.parentNode.insertBefore(cfDeleteHint, cfDeleteInput.nextSibling);
-  }
-  cfDeleteInput.addEventListener('input', refreshCfDelete);
-  return cfDeleteInput;
-}
-function cfDeleteOk(){
-  var v = cfDeleteInput ? (cfDeleteInput.value || '') : '';
-  return v.trim().toLowerCase() === 'delete';
-}
-function refreshCfDelete(){
-  if(!cfRequireDelete) return;
-  var ok = cfDeleteOk();
-  var yes = el('cfYes');
-  if(!yes) return;
-  yes.disabled = !ok;
-  yes.style.opacity = ok ? '1' : '.45';
-  yes.style.cursor = ok ? 'pointer' : 'default';
-}
-function askConfirm(msg, title, ico, yesLbl, requireDelete){
-  return new Promise(function(resolve){
-    confirmResolve = resolve;
-    cfRequireDelete = !!requireDelete;
-    if(el('cfIco')) el('cfIco').textContent = ico || '⚠️';
-    if(el('cfTitle')) el('cfTitle').textContent = title || L('confirmDefault');
-    if(el('cfMsg')) el('cfMsg').textContent = msg;
-    if(el('cfYes')) el('cfYes').textContent = yesLbl || L('btnDelFinal');
-    if(el('cfNo')) el('cfNo').textContent = L('modalCancel');
-    var inp = ensureCfDelete();
-    if(cfRequireDelete){
-      inp.style.display = '';
-      cfDeleteHint.style.display = '';
-      cfDeleteHint.textContent = L('cfDeleteWord') + ' — ' + L('cfDeleteHint');
-      inp.value = '';
-      refreshCfDelete();
-      setTimeout(function(){ try{ inp.focus(); }catch(e){} }, 80);
-    }else{
-      inp.style.display = 'none';
-      cfDeleteHint.style.display = 'none';
-      var yes = el('cfYes');
-      if(yes){ yes.disabled = false; yes.style.opacity = '1'; yes.style.cursor = 'pointer'; }
-    }
-    var cm = el('confirmModal');
-    if(cm) cm.classList.remove('hidden');
-    pushGuard();
-  });
-}
-function settleConfirm(val, consume){
-  if(consume === undefined) consume = true;
-  if(!confirmOpen() && !confirmResolve) return;
-  if(cfRequireDelete && val === true && !cfDeleteOk()) return;
-  var cm = el('confirmModal');
-  if(cm) cm.classList.add('hidden');
-  if(cfDeleteInput) cfDeleteInput.value = '';
-  cfRequireDelete = false;
-  var yes = el('cfYes');
-  if(yes){ yes.disabled = false; yes.style.opacity = '1'; }
-  var r = confirmResolve;
-  confirmResolve = null;
-  if(consume) consumeGuard();
-  if(r) r(val);
-}
-on('cfYes', 'click', function(){ settleConfirm(true); });
-on('cfNo', 'click', function(){ settleConfirm(false); });
-on('confirmModal', 'click', function(e){ if(e.target === el('confirmModal')) settleConfirm(false); });
-
-/* ===== نافذة النماذج ===== */
-function openModal(title, bodyHtml, onSave){
-  if(el('modalTitle')) el('modalTitle').textContent = title;
-  if(el('modalBody')) el('modalBody').innerHTML = bodyHtml;
-  modalOnSave = onSave;
-  var m = el('modal');
-  if(m) m.classList.remove('hidden');
-  pushGuard();
-}
-function hideModalOnly(){ var m = el('modal'); if(m) m.classList.add('hidden'); modalOnSave = null; }
-function closeModal(){ hideModalOnly(); consumeGuard(); }
-on('modalCancel', 'click', closeModal);
-on('modal', 'click', function(e){ if(e.target === el('modal')) closeModal(); });
-on('modalSave', 'click', async function(){
-  if(!modalOnSave) return;
-  try{
-    var res = await modalOnSave();
-    if(res !== false) closeModal();
-  }catch(err){
-    toast(L('errGeneric') + ((err && err.message) ? err.message : err), 'error');
-  }
-});
-
-/* ===== لافتات الأخطاء ===== */
-function showBanner(id, msg, detail){
-  var b = el(id);
-  if(!b) return;
-  b.innerHTML = '<span>⚠️</span><div><span class="msg"></span>' + (detail ? '<small>' + esc(detail) + '</small>' : '') + '</div>';
-  b.querySelector('.msg').textContent = msg;
-  b.classList.remove('show');
-  void b.offsetWidth;
-  b.classList.add('show');
-}
-function hideBanner(id){ var b = el(id); if(b) b.classList.remove('show'); }
-function classifyGhError(e){
-  var status = e.http || 0;
-  var msg = (e.message || '').toLowerCase();
-  if(status === 0) return { key:'errNetwork', detail: e.message || 'No connection' };
-  if(status === 401) return { key:'errAuth', detail:'Bad credentials' };
-  if(status === 403){
-    if(msg.includes('rate limit')) return { key:'errGeneric', detail:'Rate limit' };
-    return { key:'errPermission', detail: e.message };
-  }
-  if(status === 404) return { key:'errNotFound', detail: e.message };
-  return { key:'errGeneric', detail: e.message || ('HTTP ' + status) };
-}
-function handlePublishError(e, btn, label){
-  if(e.http === 401 || e.http === 403){
-    toast(e.http === 401 ? L('errAuth') : L('errPermission'), 'error');
-    showRenew();
-  }else{
-    toast(L('publishFail') + e.message, 'error');
-  }
-  if(btn){ btn.disabled = false; btn.textContent = label; }
-}
-
-/* ===== طبقة API (D1) ===== */
-async function apiFetch(path, opts){
-  opts = opts || {};
-  var headers = Object.assign({ 'Content-Type':'application/json' }, opts.headers || {});
-  var tok = (CFG && CFG.token) ? CFG.token : sessionStorage.getItem('mk_admin_token');
-  if(tok) headers['Authorization'] = 'Bearer ' + tok;
-  var r = await fetch(API_BASE + path, Object.assign({}, opts, { headers: headers, cache:'no-store' }));
-  if(!r.ok){
-    var e = new Error('HTTP ' + r.status);
-    e.http = r.status;
-    try{ var j = await r.json(); e.message = j.error || j.message || e.message; }catch(err){}
-    throw e;
-  }
-  return r.json();
-}
-
-/* ===== إدارة الصور: رمز GitHub اختياري للجلسة فقط ===== */
-function ensureAssetToken(){
-  var cached = sessionStorage.getItem('mk_gh_asset_token');
-  if(cached) return Promise.resolve(cached);
-  return new Promise(function(resolve, reject){
-    var ov = document.createElement('div');
-    ov.style.cssText = 'position:fixed;inset:0;background:rgba(42,26,16,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
-    var box = document.createElement('div');
-    box.style.cssText = 'background:#FFFBF4;border-radius:18px;max-width:430px;width:100%;padding:20px;font-family:inherit;direction:rtl;box-shadow:0 20px 60px rgba(0,0,0,.35)';
-    box.innerHTML = '<h3 style="margin:0 0 8px;font-size:1rem;font-weight:900">🔑 صلاحية إدارة الصور (اختيارية)</h3>' +
-      '<p style="margin:0 0 12px;font-size:.78rem;color:#7A6A55;line-height:1.8">المنيو والإعدادات تُحفظ في D1 بدون أي رمز. رفع/حذف الصور فقط يحتاج رمز GitHub بصلاحيات repo، يُحفظ في هذه الجلسة فقط ولا يُكتب في الكود أبداً.</p>' +
-      '<input id="mkAssetTok" type="password" placeholder="ghp_... أو github_pat_..." autocomplete="off" style="width:100%;padding:12px;border:1.5px solid #EAD9BE;border-radius:12px;font-size:16px;direction:ltr;margin-bottom:12px;font-family:inherit">' +
-      '<div style="display:flex;gap:8px">' +
-      '<button id="mkAssetOk" style="flex:1;padding:12px;border:none;border-radius:12px;background:linear-gradient(135deg,#C2571B,#D63A2F);color:#fff;font-weight:900;font-family:inherit;cursor:pointer">حفظ ومتابعة</button>' +
-      '<button id="mkAssetNo" style="flex:1;padding:12px;border:1.5px solid #EAD9BE;border-radius:12px;background:#fff;font-weight:900;font-family:inherit;cursor:pointer">إلغاء</button></div>';
-    ov.appendChild(box);
-    document.body.appendChild(ov);
-    box.querySelector('#mkAssetOk').addEventListener('click', function(){
-      var v = box.querySelector('#mkAssetTok').value.trim();
-      if(!v){ toast('أدخل الرمز أو ألغِ العملية', 'error'); return; }
-      sessionStorage.setItem('mk_gh_asset_token', v);
-      ov.remove();
-      resolve(v);
-    });
-    box.querySelector('#mkAssetNo').addEventListener('click', function(){
-      ov.remove();
-      reject(new Error('أُلغيت إدارة الصور — لم يُدخل رمز GitHub'));
-    });
-    setTimeout(function(){ try{ box.querySelector('#mkAssetTok').focus(); }catch(e){} }, 60);
-  });
-}
-
-/* ===== طبقة GitHub للصور فقط ===== */
-const GH_API = 'https://api.github.com';
-async function ghAsset(path, opts){
-  var tok = await ensureAssetToken();
-  opts = opts || {};
-  var headers = {
-    'Accept':'application/vnd.github+json',
-    'Authorization':'Bearer ' + tok,
-    'X-GitHub-Api-Version':'2022-11-28'
-  };
-  if(opts.headers) Object.assign(headers, opts.headers);
-  var r = await fetch(GH_API + path, Object.assign({}, opts, { headers: headers, cache:'no-store' }));
-  if(!r.ok){
-    var e = new Error('HTTP ' + r.status);
-    e.http = r.status;
-    try{ var j = await r.json(); e.message = j.message || e.message; }catch(err){}
-    throw e;
-  }
-  var ct = r.headers.get('content-type') || '';
-  if(ct.includes('json')) return r.json();
-  return { text: await r.text(), sha: r.headers.get('etag') };
-}
-/* توافق: أي استدعاء قديم لـ gh يمر عبر طبقة الصور */
-async function gh(path, opts){ return ghAsset(path, opts); }
-
-function b64ToUtf8(b64){
-  var bin = atob(b64);
-  var bytes = new Uint8Array(bin.length);
-  for(var i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
-  if(window.TextDecoder) return new TextDecoder('utf-8').decode(bytes);
-  return decodeURIComponent(escape(bin));
-}
-
-/* ===== طبقة بيانات ذكية: menu.js/settings.js → D1، والباقي → GitHub ===== */
-function extractData(text, kind){
-  try{
-    var w = parseJs(text);
-    return kind === 'menu' ? w.MENU : w.APP_SETTINGS;
-  }catch(e){
-    var j = JSON.parse(text);
-    return kind === 'menu' ? (j.menu || j) : (j.settings || j);
-  }
-}
-async function getFile(path){
-  if(path === 'menu.js'){
-    var jm = await apiFetch('/api/data/menu');
-    return { text: 'window.MENU = ' + JSON.stringify(jm.menu) + ';\n', sha: null };
-  }
-  if(path === 'settings.js'){
-    var js = await apiFetch('/api/data/settings');
-    return { text: 'window.APP_SETTINGS = ' + JSON.stringify(js.settings) + ';\n', sha: null };
-  }
-  var q = '/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/' + path + '?ref=' + GH_BRANCH + '&_cb=' + Date.now();
-  var r = await ghAsset(q);
-  return { text: b64ToUtf8(r.content), sha: r.sha };
-}
-async function putFile(path, content, sha, msg){
-  if(path === 'menu.js'){
-    var menu = extractData(content, 'menu');
-    await apiFetch('/api/data/menu', { method:'PUT', body: JSON.stringify({ menu: menu }) });
-    return { content:{ sha:null } };
-  }
-  if(path === 'settings.js'){
-    var settings = extractData(content, 'settings');
-    await apiFetch('/api/data/settings', { method:'PUT', body: JSON.stringify({ settings: settings }) });
-    return { content:{ sha:null } };
-  }
-  var body = { message: msg, content: btoa(unescape(encodeURIComponent(content))), branch: GH_BRANCH };
-  if(sha) body.sha = sha;
-  var q = '/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/' + path;
-  return ghAsset(q, { method:'PUT', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(body) });
-}
-async function ghDeleteFile(path, sha, msg){
-  var body = { message: msg || ('حذف ملف: ' + path), sha: sha, branch: GH_BRANCH };
-  var q = '/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/' + path;
-  return ghAsset(q, { method:'DELETE', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(body) });
-}
-async function listDir(dirPath){
-  var q = '/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/' + dirPath + '?ref=' + GH_BRANCH + '&_cb=' + Date.now();
-  try{
-    var r = await ghAsset(q);
-    if(!Array.isArray(r)) return [];
-    return r.filter(function(x){ return x.type === 'file'; }).map(function(x){ return { name:x.name, path:x.path, sha:x.sha }; });
-  }catch(e){
-    if(e.http === 404) return [];
-    throw e;
-  }
-}
-function b64OfFile(file){
-  return file.arrayBuffer().then(function(buf){
-    var bytes = '';
-    var u8 = new Uint8Array(buf);
-    for(var i=0;i<u8.length;i+=32768) bytes += String.fromCharCode.apply(null, u8.subarray(i, i+32768));
-    return btoa(bytes);
-  });
-}
-async function uploadItemImgById(id, file){
-  function path0(x){ return 'img/items/' + x + '.png'; }
-  var path = path0(id);
-  var cur = await getFile(path).catch(function(){ return { sha:null }; });
-  var body = { message:'رفع صورة صنف: ' + id, content: await b64OfFile(file), branch: GH_BRANCH };
-  if(cur.sha) body.sha = cur.sha;
-  await ghAsset('/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/' + path, {
-    method:'PUT', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(body)
-  });
-  return path;
-}
-async function uploadAppImage(path, file){
-  var cur = await getFile(path).catch(function(){ return { sha:null }; });
-  var body = { message:'تحديث صورة: ' + path, content: await b64OfFile(file), branch: GH_BRANCH };
-  if(cur.sha) body.sha = cur.sha;
-  await ghAsset('/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/' + path, {
-    method:'PUT', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(body)
-  });
-  return path;
-}
-function parseJs(text){
-  if(!text || typeof text !== 'string') throw new Error('الملف فارغ أو غير صالح');
-  var w = { window:{} };
-  try{ new Function('window', text)(w.window); }
-  catch(e){ throw new Error('خطأ في قراءة الملف: ' + e.message); }
-  return w.window;
-}
-
-/* ===== الحالة والهجرات ===== */
-function branches(){ return STATE.SETTINGS.branches || (STATE.SETTINGS.branches = []); }
-function brName(b){ var n = (ALANG==='ar') ? b.nameAr : b.nameEn; return n || ('B' + b.num); }
-function findItemAdmin(id){
-  for(var s of STATE.MENU){ for(var it of s.items){ if(it.id === id) return it; } }
-  return null;
-}
-function findSectionOfItem(id){
-  for(var s of STATE.MENU){
-    if(s.items.some(function(x){ return x.id===id; })) return s;
-  }
-  return null;
-}
-function nextBranchNum(){
-  var used = branches().map(function(b){ return b.num; }).filter(Number.isFinite);
-  var n = 1;
-  while(used.includes(n)) n++;
-  return n;
-}
-function renumberBranches(){ branches().forEach(function(b, i){ b.num = i + 1; }); }
-function migrateBranchNums(){
-  branches().forEach(function(b,i){ if(!Number.isFinite(b.num)) b.num = i + 1; });
-  var seen = new Set();
-  branches().forEach(function(b){ while(seen.has(b.num)) b.num++; seen.add(b.num); });
-}
-function migrateHours(){
-  branches().forEach(function(b){
-    if(!b.hours || b.hours.length !== 7){
-      b.hours = [];
-      for(var i=0;i<7;i++) b.hours.push({ o:{h:9,m:0}, c:{h:23,m:0}, closed:false });
-    }
-    b.hours.forEach(function(d){
-      if(!d.o) d.o = {h:9,m:0};
-      if(!d.c) d.c = {h:23,m:0};
-      if(typeof d.closed !== 'boolean') d.closed = false;
-    });
-  });
-}
-function migrateBestSellers(){
-  var s = STATE.SETTINGS;
-  if(!s.bestSellers || s.bestSellers.length !== 4) s.bestSellers = ['','','',''];
-}
-function migrateSocial(){ if(STATE.SETTINGS.social === undefined) STATE.SETTINGS.social = []; }
-function migratePayments(){
-  var s = STATE.SETTINGS;
-  if(!s.payments) s.payments = { cod:{enabled:true}, gateway:{enabled:false, provider:'moyasar', publishableKey:''} };
-  if(!s.payments.cod) s.payments.cod = { enabled:true };
-  if(!s.payments.gateway) s.payments.gateway = { enabled:false, provider:'moyasar', publishableKey:'' };
-}
-
-/* ===== أدوات الوقت ===== */
-function clamp12(v){
-  var n = parseInt(v,10);
-  if(!isFinite(n)) n = 12;
-  if(n<1) n = 1;
-  if(n>12) n = 12;
-  return n;
-}
-function to24h(h, ap){
-  var v = +h;
-  if(ap==='pm' && v<12) v+=12;
-  if(ap==='am' && v===12) v=0;
-  return v;
-}
-function h12of(h){
-  h = +h;
-  if(h===0) return 12;
-  if(h>12) return h-12;
-  return h;
-}
-function minSelect(cls, d, val){
-  var o0 = (val===0) ? ' selected' : '';
-  var o30 = (val===30) ? ' selected' : '';
-  return '<select class="' + cls + '" data-d="' + d + '"><option value="0"' + o0 + '>00</option><option value="30"' + o30 + '>30</option></select>';
-}
-function validWa(v){ return /^\d{1,3}\d{9}$/.test(v); }
-function waFeedback(inp, msg){
-  var v = inp.value.trim();
-  if(!v){ msg.className='wa-preview'; msg.textContent=''; return; }
-  if(validWa(v)){
-    var cc = v.slice(0,-9);
-    var link = 'https://wa.me/' + v;
-    msg.className = 'wa-preview ok';
-    if(cc === '966'){
-      msg.innerHTML = L('waOk') + ' <a href="' + link + '" target="_blank" rel="noopener" style="color:#2d6a4f;text-decoration:underline">' + link + '</a>';
-    }else{
-      msg.textContent = L('waNonSa');
-    }
-  }else{
-    msg.className = 'wa-preview bad';
-    msg.textContent = L('waBad');
-  }
-}
-
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Tajawal','Segoe UI',Tahoma,Arial,sans-serif;background:var(--dough);color:var(--ink);min-height:100vh;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+.bg{position:fixed;inset:0;z-index:-1;overflow:hidden;background:radial-gradient(1100px 560px at 88% -10%,rgba(233,161,59,.16),transparent 60%),radial-gradient(900px 500px at -10% 30%,rgba(214,58,47,.10),transparent 60%),var(--dough)}
+.blob{position:absolute;border-radius:50%;filter:blur(70px);opacity:.45;will-change:transform}
+.b1{width:340px;height:340px;background:radial-gradient(circle,#E9A13B,transparent 70%);top:-80px;right:-60px;animation:d1 22s ease-in-out infinite alternate}
+.b2{width:300px;height:300px;background:radial-gradient(circle,#D63A2F,transparent 70%);bottom:5%;left:-90px;animation:d2 26s ease-in-out infinite alternate}
+@keyframes d1{to{transform:translate(-50px,60px) scale(1.12)}}
+@keyframes d2{to{transform:translate(70px,-50px) scale(1.08)}}
+.grain{position:absolute;inset:0;opacity:.05;mix-blend-mode:multiply;pointer-events:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E")}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:var(--crust)}
+::-webkit-scrollbar-thumb{background:linear-gradient(180deg,var(--amber),var(--tomato));border-radius:8px;border:2px solid var(--crust)}
+::-webkit-scrollbar-thumb:hover{background:var(--tomato)}
+.hidden{display:none!important}
+.wrap{max-width:960px;margin:0 auto;padding:16px 14px 70px}
+/* ===== الترويسة ===== */
+header.top{display:flex;align-items:center;gap:12px;padding:14px 0;animation:rise .5s ease both}
+.logo{width:52px;height:52px;flex:0 0 auto;filter:drop-shadow(0 4px 8px rgba(154,63,15,.25))}
+.top h1{font-size:clamp(1.15rem,4vw,1.5rem);font-weight:900}
+.top .sub{font-size:.76rem;color:var(--muted);font-weight:600}
+.topact{margin-inline-start:auto;display:flex;gap:8px;align-items:center}
+.lang-seg{border:1.5px solid var(--line);background:var(--card);border-radius:99px;padding:6px 12px;font-weight:800;font-size:.72rem;cursor:pointer;font-family:inherit;color:var(--muted)}
+.lang-seg.active{background:var(--grad-hot);color:#fff;border-color:transparent}
+.iconbtn{width:40px;height:40px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);cursor:pointer;font-size:1rem;display:grid;place-items:center;transition:.18s}
+.iconbtn:hover{border-color:var(--amber);transform:translateY(-1px)}
+@keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
 /* ===== التبويبات ===== */
-document.querySelectorAll('.tab').forEach(function(t){
-  t.addEventListener('click', function(){
-    document.querySelectorAll('.tab').forEach(function(x){ x.classList.remove('active'); });
-    t.classList.add('active');
-    document.querySelectorAll('main > section').forEach(function(s){ s.classList.add('hidden'); });
-    var sec = el('tab-' + t.dataset.tab);
-    if(sec) sec.classList.remove('hidden');
-  });
-});
+.tabs{display:flex;gap:8px;overflow-x:auto;padding:6px 2px 12px;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;border:1.5px solid var(--line);background:var(--card);border-radius:99px;padding:9px 16px;font-weight:800;font-size:.82rem;cursor:pointer;font-family:inherit;color:var(--muted);transition:.18s}
+.tab:hover{border-color:var(--amber);color:var(--amber-deep)}
+.tab.active{background:var(--grad-hot);color:#fff;border-color:transparent;box-shadow:0 5px 14px rgba(214,58,47,.3)}
+/* ===== البطاقات ===== */
+.card{background:var(--card);border:1.5px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:18px 16px;margin-bottom:14px;animation:rise .5s ease both}
+.card h2{font-size:1.02rem;font-weight:900;display:flex;align-items:center;gap:9px;margin-bottom:4px}
+.card h2 .ico{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(135deg,#F6E3C8,#F0D3AE);color:var(--amber-deep);flex:0 0 auto}
+.card .desc{font-size:.78rem;color:var(--muted);margin-bottom:14px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.spread{justify-content:space-between}
+/* ===== الأزرار ===== */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 18px;font-size:.9rem;font-weight:900;font-family:inherit;border:none;border-radius:13px;cursor:pointer;transition:.18s;color:#fff;background:var(--grad-hot);box-shadow:0 5px 16px rgba(214,58,47,.26)}
+.btn:hover{transform:translateY(-2px);filter:brightness(1.05)}
+.btn:active{transform:scale(.98)}
+.btn:disabled{opacity:.6;cursor:not-allowed;transform:none}
+.btn.green{background:var(--grad-green);box-shadow:0 5px 16px rgba(46,125,79,.26)}
+.btn.ghost{background:#fff;color:var(--amber-deep);border:1.5px solid var(--line);box-shadow:none}
+.btn.ghost:hover{border-color:var(--amber);background:#FFF6EA}
+.btn.danger{background:#FDECEA;color:var(--danger);border:1.5px solid #F0C4C0;box-shadow:none}
+.btn.sm{padding:8px 13px;font-size:.76rem;border-radius:10px}
+/* ===== الحقول ===== */
+.field{margin-bottom:12px}
+.field label{display:block;font-size:.76rem;font-weight:800;margin-bottom:5px}
+input[type=text],input[type=password],input[type=number],input[type=url],select,textarea{width:100%;padding:11px 12px;font-size:16px;font-family:inherit;font-weight:600;border:1.5px solid var(--line);border-radius:12px;background:#fff;color:var(--ink);outline:none;transition:.2s}
+input:focus,select:focus,textarea:focus{border-color:var(--amber);box-shadow:0 0 0 4px rgba(194,87,27,.14)}
+textarea{resize:vertical;min-height:70px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.grid2{grid-template-columns:1fr}}
+.checkline{display:flex;align-items:center;gap:8px;font-size:.82rem;font-weight:700}
+.checkline input{width:auto}
+/* ===== لافتات ===== */
+.banner{display:none;align-items:flex-start;gap:9px;padding:11px 13px;border-radius:12px;font-size:.8rem;font-weight:700;margin-bottom:12px}
+.banner.show{display:flex;animation:rise .3s ease}
+.banner.err{background:#FDECEA;color:var(--danger);border:1.5px solid #F0C4C0}
+.banner.ok{background:#E5F3EA;color:var(--basil-deep);border:1.5px solid #BFE0CB}
+/* ===== قوائم ===== */
+.list{display:flex;flex-direction:column;gap:9px}
+.itemrow{display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:11px 12px;transition:.15s}
+.itemrow:hover{border-color:var(--gold)}
+.itemrow .thumb{width:46px;height:46px;border-radius:11px;object-fit:cover;background:var(--crust);flex:0 0 auto}
+.itemrow .meta{flex:1;min-width:0}
+.itemrow .nm{font-weight:800;font-size:.88rem}
+.itemrow .en{color:var(--muted);font-size:.68rem;display:block}
+.itemrow .pr{font-weight:900;color:var(--amber-deep);white-space:nowrap}
+.itemrow .acts{display:flex;gap:5px}
+.badge{font-size:.62rem;padding:3px 8px;border-radius:99px;font-weight:800}
+.badge.hid{background:#FDECEA;color:var(--danger)}
+.badge.on{background:#E5F3EA;color:var(--basil-deep)}
+.sec-head{display:flex;align-items:center;gap:9px;margin:16px 0 9px;font-weight:900;font-size:.95rem}
+.sec-head .cnt{margin-inline-start:auto;font-size:.68rem;background:var(--crust);color:var(--amber-deep);padding:3px 9px;border-radius:99px}
+.empty{color:var(--muted);font-weight:700;font-size:.8rem;padding:14px;border:1.5px dashed var(--line);border-radius:12px;text-align:center}
+/* ===== جداول ===== */
+.tbl{width:100%;border-collapse:collapse;font-size:.78rem}
+.tbl th{background:var(--crust);color:var(--amber-deep);font-weight:900;padding:9px 8px;text-align:right}
+.tbl td{padding:9px 8px;border-bottom:1px dashed var(--line);font-weight:600}
+.tbl tr:hover td{background:#FFF6EA}
+.st{font-size:.66rem;padding:3px 9px;border-radius:99px;font-weight:800;white-space:nowrap}
+.st.pending{background:#FFF6E4;color:var(--warn)} .st.delivered{background:#E5F3EA;color:var(--basil-deep)}
+.st.cancelled{background:#FDECEA;color:var(--danger)} .st.other{background:#EBF2F9;color:var(--steel)}
+/* ===== شاشات الدخول ===== */
+.screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.logincard{width:100%;max-width:430px;background:var(--card);border:1.5px solid var(--line);border-radius:26px;box-shadow:var(--shadow);padding:30px 24px;text-align:center;animation:rise .5s ease both}
+.logincard .logo{width:70px;height:70px;margin:0 auto 10px}
+.logincard h1{font-size:1.5rem;font-weight:900;margin-bottom:2px}
+.logincard .sub{color:var(--muted);font-size:.8rem;margin-bottom:20px}
+.logincard .field{text-align:right}
+/* ===== المودال ===== */
+.overlay{position:fixed;inset:0;background:rgba(42,26,16,.55);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(3px)}
+.modal{width:100%;max-width:520px;max-height:88vh;overflow-y:auto;background:var(--card);border-radius:22px;padding:22px 18px;box-shadow:0 24px 70px rgba(0,0,0,.35);animation:rise .3s ease}
+.modal h3{font-size:1.05rem;font-weight:900;margin-bottom:14px}
+.modal .foot{display:flex;gap:9px;margin-top:16px}
+.modal .foot .btn{flex:1}
+.cf-ico{font-size:2.2rem;text-align:center;margin-bottom:6px}
+/* ===== التوست ===== */
+#toasts{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:200;display:flex;flex-direction:column;gap:8px;width:min(92vw,430px)}
+.toast{display:flex;align-items:center;gap:10px;background:var(--dark);color:#F5E9D6;padding:12px 15px;border-radius:13px;font-size:.82rem;font-weight:700;box-shadow:0 10px 30px rgba(0,0,0,.3);animation:rise .3s ease;position:relative;overflow:hidden}
+.toast .t-ico{font-size:1rem}
+.toast .t-body{flex:1}.toast .t-body small{display:block;opacity:.75;font-size:.7rem}
+.toast .t-bar{position:absolute;bottom:0;right:0;height:3px;background:var(--gold);width:100%;transform-origin:right;animation:tbar linear forwards}
+@keyframes tbar{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+.toast.success{border-inline-start:4px solid #4CAF7D}.toast.error{border-inline-start:4px solid #E5645A}
+.toast.info{border-inline-start:4px solid var(--steel)}.toast.warn{border-inline-start:4px solid var(--gold)}
+.toast.out{opacity:0;transition:opacity .3s}
+.img-prev{border-radius:10px;overflow:hidden}
+.wa-preview{font-size:.7rem;font-weight:700;margin-top:4px;display:block}
+.wa-preview.ok{color:var(--basil-deep)}.wa-preview.bad{color:var(--danger)}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="bg"><div class="blob b1"></div><div class="blob b2"></div><div class="grain"></div></div>
 
-/* ===== الخروج ===== */
-on('btnLogout', 'click', async function(){
-  var ok = await askConfirm(L('logoutMsg'), L('logoutTitle'), '🚪', L('logoutYes'));
-  if(!ok) return;
-  sessionStorage.removeItem('mk_admin');
-  sessionStorage.removeItem('mk_admin_token');
-  sessionStorage.removeItem('mk_admin_user');
-  sessionStorage.removeItem('mk_gh_asset_token');
-  location.reload();
-});
+<!-- ===== شاشة الدخول ===== -->
+<div class="screen" id="loginScreen">
+  <div class="logincard">
+    <svg class="logo" viewBox="0 0 64 64" fill="none"><path d="M8 34h48c0 12-10 20-24 20S8 46 8 34z" fill="#C2571B"/><path d="M8 34h48c0 3-1 6-3 8H11c-2-2-3-5-3-8z" fill="#9A3F0F"/><ellipse cx="32" cy="34" rx="24" ry="5" fill="#E9A13B"/><path d="M14 33c4-3 8 2 12-1s8 2 12-1 8 2 12-1" stroke="#D63A2F" stroke-width="3" stroke-linecap="round" fill="none"/><path d="M24 22c-2-4 2-6 0-10M32 22c-2-4 2-6 0-10M40 22c-2-4 2-6 0-10" stroke="#B7A98F" stroke-width="2.5" stroke-linecap="round" fill="none"/><rect x="26" y="54" width="12" height="4" rx="2" fill="#9A3F0F"/></svg>
+    <h1>لوحة تحكم مكرونجي</h1>
+    <div class="sub">إدارة المنيو · الإعدادات · الطلبات · الموظفين</div>
+    <div class="banner err" id="loginErr"><span>⚠️</span><span class="msg"></span></div>
+    <div class="field"><label>اسم المستخدم</label><input type="text" id="inOwner" value="owner" autocomplete="username" autocapitalize="off"></div>
+    <div class="field"><label>كلمة السر</label><input type="password" id="inToken" autocomplete="current-password" placeholder="••••••"></div>
+    <button class="btn" id="btnLogin" style="width:100%">دخول</button>
+  </div>
+</div>
 
-/* ===== تحميل البيانات من D1 ===== */
-async function loadAll(){
-  var both;
-  try{
-    both = await Promise.all([ apiFetch('/api/data/menu'), apiFetch('/api/data/settings') ]);
-  }catch(e){
-    var cls = classifyGhError(e);
-    throw new Error(L(cls.key) + (cls.detail ? ' — ' + cls.detail : ''));
-  }
-  var menu = both[0].menu;
-  var settings = both[1].settings;
-  if(!Array.isArray(menu)) throw new Error('بيانات المنيو من D1 غير صالحة');
-  if(!settings || typeof settings !== 'object') throw new Error('بيانات الإعدادات من D1 غير صالحة');
-  var newState = { MENU: menu, SETTINGS: settings, shas:{ menu:null, settings:null } };
-  var S0 = newState.SETTINGS;
-  if(!S0.ad) S0.ad = {};
-  if(!S0.ad.icon) S0.ad.icon = '🍝';
-  if(!S0.delivery) S0.delivery = [];
-  if(S0.social === undefined) S0.social = [];
-  if(!S0.imagesVersion) S0.imagesVersion = 0;
-  if(!S0.display) S0.display = { mode:'grid', showDesc:true, showCal:true };
-  if(S0.bgs) delete S0.bgs;
-  STATE = newState;
-  migrateBranchNums();
-  migrateHours();
-  migrateBestSellers();
-  migrateSocial();
-  migratePayments();
-  if(el('renewScreen')) el('renewScreen').classList.add('hidden');
-  if(el('loginScreen')) el('loginScreen').classList.add('hidden');
-  if(el('app')) el('app').classList.remove('hidden');
-  if(typeof renderAll === 'function') renderAll();
+<!-- ===== شاشة تجديد الجلسة ===== -->
+<div class="screen hidden" id="renewScreen">
+  <div class="logincard">
+    <div class="cf-ico">🔁</div>
+    <h1>تجديد الجلسة</h1>
+    <div class="sub">انتهت صلاحية الدخول — أدخل كلمة المرور للمتابعة</div>
+    <div class="banner err" id="renewErr"><span>⚠️</span><span class="msg"></span></div>
+    <div class="field"><label>كلمة المرور</label><input type="password" id="inRenewToken" placeholder="••••••"></div>
+    <button class="btn" id="btnRenew" style="width:100%">متابعة</button>
+  </div>
+</div>
+
+<!-- ===== التطبيق ===== -->
+<div class="wrap hidden" id="app">
+  <header class="top">
+    <svg class="logo" viewBox="0 0 64 64" fill="none"><path d="M8 34h48c0 12-10 20-24 20S8 46 8 34z" fill="#C2571B"/><path d="M8 34h48c0 3-1 6-3 8H11c-2-2-3-5-3-8z" fill="#9A3F0F"/><ellipse cx="32" cy="34" rx="24" ry="5" fill="#E9A13B"/><path d="M14 33c4-3 8 2 12-1s8 2 12-1 8 2 12-1" stroke="#D63A2F" stroke-width="3" stroke-linecap="round" fill="none"/><path d="M24 22c-2-4 2-6 0-10M32 22c-2-4 2-6 0-10M40 22c-2-4 2-6 0-10" stroke="#B7A98F" stroke-width="2.5" stroke-linecap="round" fill="none"/><rect x="26" y="54" width="12" height="4" rx="2" fill="#9A3F0F"/></svg>
+    <div><h1>مكرونجي</h1><div class="sub" id="appSub">لوحة التحكم · D1</div></div>
+    <div class="topact">
+      <button class="lang-seg active" data-alang="ar">ع</button>
+      <button class="lang-seg" data-alang="en">EN</button>
+      <button class="iconbtn" id="btnRefresh" title="تحديث">🔄</button>
+      <button class="iconbtn" id="btnLogout" title="خروج">🚪</button>
+    </div>
+  </header>
+  <div id="adminLangBtn" style="display:none"></div>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="menu">🍝 المنيو</button>
+    <button class="tab" data-tab="settings">⚙️ إعدادات</button>
+    <button class="tab" data-tab="ads">🖼️ إعلان</button>
+    <button class="tab" data-tab="orders">🧾 الطلبات</button>
+    <button class="tab" data-tab="users">👥 الموظفون</button>
+  </nav>
+
+  <main>
+    <section id="tab-menu">
+      <div class="card">
+        <div class="row spread">
+          <h2><span class="ico">🍝</span>إدارة المنيو</h2>
+          <div class="row">
+            <button class="btn ghost sm" id="addSecBtn">➕ قسم</button>
+            <button class="btn green sm" id="pubMenuBtn">🚀 نشر المنيو</button>
+          </div>
+        </div>
+        <p class="desc">التعديلات تُحفظ محلياً ثم تُنشر إلى D1 بزر النشر.</p>
+        <div class="field"><input type="text" id="menuSearch" placeholder="🔍 ابحث عن صنف…"></div>
+        <div id="menuList"></div>
+      </div>
+    </section>
+
+    <section id="tab-settings" class="hidden">
+      <div class="card">
+        <div class="row spread">
+          <h2><span class="ico">⚙️</span>الإعدادات العامة</h2>
+          <button class="btn green sm" id="pubSetBtn">🚀 نشر الإعدادات</button>
+        </div>
+        <p class="desc">العلامة، ساعات العمل، العرض، والتواصل الاجتماعي.</p>
+        <div class="grid2">
+          <div class="field"><label>الاسم (عربي)</label><input type="text" id="setBrandAr"></div>
+          <div class="field"><label>الاسم (إنجليزي)</label><input type="text" id="setBrandEn"></div>
+          <div class="field"><label>الوصف (عربي)</label><input type="text" id="setTagAr"></div>
+          <div class="field"><label>الوصف (إنجليزي)</label><input type="text" id="setTagEn"></div>
+          <div class="field"><label>فتح (ساعة 24)</label><input type="number" id="setOpenH" min="0" max="23"></div>
+          <div class="field"><label>إغلاق (ساعة 24)</label><input type="number" id="setCloseH" min="0" max="23"></div>
+        </div>
+        <div class="field"><label>طريقة العرض</label>
+          <select id="setDispMode"><option value="list">قائمة</option><option value="grid">شبكة</option></select>
+        </div>
+        <div class="row">
+          <label class="checkline"><input type="checkbox" id="setShowDesc"> إظهار الوصف</label>
+          <label class="checkline"><input type="checkbox" id="setShowCal"> إظهار السعرات</label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row spread"><h2><span class="ico">🏪</span>الفروع</h2><button class="btn ghost sm" id="addBranchBtn">➕ فرع</button></div>
+        <p class="desc">بيانات الفروع ورسوم التوصيل وأوقات العمل.</p>
+        <div class="list" id="branchList"></div>
+      </div>
+
+      <div class="card">
+        <div class="row spread"><h2><span class="ico">🔗</span>التواصل الاجتماعي</h2><button class="btn ghost sm" id="addSocialBtn">➕ رابط</button></div>
+        <div class="list" id="socialList"></div>
+      </div>
+    </section>
+
+    <section id="tab-ads" class="hidden">
+      <div class="card">
+        <h2><span class="ico">📢</span>الإعلان المنبثق</h2>
+        <p class="desc">يظهر للعملاء عند فتح التطبيق (اختياري).</p>
+        <label class="checkline" style="margin-bottom:12px"><input type="checkbox" id="adEnabled"> تفعيل الإعلان</label>
+        <div class="grid2">
+          <div class="field"><label>العنوان (عربي)</label><input type="text" id="adTitleAr"></div>
+          <div class="field"><label>العنوان (إنجليزي)</label><input type="text" id="adTitleEn"></div>
+        </div>
+        <div class="field"><label>النص (عربي)</label><textarea id="adTextAr"></textarea></div>
+        <div class="field"><label>النص (إنجليزي)</label><textarea id="adTextEn"></textarea></div>
+        <div class="grid2">
+          <div class="field"><label>زر (عربي)</label><input type="text" id="adBtnAr"></div>
+          <div class="field"><label>زر (إنجليزي)</label><input type="text" id="adBtnEn"></div>
+        </div>
+        <button class="btn green sm" id="pubAdBtn">🚀 نشر الإعلان</button>
+      </div>
+    </section>
+
+    <section id="tab-orders" class="hidden">
+      <div class="card">
+        <div class="row spread">
+          <h2><span class="ico">🧾</span>الطلبات</h2>
+          <div class="row">
+            <select id="ordFilter" style="width:auto"><option value="">الكل</option><option value="pending">قيد الانتظار</option><option value="delivered">مسلّم</option><option value="cancelled">ملغي</option></select>
+            <button class="btn ghost sm" id="ordRefresh">🔄</button>
+          </div>
+        </div>
+        <p class="desc">أحدث الطلبات من قاعدة البيانات مباشرة.</p>
+        <div style="overflow-x:auto"><table class="tbl"><thead><tr><th>الرقم</th><th>العميل</th><th>الفرع</th><th>الإجمالي</th><th>الحالة</th><th>التاريخ</th></tr></thead><tbody id="ordBody"></tbody></table></div>
+        <div class="empty hidden" id="ordEmpty">لا توجد طلبات</div>
+      </div>
+    </section>
+
+    <section id="tab-users" class="hidden">
+      <div class="card">
+        <div class="row spread"><h2><span class="ico">👥</span>الموظفون</h2><button class="btn ghost sm" id="addUserBtn">➕ موظف</button></div>
+        <p class="desc">مشرفون وسائقون — الصلاحيات عبر D1.</p>
+        <div class="list" id="userList"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ===== المودال العام ===== -->
+<div class="overlay hidden" id="modal">
+  <div class="modal">
+    <h3 id="modalTitle"></h3>
+    <div id="modalBody"></div>
+    <div class="foot">
+      <button class="btn" id="modalSave">حفظ</button>
+      <button class="btn ghost" id="modalCancel">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== مودال التأكيد ===== -->
+<div class="overlay hidden" id="confirmModal">
+  <div class="modal" style="max-width:400px;text-align:center">
+    <div class="cf-ico" id="cfIco">⚠️</div>
+    <h3 id="cfTitle" style="text-align:center"></h3>
+    <p id="cfMsg" style="font-size:.84rem;color:var(--muted);white-space:pre-line;margin-bottom:14px"></p>
+    <div class="foot">
+      <button class="btn danger" id="cfYes">تأكيد</button>
+      <button class="btn ghost" id="cfNo">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script src="admin-i18n.js"></script>
+<script src="admin-core.js"></script>
+<script>
+/* ===== تطبيق اللوحة (v6.0) — يعتمد على admin-core.js v5.1 ===== */
+'use strict';
+function q(id){ return document.getElementById(id); }
+function ce(t){ return document.createElement(t); }
+function val(id){ var n=q(id); return n?n.value:''; }
+function setv(id,v){ var n=q(id); if(n) n.value=(v==null?'':v); }
+function chk(id,v){ var n=q(id); if(n) n.checked=!!v; }
+
+/* ===== renderAll (يستدعيه admin-core بعد التحميل) ===== */
+function renderAll(){
+  renderMenu();
+  renderSettings();
+  renderBranches();
+  renderSocial();
+  renderAd();
+  var t=0; STATE.MENU.forEach(function(s){t+=s.items.length;});
+  q('appSub').textContent='لوحة التحكم · '+STATE.MENU.length+' أقسام · '+t+' صنف · '+branches().length+' فروع';
 }
 
-/* ===== تسجيل الدخول عبر API ===== */
-on('btnLogin', 'click', async function(){
-  var username = mv('inOwner').trim();
-  var password = mv('inToken').trim();
-  hideBanner('loginErr');
-  if(!username || !password){
-    showBanner('loginErr', 'اسم المستخدم وكلمة المرور مطلوبان');
+/* ===== المنيو ===== */
+function renderMenu(){
+  var box=q('menuList'); if(!box||!STATE) return;
+  var filter=(val('menuSearch')||'').trim().toLowerCase();
+  var html='';
+  STATE.MENU.forEach(function(sec,si){
+    var items=sec.items.filter(function(it){ return !filter || (it.ar+' '+it.en+' '+it.id).toLowerCase().indexOf(filter)>=0; });
+    if(filter && !items.length) return;
+    html+='<div class="sec-head"><span>'+esc(sec.i||'🍽️')+'</span><span>'+esc(sec.t)+'</span><span class="cnt">'+sec.items.length+'</span>'+
+      '<button class="btn ghost sm" data-secedit="'+si+'">✏️</button>'+
+      '<button class="btn ghost sm" data-itemadd="'+si+'">➕ صنف</button>'+
+      '<button class="btn danger sm" data-secdel="'+si+'">🗑</button></div><div class="list">';
+    if(!items.length) html+='<div class="empty">لا أصناف في هذا القسم</div>';
+    items.forEach(function(it){
+      var ii=sec.items.indexOf(it);
+      html+='<div class="itemrow">'+
+        '<img class="thumb" src="img/items/'+esc(it.id)+'.png?v='+(it.imgv||0)+'" onerror="this.style.visibility=\'hidden\'">'+
+        '<div class="meta"><span class="nm">'+esc(it.ar)+'</span><span class="en">'+esc(it.en||'')+'</span></div>'+
+        (it.hidden?'<span class="badge hid">مخفي</span>':'')+
+        '<span class="pr">'+(it.prices&&it.prices[0]!=null?it.prices[0]:0)+' ر.س</span>'+
+        '<div class="acts"><button class="btn ghost sm" data-itemedit="'+si+':'+ii+'">✏️</button>'+
+        '<button class="btn danger sm" data-itemdel="'+si+':'+ii+'">🗑</button></div></div>';
+    });
+    html+='</div>';
+  });
+  box.innerHTML=html||'<div class="empty">لا أقسام — أضف قسماً للبدء</div>';
+}
+q('menuSearch').addEventListener('input',renderMenu);
+q('menuList').addEventListener('click',async function(e){
+  var se=e.target.closest('[data-secedit]'), sa=e.target.closest('[data-itemadd]'), sd=e.target.closest('[data-secdel]'),
+      ie=e.target.closest('[data-itemedit]'), id=e.target.closest('[data-itemdel]');
+  if(se){ editSection(+se.dataset.secedit); return; }
+  if(sa){ editItem(+sa.dataset.itemadd,-1); return; }
+  if(sd){
+    var si=+sd.dataset.secdel;
+    var ok=await askConfirm('حذف القسم "'+STATE.MENU[si].t+'" وكل أصنافه؟','حذف قسم','🗑','حذف');
+    if(ok){ STATE.MENU.splice(si,1); renderMenu(); toast('حُذف القسم — اضغط نشر','warn'); }
     return;
   }
-  var btn = el('btnLogin');
-  if(btn){ btn.textContent = 'جارٍ تسجيل الدخول...'; btn.disabled = true; }
-  try{
-    var response = await fetch(API_BASE + '/api/auth/login', {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json' },
-      body: JSON.stringify({ username: username, password: password })
+  if(ie){ var p=ie.dataset.itemedit.split(':'); editItem(+p[0],+p[1]); return; }
+  if(id){
+    var p2=id.dataset.itemdel.split(':'); var s=STATE.MENU[+p2[0]], it=s.items[+p2[1]];
+    var ok2=await askConfirm('حذف الصنف "'+it.ar+'"؟','حذف صنف','🗑','حذف');
+    if(ok2){ s.items.splice(+p2[1],1); renderMenu(); toast('حُذف الصنف — اضغط نشر','warn'); }
+  }
+});
+q('addSecBtn').addEventListener('click',function(){ editSection(-1); });
+function editSection(si){
+  var s=si>=0?STATE.MENU[si]:{id:'sec-'+Date.now(),t:'',tEn:'',i:'🍽️',items:[],hidden:false};
+  openModal(si>=0?'تعديل قسم':'قسم جديد',
+    '<div class="field"><label>الاسم (عربي)</label><input id="mSecT" type="text" value="'+esc(s.t)+'"></div>'+
+    '<div class="field"><label>الاسم (إنجليزي)</label><input id="mSecEn" type="text" value="'+esc(s.tEn||'')+'"></div>'+
+    '<div class="field"><label>الأيقونة</label><input id="mSecI" type="text" value="'+esc(s.i||'🍽️')+'"></div>',
+    function(){
+      var t=val('mSecT').trim(); if(!t){ toast('الاسم مطلوب','error'); return false; }
+      s.t=t; s.tEn=val('mSecEn').trim(); s.i=val('mSecI').trim()||'🍽️';
+      if(si<0) STATE.MENU.push(s);
+      renderMenu(); toast('تم — اضغط نشر المنيو','success');
     });
-    var data = await response.json();
-    if(!response.ok) throw new Error(data.error || 'بيانات الدخول غير صحيحة');
-    sessionStorage.setItem('mk_admin_token', data.token);
-    sessionStorage.setItem('mk_admin_user', JSON.stringify(data.user));
-    CFG = { owner: GH_OWNER, repo: GH_REPO, branch: GH_BRANCH, token: data.token };
-    sessionStorage.setItem('mk_admin', JSON.stringify(CFG));
-    toast(L('loggedIn'), 'success', L('loggedSub'));
-    await loadAll();
-    applyAdminLang();
-  }catch(e){
-    showBanner('loginErr', L('errPublish'), (e && e.message) ? e.message : String(e));
-    sessionStorage.removeItem('mk_admin');
-    sessionStorage.removeItem('mk_admin_token');
-    sessionStorage.removeItem('mk_admin_user');
-    CFG = null;
-  }
-  if(btn){ btn.disabled = false; btn.textContent = L('btnLogin'); }
-});
-['inOwner','inToken'].forEach(function(id){
-  on(id, 'keydown', function(e){ if(e.key === 'Enter'){ var b = el('btnLogin'); if(b) b.click(); } });
-});
-
-/* ===== شاشة تجديد الجلسة (كلمة المرور) ===== */
-function showRenew(){
-  if(el('loginScreen')) el('loginScreen').classList.add('hidden');
-  if(el('app')) el('app').classList.add('hidden');
-  if(el('renewScreen')) el('renewScreen').classList.remove('hidden');
-  var inp = el('inRenewToken');
-  if(inp){ inp.type = 'password'; inp.placeholder = 'كلمة المرور'; inp.value = ''; }
 }
-on('btnRenew', 'click', async function(){
-  var p = mv('inRenewToken').trim();
-  hideBanner('renewErr');
-  if(!p){ showBanner('renewErr', L('errRenewEmpty')); return; }
-  var u = 'owner';
-  try{ u = (JSON.parse(sessionStorage.getItem('mk_admin_user') || '{}').username) || 'owner'; }catch(e){}
-  var btn = el('btnRenew');
-  if(btn){ btn.textContent = L('publishing'); btn.disabled = true; }
-  try{
-    var r = await fetch(API_BASE + '/api/auth/login', {
-      method:'POST', headers:{ 'Content-Type':'application/json' },
-      body: JSON.stringify({ username: u, password: p })
+function editItem(si,ii){
+  var s=STATE.MENU[si];
+  var it=ii>=0?s.items[ii]:{id:'item-'+Date.now(),ar:'',en:'',prices:[0],cal:0,desc:'',descEn:'',hidden:false};
+  openModal(ii>=0?'تعديل صنف':'صنف جديد',
+    '<div class="grid2"><div class="field"><label>الاسم (عربي)</label><input id="mAr" type="text" value="'+esc(it.ar)+'"></div>'+
+    '<div class="field"><label>الاسم (إنجليزي)</label><input id="mEn" type="text" value="'+esc(it.en||'')+'"></div>'+
+    '<div class="field"><label>السعر (ر.س)</label><input id="mPrice" type="number" min="0" step="0.5" value="'+(it.prices&&it.prices[0]!=null?it.prices[0]:0)+'"></div>'+
+    '<div class="field"><label>السعرات</label><input id="mCal" type="number" min="0" value="'+(it.cal||0)+'"></div></div>'+
+    '<div class="field"><label>الوصف (عربي)</label><textarea id="mDesc">'+esc(it.desc||'')+'</textarea></div>'+
+    '<div class="field"><label>الوصف (إنجليزي)</label><textarea id="mDescEn">'+esc(it.descEn||'')+'</textarea></div>'+
+    '<label class="checkline"><input id="mHidden" type="checkbox"'+(it.hidden?' checked':'')+'> مخفي عن العملاء</label>',
+    function(){
+      var ar=val('mAr').trim(); if(!ar){ toast('الاسم مطلوب','error'); return false; }
+      it.ar=ar; it.en=val('mEn').trim(); it.prices=[parseFloat(val('mPrice'))||0];
+      it.cal=parseInt(val('mCal'),10)||0; it.desc=val('mDesc'); it.descEn=val('mDescEn');
+      it.hidden=q('mHidden').checked;
+      if(ii<0) s.items.push(it);
+      renderMenu(); toast('تم — اضغط نشر المنيو','success');
     });
-    var d = await r.json();
-    if(!r.ok){ var er = new Error(d.error || 'HTTP ' + r.status); er.http = r.status; throw er; }
-    CFG = { owner: GH_OWNER, repo: GH_REPO, branch: GH_BRANCH, token: d.token };
-    sessionStorage.setItem('mk_admin', JSON.stringify(CFG));
-    sessionStorage.setItem('mk_admin_token', d.token);
-    sessionStorage.setItem('mk_admin_user', JSON.stringify(d.user));
-    await loadAll();
-    toast(L('loggedIn'), 'success', L('loggedSub'));
-  }catch(e){
-    var cls = classifyGhError(e);
-    showBanner('renewErr', (e.http===401||e.http===403) ? L('errRenewBad') : L(cls.key), cls.detail || (e && e.message));
-  }
-  if(btn){ btn.disabled = false; btn.textContent = L('btnRenew'); }
+}
+q('pubMenuBtn').addEventListener('click',async function(){
+  var b=q('pubMenuBtn'); b.disabled=true;
+  try{ await publishMenu('تحديث المنيو من اللوحة'); toast('✔ نُشر المنيو إلى D1','success'); }
+  catch(e){ handlePublishError(e,b,'🚀 نشر المنيو'); return; }
+  b.disabled=false;
 });
 
-/* ===== تحديث من D1 ===== */
-on('btnRefresh', 'click', async function(){
-  if(!CFG){ var t0 = sessionStorage.getItem('mk_admin_token'); if(t0) CFG = { owner:GH_OWNER, repo:GH_REPO, branch:GH_BRANCH, token:t0 }; }
-  if(!CFG) return;
-  var b = el('btnRefresh');
-  var old = b ? b.textContent : '';
-  if(b){ b.textContent = L('refreshing'); b.disabled = true; }
+/* ===== الإعدادات ===== */
+function renderSettings(){
+  var S=STATE.SETTINGS;
+  setv('setBrandAr',S.brand&&S.brand.nameAr); setv('setBrandEn',S.brand&&S.brand.nameEn);
+  setv('setTagAr',S.brand&&S.brand.tagAr); setv('setTagEn',S.brand&&S.brand.tagEn);
+  setv('setOpenH',S.hours&&S.hours.open?S.hours.open.h:13); setv('setCloseH',S.hours&&S.hours.close?S.hours.close.h:2);
+  setv('setDispMode',S.display?S.display.mode:'list');
+  chk('setShowDesc',S.display?S.display.showDesc:true); chk('setShowCal',S.display?S.display.showCal:true);
+}
+function collectSettings(){
+  var S=STATE.SETTINGS;
+  S.brand=S.brand||{}; S.brand.nameAr=val('setBrandAr'); S.brand.nameEn=val('setBrandEn');
+  S.brand.tagAr=val('setTagAr'); S.brand.tagEn=val('setTagEn');
+  S.hours={open:{h:parseInt(val('setOpenH'),10)||0,m:0},close:{h:parseInt(val('setCloseH'),10)||0,m:0}};
+  S.display={mode:val('setDispMode'),showDesc:q('setShowDesc').checked,showCal:q('setShowCal').checked};
+}
+q('pubSetBtn').addEventListener('click',async function(){
+  collectSettings();
+  var b=q('pubSetBtn'); b.disabled=true;
+  try{ await publishSettings('تحديث الإعدادات من اللوحة'); toast('✔ نُشرت الإعدادات إلى D1','success'); }
+  catch(e){ handlePublishError(e,b,'🚀 نشر الإعدادات'); return; }
+  b.disabled=false;
+});
+
+/* ===== الفروع ===== */
+function renderBranches(){
+  var box=q('branchList'); if(!box||!STATE) return;
+  box.innerHTML=branches().map(function(b,i){
+    return '<div class="itemrow"><div class="meta"><span class="nm">'+esc(b.nameAr)+'</span><span class="en">'+esc(b.nameEn||'')+' · '+esc(b.wa||'')+'</span></div>'+
+      '<span class="pr">'+(b.deliveryFee||0)+' ر.س</span>'+
+      '<div class="acts"><button class="btn ghost sm" data-bredit="'+i+'">✏️</button><button class="btn danger sm" data-brdel="'+i+'">🗑</button></div></div>';
+  }).join('')||'<div class="empty">لا فروع</div>';
+}
+q('branchList').addEventListener('click',async function(e){
+  var ed=e.target.closest('[data-bredit]'), del=e.target.closest('[data-brdel]');
+  if(ed){ editBranch(+ed.dataset.bredit); return; }
+  if(del){
+    var i=+del.dataset.bdel;
+    var ok=await askConfirm('حذف فرع "'+branches()[i].nameAr+'"؟','حذف فرع','🗑','حذف');
+    if(ok){ branches().splice(i,1); renumberBranches(); renderBranches(); toast('حُذف الفرع — اضغط نشر','warn'); }
+  }
+});
+q('addBranchBtn').addEventListener('click',function(){ editBranch(-1); });
+function editBranch(i){
+  var b=i>=0?branches()[i]:{id:'b-'+Date.now(),num:nextBranchNum(),nameAr:'',nameEn:'',addrAr:'',addrEn:'',wa:'',lat:0,lng:0,map:'',deliveryFee:10,hours:[]};
+  openModal(i>=0?'تعديل فرع':'فرع جديد',
+    '<div class="grid2"><div class="field"><label>الاسم (عربي)</label><input id="bAr" type="text" value="'+esc(b.nameAr)+'"></div>'+
+    '<div class="field"><label>الاسم (إنجليزي)</label><input id="bEn" type="text" value="'+esc(b.nameEn||'')+'"></div>'+
+    '<div class="field"><label>واتساب (966…)</label><input id="bWa" type="text" value="'+esc(b.wa||'')+'"></div>'+
+    '<div class="field"><label>رسوم التوصيل</label><input id="bFee" type="number" min="0" step="0.5" value="'+(b.deliveryFee||0)+'"></div></div>'+
+    '<div class="field"><label>العنوان (عربي)</label><input id="bAddr" type="text" value="'+esc(b.addrAr||'')+'"></div>'+
+    '<div class="field"><label>رابط الخريطة</label><input id="bMap" type="url" value="'+esc(b.map||'')+'"></div>',
+    function(){
+      var n=val('bAr').trim(); if(!n){ toast('الاسم مطلوب','error'); return false; }
+      b.nameAr=n; b.nameEn=val('bEn'); b.wa=val('bWa'); b.addrAr=val('bAddr'); b.map=val('bMap');
+      b.deliveryFee=parseFloat(val('bFee'))||0;
+      if(i<0) branches().push(b);
+      renumberBranches(); renderBranches(); toast('تم — اضغط نشر الإعدادات','success');
+    });
+}
+
+/* ===== التواصل ===== */
+function renderSocial(){
+  var box=q('socialList'); if(!box||!STATE) return;
+  var list=STATE.SETTINGS.social||[];
+  box.innerHTML=list.map(function(s,i){
+    return '<div class="itemrow"><div class="meta"><span class="nm">'+esc(s.nameAr||s.key)+'</span><span class="en">'+esc(s.url||'')+'</span></div>'+
+      '<div class="acts"><button class="btn ghost sm" data-soedit="'+i+'">✏️</button><button class="btn danger sm" data-sodel="'+i+'">🗑</button></div></div>';
+  }).join('')||'<div class="empty">لا روابط</div>';
+}
+q('socialList').addEventListener('click',async function(e){
+  var ed=e.target.closest('[data-soedit]'), del=e.target.closest('[data-sodel]');
+  var list=STATE.SETTINGS.social;
+  if(ed){ editSocial(+ed.dataset.soedit); return; }
+  if(del){ var ok=await askConfirm('حذف الرابط؟','حذف','🗑','حذف'); if(ok){ list.splice(+del.dataset.sodel,1); renderSocial(); } }
+});
+q('addSocialBtn').addEventListener('click',function(){ editSocial(-1); });
+function editSocial(i){
+  var list=STATE.SETTINGS.social;
+  var s=i>=0?list[i]:{id:'s-'+Date.now(),key:'',nameAr:'',nameEn:'',url:''};
+  openModal(i>=0?'تعديل رابط':'رابط جديد',
+    '<div class="field"><label>الاسم</label><input id="soName" type="text" value="'+esc(s.nameAr||'')+'"></div>'+
+    '<div class="field"><label>الرابط</label><input id="soUrl" type="url" value="'+esc(s.url||'')+'"></div>',
+    function(){
+      s.nameAr=val('soName'); s.url=val('soUrl'); s.key=s.key||'link';
+      if(i<0) list.push(s);
+      renderSocial(); toast('تم — اضغط نشر الإعدادات','success');
+    });
+}
+
+/* ===== الإعلان ===== */
+function renderAd(){
+  var a=STATE.SETTINGS.ad||{};
+  chk('adEnabled',a.enabled); setv('adTitleAr',a.titleAr); setv('adTitleEn',a.titleEn);
+  setv('adTextAr',a.textAr); setv('adTextEn',a.textEn); setv('adBtnAr',a.btnAr); setv('adBtnEn',a.btnEn);
+}
+q('pubAdBtn').addEventListener('click',async function(){
+  var a=STATE.SETTINGS.ad=STATE.SETTINGS.ad||{};
+  a.enabled=q('adEnabled').checked; a.titleAr=val('adTitleAr'); a.titleEn=val('adTitleEn');
+  a.textAr=val('adTextAr'); a.textEn=val('adTextEn'); a.btnAr=val('adBtnAr'); a.btnEn=val('adBtnEn');
+  var b=q('pubAdBtn'); b.disabled=true;
+  try{ await publishSettings('تحديث الإعلان'); toast('✔ نُشر الإعلان','success'); }
+  catch(e){ handlePublishError(e,b,'🚀 نشر الإعلان'); return; }
+  b.disabled=false;
+});
+
+/* ===== الطلبات ===== */
+var ordLoaded=false;
+function stClass(s){ if(s==='pending')return 'pending'; if(s==='delivered')return 'delivered'; if(s==='cancelled')return 'cancelled'; return 'other'; }
+async function loadOrders(){
+  var body=q('ordBody'); body.innerHTML='<tr><td colspan="6" style="text-align:center">⏳ جارٍ التحميل…</td></tr>';
   try{
-    await loadAll();
-    toast(L('refreshed'), 'success');
-  }catch(e){
-    if(e.http===401||e.http===403){ toast(L('errAuth'), 'error'); showRenew(); }
-    else toast((L('refreshFail') + ' ') + (e && e.message ? e.message : ''), 'error');
-  }
-  if(b){ b.disabled = false; b.textContent = old; }
-});
-
-/* ===== نصوص النشر (للمعاينة) ===== */
-function menuText(){ return 'window.MENU = ' + JSON.stringify(STATE.MENU, null, 2) + ';\n'; }
-function settingsText(){ return 'window.APP_SETTINGS = ' + JSON.stringify(STATE.SETTINGS, null, 2) + ';\n'; }
-
-/* ===== أدوات تعارض SHA (للصور) ===== */
-function isShaConflict(e){
-  if(!e) return false;
-  if(e.http === 409 || e.http === 412 || e.http === 422) return true;
-  var m = (e.message || '').toLowerCase();
-  return m.includes('does not match') || (m.includes('sha') && m.includes('match'));
-}
-function shaFromError(e){
-  var m = (e && e.message) ? e.message : '';
-  var hit = m.match(/[0-9a-f]{40}/);
-  return hit ? hit[0] : null;
-}
-
-/* ===== النشر إلى D1 ===== */
-async function publishSettings(msg){
-  await apiFetch('/api/data/settings', { method:'PUT', body: JSON.stringify({ settings: STATE.SETTINGS }) });
-  STATE.shas.settings = null;
-}
-async function publishMenu(msg){
-  await apiFetch('/api/data/menu', { method:'PUT', body: JSON.stringify({ menu: STATE.MENU }) });
-  STATE.shas.menu = null;
-}
-
-/* ===== v15.4: السلايدر + رسوم التوصيل ===== */
-function migrateBanners(){
-  var S0 = STATE.SETTINGS;
-  if(!Array.isArray(S0.banners)) S0.banners = [];
-  S0.banners.forEach(function(b, i){
-    if(!b || typeof b !== 'object') return;
-    if(!b.id) b.id = 'bn-' + (i + 1);
-    if(typeof b.v !== 'number') b.v = 0;
-  });
-  if(S0.deliveryFeeMode !== 'free' && S0.deliveryFeeMode !== 'fixed' && S0.deliveryFeeMode !== 'perBranch') S0.deliveryFeeMode = 'fixed';
-  if(typeof S0.deliveryFee !== 'number') S0.deliveryFee = 5;
-  if(S0.deliveryFeeMode === 'perBranch'){
-    branches().forEach(function(b){ if(typeof b.deliveryFee !== 'number') b.deliveryFee = S0.deliveryFee; });
-  }
-}
-function v15Style(){
-  if(el('v15Style')) return;
-  var st = document.createElement('style');
-  st.id = 'v15Style';
-  st.textContent = '.v15-card{background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:1rem;margin:0 0 1rem}.v15-card h3{font-size:1rem;font-weight:900;color:var(--ink);margin:0 0 .6rem}.v15-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:.6rem;margin:0 0 .7rem}.bn-adm{position:relative;border:1.5px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}.bn-adm .img-prev{aspect-ratio:16/9;overflow:hidden;background:#f0e8dc}.bn-adm .img-prev img{width:100%;height:100%;object-fit:cover;display:block}.bn-adm-act{display:flex;gap:.3rem;padding:.4rem}.bn-adm-act button{flex:1;border:none;border-radius:8px;padding:.35rem 0;font-weight:900;cursor:pointer;font-family:inherit;font-size:.72rem}.bn-up,.bn-dn{background:#f3e7d7;color:var(--ink)}.bn-del{background:#fee2e2;color:#b91c1c}.v15-row{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap}.v15-add{border:none;border-radius:12px;padding:.7rem 1.2rem;background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--dark);font-weight:900;cursor:pointer;font-family:inherit}.v15-pub{border:none;border-radius:12px;padding:.7rem 1.2rem;background:var(--wa);color:#fff;font-weight:900;cursor:pointer;font-family:inherit}.v15-clean{border:none;border-radius:12px;padding:.7rem 1.2rem;background:#fff6e6;color:#a06b1c;border:1.5px dashed #e0912f;font-weight:900;cursor:pointer;font-family:inherit}.v15-fee{width:110px;border:1.5px solid var(--line);border-radius:10px;padding:.55rem .6rem;font-family:inherit;font-weight:900;font-size:1rem;text-align:center}.v15-sel{width:110px;border:1.5px solid var(--line);border-radius:10px;padding:.55rem .6rem;font-family:inherit;font-weight:800;background:#fff;color:var(--ink)}.v15-bfees{display:flex;flex-direction:column;gap:.5rem;margin-top:.7rem}.v15-bfee-row{display:flex;align-items:center;gap:.6rem;background:#fff;border:1.5px solid var(--line);border-radius:10px;padding:.45rem .6rem}.v15-bfee-row span{flex:1;font-weight:800;font-size:.85rem;color:var(--ink)}.v15-bfee-row small{color:var(--muted);font-weight:700}.v15-empty{color:var(--muted);font-weight:700;font-size:.8rem;padding:.6rem;border:1.5px dashed var(--line);border-radius:10px;text-align:center}';
-  document.head.appendChild(st);
-}
-function adminSection(reList){
-  var tabs = document.querySelectorAll('.tab');
-  for(var i=0;i<tabs.length;i++){
-    var t = tabs[i];
-    var key = ((t.dataset && t.dataset.tab) || '') + ' ' + (t.textContent || '');
-    for(var r=0;r<reList.length;r++){ if(reList[r].test(key)) return el('tab-' + t.dataset.tab); }
-  }
-  return null;
-}
-function ensureV15Cards(){
-  if(el('v15BannerCard')) return;
-  v15Style();
-  var adsSec = adminSection([/ads?|إعلان/i]);
-  var setSec = adminSection([/settings?|إعداد|ضبط/i]);
-  var host = adsSec || setSec || document.querySelector('main > section');
-  if(!host) return;
-  var card = document.createElement('div');
-  card.className = 'v15-card'; card.id = 'v15BannerCard';
-  card.innerHTML = '<h3>🖼️ سلايدر الصفحة الرئيسية / Home Slider</h3><div class="v15-grid" id="bnAdminList"></div><div class="v15-row"><button class="v15-add" id="bnAddBtn">➕ إضافة بانر / Add</button><button class="v15-pub" id="bnPublishBtn">🚀 نشر / Publish</button><button class="v15-clean" id="bnCleanBtn">🧹 تنظيف اليتيمة / Clean orphans</button><input type="file" id="bnFile" accept="image/*" hidden></div>';
-  host.insertBefore(card, host.firstChild);
-  var feeHost = setSec || host;
-  var fee = document.createElement('div');
-  fee.className = 'v15-card'; fee.id = 'v15FeeCard';
-  fee.innerHTML = '<h3>🛵 رسوم توصيل المطعم / Restaurant Delivery Fee</h3><div class="v15-row"><select class="v15-sel" id="v15FeeMode"><option value="free">مجاني / Free</option><option value="fixed">ثابت لكل الفروع / Fixed</option><option value="perBranch">سعر لكل فرع / Per branch</option></select><input type="number" min="0" step="0.5" class="v15-fee" id="v15FeeInput"><span id="v15FeeUnit">ريال / SAR</span><button class="v15-pub" id="feePublishBtn">🚀 نشر / Publish</button></div><div class="v15-bfees" id="v15BranchFees"></div>';
-  feeHost.insertBefore(fee, feeHost.firstChild);
-  on('bnAddBtn', 'click', function(){ var f = el('bnFile'); if(f) f.click(); });
-  on('bnFile', 'change', async function(e){
-    var f = e.target.files && e.target.files[0];
-    e.target.value = '';
-    if(!f) return;
-    try{
-      toast('جارٍ رفع البانر...', 'info');
-      var path = await uploadBannerImg('img/banners/bn-' + Date.now() + '.png', f);
-      STATE.SETTINGS.banners.push({ id:'bn-' + Date.now(), img:path, v:Date.now(), titleAr:'', titleEn:'' });
-      renderBannersAdmin();
-      toast('✔ تم إضافة البانر — اضغط نشر', 'success');
-    }catch(err){ toast('فشل الرفع: ' + err.message, 'error'); }
-  });
-  on('bnPublishBtn', 'click', publishV15);
-  on('bnCleanBtn', 'click', cleanOrphanBanners);
-  on('feePublishBtn', 'click', publishV15);
-  on('v15FeeMode', 'change', function(e){
-    STATE.SETTINGS.deliveryFeeMode = e.target.value;
-    if(e.target.value === 'perBranch'){
-      branches().forEach(function(b){ if(typeof b.deliveryFee !== 'number') b.deliveryFee = STATE.SETTINGS.deliveryFee || 0; });
-    }
-    renderFeeAdmin();
-  });
-  on('v15FeeInput', 'change', function(e){
-    var v = parseFloat(e.target.value);
-    STATE.SETTINGS.deliveryFee = (isFinite(v) && v >= 0) ? v : 0;
-  });
-  on('v15BranchFees', 'change', function(e){
-    var id = e.target.getAttribute ? e.target.getAttribute('data-bfee') : null;
-    if(!id) return;
-    var b = branches().find(function(x){ return x.id === id; });
-    if(!b) return;
-    var v = parseFloat(e.target.value);
-    b.deliveryFee = (isFinite(v) && v >= 0) ? v : 0;
-  });
-  on('bnAdminList', 'click', async function(e){
-    var up = e.target.closest('[data-bnup]');
-    var dn = e.target.closest('[data-bndn]');
-    var del = e.target.closest('[data-bndel]');
-    var list = STATE.SETTINGS.banners;
-    if(up){
-      var i = +up.dataset.bnup;
-      if(i > 0){ var t = list[i-1]; list[i-1] = list[i]; list[i] = t; renderBannersAdmin(); }
-      return;
-    }
-    if(dn){
-      var j = +dn.dataset.bndn;
-      if(j < list.length - 1){ var t2 = list[j+1]; list[j+1] = list[j]; list[j] = t2; renderBannersAdmin(); }
-      return;
-    }
-    if(del){
-      var k = +del.dataset.bndel;
-      var bn = list[k];
-      var ok = await askConfirm('سيُحذف البانر من السلايدر ومن المستودع نهائياً.\n\nالملف: ' + (bn && bn.img ? bn.img : '—'), 'حذف بانر', '🗑', 'حذف');
-      if(!ok) return;
-      list.splice(k, 1);
-      if(bn && bn.img){
-        try{
-          toast('جارٍ حذف الملف من المستودع...', 'info');
-          var f = await getFile(bn.img).catch(function(){ return null; });
-          if(f && f.sha){
-            await ghDeleteFile(bn.img, f.sha, 'حذف بانر: ' + bn.img);
-            toast('✔ حُذف الملف من GitHub', 'success');
-          }else{
-            toast('الملف غير موجود بالمستودع أصلاً', 'info');
-          }
-        }catch(err){ toast('⚠️ تعذر حذف الملف: ' + err.message, 'warn'); }
-      }
-      renderBannersAdmin();
-      toast('✔ تم الحذف — اضغط نشر', 'success');
-    }
-  });
-}
-function retryAdminBn(im){
-  if(!im || im.dataset.retrying) return;
-  var n = (+im.dataset.retry || 0) + 1;
-  if(n > 6) return;
-  im.dataset.retry = n; im.dataset.retrying = '1';
-  var s = im.getAttribute('src');
-  setTimeout(function(){
-    delete im.dataset.retrying;
-    im.removeAttribute('src');
-    im.src = s + (s.indexOf('?') >= 0 ? '&' : '?') + 'rr=' + Date.now();
-  }, 5000);
-}
-function renderBannersAdmin(){
-  var box = el('bnAdminList');
-  if(!box || !STATE) return;
-  var list = STATE.SETTINGS.banners || [];
-  if(!list.length){
-    box.innerHTML = '<div class="v15-empty">لا توجد بانرات — أضف أول بانر ليظهر السلايدر بالتطبيق / No banners yet</div>';
-  }else{
-    var bnAdmStamp = Date.now();
-    box.innerHTML = list.map(function(b, i){
-      var bq = (b.v ? '?v=' + b.v : '') + (b.v ? '&r=' : '?r=') + bnAdmStamp;
-      return '<div class="bn-adm"><div class="img-prev"><img src="' + esc(b.img) + bq + '" onerror="retryAdminBn(this)"></div><div class="bn-adm-act"><button class="bn-up" data-bnup="' + i + '">↑</button><button class="bn-dn" data-bndn="' + i + '">↓</button><button class="bn-del" data-bndel="' + i + '">🗑</button></div></div>';
+    var f=val('ordFilter');
+    var j=await apiFetch('/api/admin/orders'+(f?'?status='+encodeURIComponent(f):''));
+    var rows=j.orders||[];
+    q('ordEmpty').classList.toggle('hidden',rows.length>0);
+    body.innerHTML=rows.map(function(o){
+      return '<tr><td><bdi>#'+esc(o.number)+'</bdi></td><td>'+esc(o.customer_name)+'</td><td>'+esc(o.branch_name||'')+'</td>'+
+        '<td><bdi>'+o.total+' ر.س</bdi></td><td><span class="st '+stClass(o.status)+'">'+esc(o.status_text||o.status)+'</span></td>'+
+        '<td><bdi>'+esc((o.created_at||'').slice(0,10))+'</bdi></td></tr>';
     }).join('');
-  }
-  renderFeeAdmin();
+    ordLoaded=true;
+  }catch(e){ body.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--danger)">تعذر التحميل: '+esc(e.message)+'</td></tr>'; }
 }
-function renderFeeAdmin(){
-  if(!STATE) return;
-  var S0 = STATE.SETTINGS;
-  var sel = el('v15FeeMode'), inp = el('v15FeeInput'), unit = el('v15FeeUnit'), wrap = el('v15BranchFees');
-  if(!sel || !inp) return;
-  sel.value = S0.deliveryFeeMode || 'fixed';
-  inp.value = S0.deliveryFee;
-  var isFree = (S0.deliveryFeeMode === 'free');
-  inp.style.display = isFree ? 'none' : '';
-  if(unit) unit.style.display = isFree ? 'none' : '';
-  if(wrap){
-    if(S0.deliveryFeeMode === 'perBranch'){
-      wrap.style.display = '';
-      wrap.innerHTML = branches().map(function(b){
-        var val = (typeof b.deliveryFee === 'number') ? b.deliveryFee : (S0.deliveryFee || 0);
-        return '<div class="v15-bfee-row"><span>' + esc(brName(b)) + '</span><input type="number" min="0" step="0.5" class="v15-fee" data-bfee="' + esc(b.id) + '" value="' + val + '"><small>ريال</small></div>';
-      }).join('');
-    }else{
-      wrap.style.display = 'none'; wrap.innerHTML = '';
-    }
-  }
-}
-async function uploadBannerImg(path, file){
-  var cur = await getFile(path).catch(function(){ return { sha:null }; });
-  var body = { message:'رفع بانر: ' + path, content: await b64OfFile(file), branch: GH_BRANCH };
-  if(cur.sha) body.sha = cur.sha;
-  await ghAsset('/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/' + path, {
-    method:'PUT', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(body)
-  });
-  return path;
-}
-async function publishV15(){
-  var btn = el('bnPublishBtn');
-  var old = btn ? btn.textContent : '';
-  if(btn){ btn.disabled = true; btn.textContent = '...'; }
+q('ordRefresh').addEventListener('click',loadOrders);
+q('ordFilter').addEventListener('change',loadOrders);
+
+/* ===== الموظفون ===== */
+async function loadUsers(){
+  var box=q('userList'); box.innerHTML='<div class="empty">⏳ جارٍ التحميل…</div>';
   try{
-    await publishSettings('🖼️ تحديث السلايدر ورسوم التوصيل');
-    toast('✔ تم النشر — سيظهر بالتطبيق خلال دقيقة', 'success');
-  }catch(e){
-    handlePublishError(e, btn, old);
+    var j=await apiFetch('/api/admin/users');
+    var us=j.users||[];
+    box.innerHTML=us.map(function(u){
+      return '<div class="itemrow"><div class="meta"><span class="nm">'+esc(u.name)+'</span><span class="en">@'+esc(u.username)+' · '+esc(u.role)+' · '+esc(u.branch_name||'—')+'</span></div>'+
+        (u.is_active?'<span class="badge on">نشط</span>':'<span class="badge hid">معطل</span>')+
+        '<div class="acts"><button class="btn ghost sm" data-ureset="'+u.id+'">🔑</button>'+
+        '<button class="btn ghost sm" data-utoggle="'+u.id+':'+(u.is_active?0:1)+'">'+(u.is_active?'⏸':'▶')+'</button>'+
+        '<button class="btn danger sm" data-udel="'+u.id+'">🗑</button></div></div>';
+    }).join('')||'<div class="empty">لا موظفين</div>';
+  }catch(e){ box.innerHTML='<div class="empty" style="color:var(--danger)">تعذر التحميل: '+esc(e.message)+'</div>'; }
+}
+q('userList').addEventListener('click',async function(e){
+  var rs=e.target.closest('[data-ureset]'), tg=e.target.closest('[data-utoggle]'), dl=e.target.closest('[data-udel]');
+  if(rs){
+    var ok=await askConfirm('إعادة تعيين كلمة مرور هذا الموظف؟','تعيين كلمة مرور','🔑','تعيين');
+    if(!ok) return;
+    try{ var j=await apiFetch('/api/admin/users/'+rs.dataset.ureset+'/reset-password',{method:'POST'});
+      openModal('كلمة المرور المؤقتة','<p style="font-size:.85rem;margin-bottom:10px">سلّم هذه الكلمة للموظف الآن — لن تظهر مرة أخرى:</p><div class="field"><input type="text" readonly value="'+esc(j.temp_password)+'" style="direction:ltr;text-align:center;font-weight:900"></div>',function(){});
+    }catch(err){ toast(err.message,'error'); }
     return;
   }
-  if(btn){ btn.disabled = false; btn.textContent = old; }
-}
-async function cleanOrphanBanners(){
-  if(!STATE || !CFG){ toast('سجّل الدخول أولاً', 'error'); return; }
-  var btn = el('bnCleanBtn');
-  var old = btn ? btn.textContent : '';
-  if(btn){ btn.disabled = true; btn.textContent = '... جاري الفحص ...'; }
-  try{
-    var files = await listDir('img/banners');
-    var used = {};
-    (STATE.SETTINGS.banners || []).forEach(function(b){ if(b && b.img) used[b.img] = true; });
-    var orphans = files.filter(function(f){ return !used[f.path]; });
-    if(!orphans.length){
-      toast('✔ لا توجد صور يتيمة — المستودع نظيف', 'success');
-      if(btn){ btn.disabled = false; btn.textContent = old; }
-      return;
-    }
-    var list = orphans.map(function(f){ return '• ' + f.name; }).join('\n');
-    var msg = 'يوجد ' + orphans.length + ' صورة يتيمة في المستودع:\n\n' + list + '\n\nهل تريد حذفها نهائياً من GitHub؟';
-    var ok = await askConfirm(msg, 'تنظيف اليتيمة', '🧹', 'حذف الكل', true);
-    if(!ok){ if(btn){ btn.disabled = false; btn.textContent = old; } return; }
-    var successCount = 0, failCount = 0;
-    for(var i=0; i<orphans.length; i++){
+  if(tg){
+    var p=tg.dataset.utoggle.split(':');
+    try{ await apiFetch('/api/admin/users/'+p[0],{method:'PUT',body:JSON.stringify({is_active:+p[1]})}); loadUsers(); toast('تم تحديث الحالة','success'); }
+    catch(err){ toast(err.message,'error'); }
+    return;
+  }
+  if(dl){
+    var ok2=await askConfirm('حذف هذا الموظف نهائياً؟','حذف موظف','🗑','حذف');
+    if(!ok2) return;
+    try{ await apiFetch('/api/admin/users/'+dl.dataset.udel,{method:'DELETE'}); loadUsers(); toast('حُذف الموظف','success'); }
+    catch(err){ toast(err.message,'error'); }
+  }
+});
+q('addUserBtn').addEventListener('click',function(){
+  var brOpts=branches().map(function(b){ return '<option value="'+esc(b.id)+'">'+esc(b.nameAr)+'</option>'; }).join('');
+  openModal('موظف جديد',
+    '<div class="grid2"><div class="field"><label>الاسم</label><input id="uName" type="text"></div>'+
+    '<div class="field"><label>اسم المستخدم</label><input id="uUser" type="text" autocapitalize="off"></div>'+
+    '<div class="field"><label>الدور</label><select id="uRole"><option value="supervisor">مشرف</option><option value="driver">سائق</option></select></div>'+
+    '<div class="field"><label>الفرع</label><select id="uBranch">'+brOpts+'</select></div></div>'+
+    '<div class="field"><label>كلمة مرور مؤقتة (اختياري)</label><input id="uPass" type="text"></div>',
+    async function(){
+      var n=val('uName').trim(), u=val('uUser').trim();
+      if(!n||!u){ toast('الاسم واسم المستخدم مطلوبان','error'); return false; }
       try{
-        await ghDeleteFile(orphans[i].path, orphans[i].sha, 'تنظيف صورة بانر يتيمة: ' + orphans[i].name);
-        successCount++;
-        toast('✔ ' + orphans[i].name, 'success');
-      }catch(err){ failCount++; console.warn('فشل حذف:', orphans[i].path, err); }
-    }
-    toast('انتهى التنظيف: ' + successCount + ' تم، ' + failCount + ' فشل', successCount > 0 ? 'success' : 'error');
-  }catch(err){ toast('⚠️ فشل التنظيف: ' + err.message, 'error'); }
-  if(btn){ btn.disabled = false; btn.textContent = old; }
-}
+        var j=await apiFetch('/api/admin/users',{method:'POST',body:JSON.stringify({name:n,username:u,role:val('uRole'),branch_id:val('uBranch'),password:val('uPass')||null})});
+        loadUsers();
+        openModal('تم إنشاء الموظف','<p style="font-size:.85rem;margin-bottom:10px">كلمة المرور المؤقتة — سلّمها الآن:</p><div class="field"><input type="text" readonly value="'+esc(j.temp_password)+'" style="direction:ltr;text-align:center;font-weight:900"></div>',function(){});
+      }catch(err){ toast(err.message,'error'); return false; }
+    });
+});
 
-/* ===== لفّ loadAll ===== */
-var _loadAllOrig = loadAll;
-loadAll = async function(){
-  var r = await _loadAllOrig();
-  migrateBanners();
-  ensureV15Cards();
-  renderBannersAdmin();
-  return r;
-};
-/* ===== END admin-core.js (v5.1) ===== */
+/* ===== تفعيل التبويبات الإضافية ===== */
+document.querySelectorAll('.tab').forEach(function(t){
+  t.addEventListener('click',function(){
+    if(t.dataset.tab==='orders'&&!ordLoaded) loadOrders();
+    if(t.dataset.tab==='users') loadUsers();
+  });
+});
+</script>
+</body>
+</html>
