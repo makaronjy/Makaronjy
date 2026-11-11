@@ -1,6 +1,8 @@
 // ═══════════════════════════════════════════
 //  مكرونجي - Cloudflare Worker API (كامل)
-//  الإصدار: 2.1
+//  الإصدار: 2.2
+//  v2.2: جسر المالك يقبل التوكن السحابي JWT مباشرة
+//        (يُصلح تبويبات الموظفين/الطلبات/التقارير بدون توكن GitHub)
 //  v2.1: إضافة endpoints لقراءة/كتابة المنيو والإعدادات من D1
 //        + endpoint لنقل البيانات من GitHub إلى D1
 // ═══════════════════════════════════════════
@@ -460,14 +462,38 @@ async function handleLogin(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  2) جسر المالك
+//  2) جسر المالك (v2.2: يقبل التوكن السحابي JWT مباشرة)
 // ═══════════════════════════════════════════
 async function handleAdminBridge(request, env) {
   const ip = getIP(request);
-  const rateCheck = await checkRateLimit(env, `bridge:${ip}`, 5, 900);
+  const rateCheck = await checkRateLimit(env, `bridge:${ip}`, 60, 900);
   if (!rateCheck.allowed) return error('محاولات كثيرة', 429);
   const body = await request.json().catch(() => null);
   if (!body || !body.github_token) return error('التوكن مطلوب');
+
+  /* v2.2: إذا كان المُرسل توكن سحابي صالح (JWT) لمالك النظام،
+     نقبله مباشرة بدون أي اتصال بـ GitHub — هذا يجعل تبويبات
+     الموظفين/الطلبات/التقارير تعمل بتوكن الدخول السحابي. */
+  const jwtPayload = await verifyJWT(body.github_token, env.JWT_SECRET);
+  if (jwtPayload && jwtPayload.role === 'super_admin') {
+    const ownerUser = await env.DB.prepare(
+      "SELECT * FROM users WHERE id = ? AND is_active = 1"
+    ).bind(jwtPayload.userId).first();
+    if (ownerUser) {
+      return json({
+        success: true,
+        token: body.github_token,
+        user: {
+          id: ownerUser.id,
+          name: ownerUser.name,
+          username: ownerUser.username,
+          role: 'super_admin'
+        }
+      });
+    }
+  }
+
+  /* الاحتياط الأصلي: التحقق عبر GitHub (لمن ما زال يستخدم توكن GitHub) */
   const ghHeaders = {
     'Authorization': `Bearer ${body.github_token}`,
     'Accept': 'application/vnd.github+json',
@@ -1159,7 +1185,7 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
     try {
-      if (path === '/api/health' && request.method === 'GET') return json({ status: 'ok', version: '2.1', live_mode: env.LIVE_MODE || 'polling' });
+      if (path === '/api/health' && request.method === 'GET') return json({ status: 'ok', version: '2.2', live_mode: env.LIVE_MODE || 'polling' });
       if (path === '/api/bootstrap' && request.method === 'POST') return await handleBootstrap(env);
       if (path === '/api/fix-password' && request.method === 'POST') return await handleFixOwnerPassword(env);
       if (path === '/api/data/menu' && request.method === 'GET') return await handleGetMenu(env);
@@ -1263,5 +1289,5 @@ export default {
 };
 
 // ═══════════════════════════════════════════
-//  نهاية worker/index.js (v2.1)
+//  نهاية worker/index.js (v2.2)
 // ═══════════════════════════════════════════
