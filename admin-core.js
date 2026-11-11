@@ -23,6 +23,7 @@ function(e){ e.preventDefault(); });
 document.addEventListener(`dblclick`,
 function(e){ e.preventDefault(); });
 /* ===== ثوابت الدخول والنشر ===== */
+const API_BASE = `https://makaronjy-api.makaronjy.workers.dev`;
 const GH_OWNER = `makaronjy`;
 const GH_REPO = `Makaronjy`;
 const GH_BRANCH = `main`;
@@ -701,12 +702,15 @@ el(`tab-` + t.dataset.tab).classList.remove(`hidden`);
 });
 });
 /* ===== الخروج ===== */
+/* ===== الخروج ===== */
 el(`btnLogout`).addEventListener(`click`,
 async function(){
 var ok = await askConfirm(
 L(`logoutMsg`), L(`logoutTitle`), `🚪`, L(`logoutYes`));
 if(!ok) return;
 sessionStorage.removeItem(`mk_admin`);
+sessionStorage.removeItem(`mk_admin_token`);
+sessionStorage.removeItem(`mk_admin_user`);
 location.reload();
 });
 /* ===== تحميل البيانات ===== */
@@ -780,59 +784,57 @@ el(`app`).classList.remove(`hidden`);
 renderAll();
 }
 /* ===== الدخول ===== */
+/* ===== v4.0: تسجيل الدخول عبر API ===== */
 el(`btnLogin`).addEventListener(`click`,
 async function(){
-var owner = el(`inOwner`).value.trim();
-var repo = el(`inRepo`).value.trim() || GH_REPO;
-var branch = el(`inBranch`).value.trim() || GH_BRANCH;
-var token = el(`inToken`).value.trim();
+var username = el(`inOwner`).value.trim();
+var password = el(`inToken`).value.trim();
+
 hideBanner(`loginErr`);
-if(!owner || !token){
-showBanner(`loginErr`, L(`errComplete`));
+if(!username || !password){
+showBanner(`loginErr`, `اسم المستخدم وكلمة المرور مطلوبان`);
 return;
 }
-var pat1 = `^(github_pat_|ghp_|`;
-var pat2 = `gho_|ghu_|ghs_|ghr_)`;
-var tokenLike =
-new RegExp(pat1 + pat2, `i`).test(token);
-/* v3.6: تم تعطيل الدخول المحلي للأمان */
-var isLocal = false;
-var isEmbed =
-(GH_TOKEN !== ``) && (token === GH_TOKEN);
-if(!isLocal && !tokenLike && !isEmbed){
-showBanner(`loginErr`, L(`errCreds`));
-return;
-}
-var finalOwner = isLocal ? GH_OWNER : owner;
-var finalToken = isLocal ? (GH_TOKEN || ``) : token;
-if(!finalToken){
-showBanner(`loginErr`, L(`errNoToken`));
-return;
-}
-CFG = {
-owner: finalOwner,
-repo: repo,
-branch: branch,
-token: finalToken
-};
-sessionStorage.setItem(`mk_admin`,
-JSON.stringify(CFG));
+
 var btn = el(`btnLogin`);
-btn.textContent = L(`publishing`);
+btn.textContent = `جارٍ تسجيل الدخول...`;
 btn.disabled = true;
+
 try{
+var response = await fetch(`${API_BASE}/api/auth/login`, {
+method: `POST`,
+headers: { `Content-Type`: `application/json` },
+body: JSON.stringify({ username: username, password: password })
+});
+
+var data = await response.json();
+
+if(!response.ok){
+throw new Error(data.error || `بيانات الدخول غير صحيحة`);
+}
+
+sessionStorage.setItem(`mk_admin_token`, data.token);
+sessionStorage.setItem(`mk_admin_user`, JSON.stringify(data.user));
+
+CFG = {
+owner: GH_OWNER,
+repo: GH_REPO,
+branch: GH_BRANCH,
+token: data.token
+};
+sessionStorage.setItem(`mk_admin`, JSON.stringify(CFG));
+
+toast(L(`loggedIn`), `success`, L(`loggedSub`));
 await loadAll();
 applyAdminLang();
-toast(L(`loggedIn`), `success`, L(`loggedSub`));
+
 }catch(e){
 var errMsg = (e && e.message) ? e.message : String(e);
-showBanner(`loginErr`,
-L(`errPublish`),
-errMsg
-);
+showBanner(`loginErr`, L(`errPublish`), errMsg);
 sessionStorage.removeItem(`mk_admin`);
 CFG = null;
 }
+
 btn.disabled = false;
 btn.textContent = L(`btnLogin`);
 });
