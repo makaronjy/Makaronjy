@@ -1,7 +1,8 @@
 // ═══════════════════════════════════════════
 //  مكرونجي - Cloudflare Worker API (كامل)
-//  الإصدار: 2.0.1
-//  v2.0.1: إضافة Bootstrap + إصلاح كلمة مرور المالك
+//  الإصدار: 2.1
+//  v2.1: إضافة endpoints لقراءة/كتابة المنيو والإعدادات من D1
+//        + endpoint لنقل البيانات من GitHub إلى D1
 // ═══════════════════════════════════════════
 
 const CORS_HEADERS = {
@@ -21,7 +22,7 @@ const STATUS_TEXT = {
   driver_at_restaurant: 'السائق في المطعم',
   out_for_delivery: 'في الطريق إليك',
   delivered: 'تم التسليم',
-  delivered_pickup: 'تم استلام الطلب من الفرع ✅',
+  delivered_pickup: 'تم استلام الطلب من الفرع',
   cancelled: 'تم الإلغاء',
   archived: 'مؤرشف',
 };
@@ -309,6 +310,115 @@ async function handleFixOwnerPassword(env) {
 }
 
 // ═══════════════════════════════════════════
+//  0.6) قراءة المنيو من D1
+// ═══════════════════════════════════════════
+async function handleGetMenu(env) {
+  try {
+    const data = await env.DB.prepare('SELECT menu_json FROM app_data WHERE id = 1').first();
+    if (!data) {
+      return json({ menu: [] });
+    }
+    return json({ menu: JSON.parse(data.menu_json) });
+  } catch (e) {
+    console.error('Get menu error:', e);
+    return json({ menu: [] });
+  }
+}
+
+// ═══════════════════════════════════════════
+//  0.7) حفظ المنيو في D1
+// ═══════════════════════════════════════════
+async function handleSaveMenu(request, env) {
+  const auth = await requireAuth(request, env, ['super_admin']);
+  if (auth.error) return auth.error;
+  
+  try {
+    const body = await request.json();
+    if (!body.menu || !Array.isArray(body.menu)) {
+      return error('بيانات المنيو غير صالحة', 400);
+    }
+    
+    await env.DB.prepare(`
+      UPDATE app_data SET menu_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1
+    `).bind(JSON.stringify(body.menu)).run();
+    
+    return json({ success: true, message: 'تم حفظ المنيو بنجاح' });
+  } catch (e) {
+    console.error('Save menu error:', e);
+    return error('فشل حفظ المنيو: ' + e.message, 500);
+  }
+}
+
+// ═══════════════════════════════════════════
+//  0.8) قراءة الإعدادات من D1
+// ═══════════════════════════════════════════
+async function handleGetSettings(env) {
+  try {
+    const data = await env.DB.prepare('SELECT settings_json FROM app_data WHERE id = 1').first();
+    if (!data) {
+      return json({ settings: {} });
+    }
+    return json({ settings: JSON.parse(data.settings_json) });
+  } catch (e) {
+    console.error('Get settings error:', e);
+    return json({ settings: {} });
+  }
+}
+
+// ═══════════════════════════════════════════
+//  0.9) حفظ الإعدادات في D1
+// ═══════════════════════════════════════════
+async function handleSaveSettings(request, env) {
+  const auth = await requireAuth(request, env, ['super_admin']);
+  if (auth.error) return auth.error;
+  
+  try {
+    const body = await request.json();
+    if (!body.settings || typeof body.settings !== 'object') {
+      return error('بيانات الإعدادات غير صالحة', 400);
+    }
+    
+    await env.DB.prepare(`
+      UPDATE app_data SET settings_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1
+    `).bind(JSON.stringify(body.settings)).run();
+    
+    return json({ success: true, message: 'تم حفظ الإعدادات بنجاح' });
+  } catch (e) {
+    console.error('Save settings error:', e);
+    return error('فشل حفظ الإعدادات: ' + e.message, 500);
+  }
+}
+
+// ═══════════════════════════════════════════
+//  0.10) نقل البيانات من GitHub إلى D1 (Migration)
+// ═══════════════════════════════════════════
+async function handleMigrateFromGithub(request, env) {
+  const auth = await requireAuth(request, env, ['super_admin']);
+  if (auth.error) return auth.error;
+  
+  try {
+    const body = await request.json();
+    if (!body.menu || !body.settings) {
+      return error('بيانات النقل غير صالحة', 400);
+    }
+    
+    await env.DB.prepare(`
+      UPDATE app_data SET menu_json = ?, settings_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1
+    `).bind(JSON.stringify(body.menu), JSON.stringify(body.settings)).run();
+    
+    return json({ 
+      success: true, 
+      message: 'تم نقل البيانات من GitHub إلى D1 بنجاح',
+      menu_items: body.menu.length || 0,
+      settings_keys: Object.keys(body.settings).length || 0
+    });
+  } catch (e) {
+    console.error('Migration error:', e);
+    return error('فشل نقل البيانات: ' + e.message, 500);
+  }
+}
+
+// ═══════════════════════════════════════════
 //  1) تسجيل الدخول
 // ═══════════════════════════════════════════
 async function handleLogin(request, env) {
@@ -455,7 +565,7 @@ async function handleCreateOrder(request, env) {
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'cod', 'pending', ?)
   `).bind(orderNumber, branchId, orderType, orderLang, customerName, customerPhone, customerAddress, customerLat, customerLng, JSON.stringify(cleanItems), subtotal, deliveryFee, total, notes).run();
   const orderId = result.meta.last_row_id;
-  await env.DB.prepare(`INSERT INTO order_tracking (order_id, status, notes) VALUES (?, 'pending', ?)`).bind(orderId, orderType === 'pickup' ? 'تم استلام الطلب — استلام من الفرع 🏪' : 'تم استلام الطلب 🛵').run();
+  await env.DB.prepare(`INSERT INTO order_tracking (order_id, status, notes) VALUES (?, 'pending', ?)`).bind(orderId, orderType === 'pickup' ? 'تم استلام الطلب — استلام من الفرع' : 'تم استلام الطلب').run();
   return json({
     success: true, order_number: orderNumber, order_id: orderId, order_type: orderType, lang: orderLang,
     total, delivery_fee: deliveryFee, branch_name: branch.name_ar, branch_phone: branch.phone,
@@ -1049,9 +1159,14 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
     try {
-      if (path === '/api/health' && request.method === 'GET') return json({ status: 'ok', version: '2.0.1', live_mode: env.LIVE_MODE || 'polling' });
+      if (path === '/api/health' && request.method === 'GET') return json({ status: 'ok', version: '2.1', live_mode: env.LIVE_MODE || 'polling' });
       if (path === '/api/bootstrap' && request.method === 'POST') return await handleBootstrap(env);
       if (path === '/api/fix-password' && request.method === 'POST') return await handleFixOwnerPassword(env);
+      if (path === '/api/data/menu' && request.method === 'GET') return await handleGetMenu(env);
+      if (path === '/api/data/menu' && request.method === 'PUT') return await handleSaveMenu(request, env);
+      if (path === '/api/data/settings' && request.method === 'GET') return await handleGetSettings(env);
+      if (path === '/api/data/settings' && request.method === 'PUT') return await handleSaveSettings(request, env);
+      if (path === '/api/migrate/github' && request.method === 'POST') return await handleMigrateFromGithub(request, env);
       if (path === '/api/auth/login' && request.method === 'POST') return await handleLogin(request, env);
       if (path === '/api/auth/admin-bridge' && request.method === 'POST') return await handleAdminBridge(request, env);
       if (path === '/api/auth/change-password' && request.method === 'POST') return await handleChangePassword(request, env);
@@ -1148,5 +1263,5 @@ export default {
 };
 
 // ═══════════════════════════════════════════
-//  نهاية worker/index.js (v2.0.1)
+//  نهاية worker/index.js (v2.1)
 // ═══════════════════════════════════════════
