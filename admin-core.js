@@ -150,12 +150,13 @@ applyAdminLang();
 if(STATE) renderAll();
 });
 /* ===== التوستات ===== */
+/* ===== التوستات ===== */
 let toastSeq = 0;
 function toast(title, kind, sub){
-kind = kind || `info`;
-var wrap = el(`toasts`);
+kind = kind || 'info';
+var wrap = el('toasts');
 var icons = {
-success:`✔`, error:`✖`, info:`ℹ`, warn:`⚠`
+success:'✔', error:'✖', info:'ℹ', warn:''
 };
 var div = document.createElement(`div`);
 div.className = `toast ` + kind;
