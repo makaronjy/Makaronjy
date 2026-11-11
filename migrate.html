@@ -1,6 +1,8 @@
-/* ===== admin-core.js — النواة: دخول API + بيانات D1 + نوافذ (v5.0) =====
-   v5.0: المنيو والإعدادات تُقرأ وتُحفظ من D1 عبر API (بدون GitHub Token)
+/* ===== admin-core.js — النواة: دخول API + بيانات D1 + نوافذ (v5.1) =====
+   v5.1: إصلاح شامل — طبقة بيانات ذكية (menu.js/settings.js → D1 تلقائياً)
+         حراسة كل العناصر + توافق كامل مع admin-tabs.js و admin-i18n.js
          إدارة الصور فقط تستخدم رمز GitHub اختيارياً يُحفظ في الجلسة
+   v5.0: المنيو والإعدادات من D1 بدون GitHub Token
    v4.0: تسجيل الدخول عبر API (JWT)
    v3.7: إصلاح معالج التبويبات
    v3.5: كسر الكاش في القراءات
@@ -21,6 +23,8 @@ const API_BASE = 'https://makaronjy-api.makaronjy.workers.dev';
 const GH_OWNER = 'makaronjy';
 const GH_REPO = 'Makaronjy';
 const GH_BRANCH = 'main';
+const GH_TOKEN = ''; /* متوافق مع الملفات القديمة — لا يُستخدم للدخول */
+window.MK_ADMIN_VERSION = '5.1';
 let CFG = null;
 let STATE = null;
 let modalOnSave = null;
@@ -28,6 +32,7 @@ let ALANG = (localStorage.getItem('mk_admin_lang') === 'en') ? 'en' : 'ar';
 
 /* ===== أدوات عامة ===== */
 const el = function(id){ return document.getElementById(id); };
+function on(id, ev, fn){ var n = el(id); if(n) n.addEventListener(ev, fn); }
 function esc(s){
   var v = String(s == null ? '' : s);
   return v.replace(/[&<>"']/g, function(c){
@@ -36,18 +41,20 @@ function esc(s){
   });
 }
 function L(k, a){
-  var d = ASTR[ALANG] || ASTR.ar;
+  var src = (typeof ASTR !== 'undefined') ? ASTR : {};
+  var d = src[ALANG] || src.ar || {};
   var v = d[k];
-  if(v === undefined) v = ASTR.ar[k];
+  if(v === undefined && src.ar) v = src.ar[k];
   if(v === undefined) v = k;
   if(typeof v === 'function') return v(a);
   return v;
 }
 function LF(k){
   var args = [].slice.call(arguments, 1);
-  var d = ASTR[ALANG] || ASTR.ar;
+  var src = (typeof ASTR !== 'undefined') ? ASTR : {};
+  var d = src[ALANG] || src.ar || {};
   var v = d[k];
-  if(v === undefined) v = ASTR.ar[k];
+  if(v === undefined && src.ar) v = src.ar[k];
   if(typeof v === 'function') return v.apply(null, args);
   return v;
 }
@@ -64,8 +71,8 @@ function checkedVals(cls){
 /* ===== حاجز زر الرجوع ===== */
 let guardDepth = 0;
 let suppressCount = 0;
-function modalOpen(){ return !el('modal').classList.contains('hidden'); }
-function confirmOpen(){ return !el('confirmModal').classList.contains('hidden'); }
+function modalOpen(){ var n = el('modal'); return n && !n.classList.contains('hidden'); }
+function confirmOpen(){ var n = el('confirmModal'); return n && !n.classList.contains('hidden'); }
 function pushGuard(){
   try{ history.pushState({ mkAdminGuard: 1 }, ''); guardDepth++; }
   catch(e){ guardDepth++; }
@@ -105,12 +112,12 @@ function applyAdminLang(){
   });
   localStorage.setItem('mk_admin_lang', ALANG);
 }
-el('adminLangBtn').addEventListener('click', function(e){
+on('adminLangBtn', 'click', function(e){
   var s = e.target.closest('.lang-seg');
   if(!s) return;
   ALANG = s.getAttribute('data-alang');
   applyAdminLang();
-  if(STATE) renderAll();
+  if(STATE && typeof renderAll === 'function') renderAll();
 });
 
 /* ===== التوستات ===== */
@@ -118,6 +125,7 @@ let toastSeq = 0;
 function toast(title, kind, sub){
   kind = kind || 'info';
   var wrap = el('toasts');
+  if(!wrap) return;
   var icons = { success:'✔', error:'✖', info:'ℹ', warn:'⚠' };
   var div = document.createElement('div');
   div.className = 'toast ' + kind;
@@ -148,8 +156,10 @@ function ensureCfDelete(){
   cfDeleteHint.id = 'cfDeleteHintLbl';
   cfDeleteHint.style.cssText = 'display:block;color:var(--muted);font-weight:700;font-size:.7rem;margin:0 0 .8rem;line-height:1.6';
   var msgEl = el('cfMsg');
-  msgEl.parentNode.insertBefore(cfDeleteInput, msgEl.nextSibling);
-  msgEl.parentNode.insertBefore(cfDeleteHint, cfDeleteInput.nextSibling);
+  if(msgEl && msgEl.parentNode){
+    msgEl.parentNode.insertBefore(cfDeleteInput, msgEl.nextSibling);
+    msgEl.parentNode.insertBefore(cfDeleteHint, cfDeleteInput.nextSibling);
+  }
   cfDeleteInput.addEventListener('input', refreshCfDelete);
   return cfDeleteInput;
 }
@@ -161,6 +171,7 @@ function refreshCfDelete(){
   if(!cfRequireDelete) return;
   var ok = cfDeleteOk();
   var yes = el('cfYes');
+  if(!yes) return;
   yes.disabled = !ok;
   yes.style.opacity = ok ? '1' : '.45';
   yes.style.cursor = ok ? 'pointer' : 'default';
@@ -169,11 +180,11 @@ function askConfirm(msg, title, ico, yesLbl, requireDelete){
   return new Promise(function(resolve){
     confirmResolve = resolve;
     cfRequireDelete = !!requireDelete;
-    el('cfIco').textContent = ico || '⚠️';
-    el('cfTitle').textContent = title || L('confirmDefault');
-    el('cfMsg').textContent = msg;
-    el('cfYes').textContent = yesLbl || L('btnDelFinal');
-    el('cfNo').textContent = L('modalCancel');
+    if(el('cfIco')) el('cfIco').textContent = ico || '⚠️';
+    if(el('cfTitle')) el('cfTitle').textContent = title || L('confirmDefault');
+    if(el('cfMsg')) el('cfMsg').textContent = msg;
+    if(el('cfYes')) el('cfYes').textContent = yesLbl || L('btnDelFinal');
+    if(el('cfNo')) el('cfNo').textContent = L('modalCancel');
     var inp = ensureCfDelete();
     if(cfRequireDelete){
       inp.style.display = '';
@@ -186,9 +197,10 @@ function askConfirm(msg, title, ico, yesLbl, requireDelete){
       inp.style.display = 'none';
       cfDeleteHint.style.display = 'none';
       var yes = el('cfYes');
-      yes.disabled = false; yes.style.opacity = '1'; yes.style.cursor = 'pointer';
+      if(yes){ yes.disabled = false; yes.style.opacity = '1'; yes.style.cursor = 'pointer'; }
     }
-    el('confirmModal').classList.remove('hidden');
+    var cm = el('confirmModal');
+    if(cm) cm.classList.remove('hidden');
     pushGuard();
   });
 }
@@ -196,33 +208,35 @@ function settleConfirm(val, consume){
   if(consume === undefined) consume = true;
   if(!confirmOpen() && !confirmResolve) return;
   if(cfRequireDelete && val === true && !cfDeleteOk()) return;
-  el('confirmModal').classList.add('hidden');
+  var cm = el('confirmModal');
+  if(cm) cm.classList.add('hidden');
   if(cfDeleteInput) cfDeleteInput.value = '';
   cfRequireDelete = false;
   var yes = el('cfYes');
-  yes.disabled = false; yes.style.opacity = '1';
+  if(yes){ yes.disabled = false; yes.style.opacity = '1'; }
   var r = confirmResolve;
   confirmResolve = null;
   if(consume) consumeGuard();
   if(r) r(val);
 }
-el('cfYes').addEventListener('click', function(){ settleConfirm(true); });
-el('cfNo').addEventListener('click', function(){ settleConfirm(false); });
-el('confirmModal').addEventListener('click', function(e){ if(e.target === el('confirmModal')) settleConfirm(false); });
+on('cfYes', 'click', function(){ settleConfirm(true); });
+on('cfNo', 'click', function(){ settleConfirm(false); });
+on('confirmModal', 'click', function(e){ if(e.target === el('confirmModal')) settleConfirm(false); });
 
 /* ===== نافذة النماذج ===== */
 function openModal(title, bodyHtml, onSave){
-  el('modalTitle').textContent = title;
-  el('modalBody').innerHTML = bodyHtml;
+  if(el('modalTitle')) el('modalTitle').textContent = title;
+  if(el('modalBody')) el('modalBody').innerHTML = bodyHtml;
   modalOnSave = onSave;
-  el('modal').classList.remove('hidden');
+  var m = el('modal');
+  if(m) m.classList.remove('hidden');
   pushGuard();
 }
-function hideModalOnly(){ el('modal').classList.add('hidden'); modalOnSave = null; }
+function hideModalOnly(){ var m = el('modal'); if(m) m.classList.add('hidden'); modalOnSave = null; }
 function closeModal(){ hideModalOnly(); consumeGuard(); }
-el('modalCancel').addEventListener('click', closeModal);
-el('modal').addEventListener('click', function(e){ if(e.target === el('modal')) closeModal(); });
-el('modalSave').addEventListener('click', async function(){
+on('modalCancel', 'click', closeModal);
+on('modal', 'click', function(e){ if(e.target === el('modal')) closeModal(); });
+on('modalSave', 'click', async function(){
   if(!modalOnSave) return;
   try{
     var res = await modalOnSave();
@@ -235,13 +249,14 @@ el('modalSave').addEventListener('click', async function(){
 /* ===== لافتات الأخطاء ===== */
 function showBanner(id, msg, detail){
   var b = el(id);
+  if(!b) return;
   b.innerHTML = '<span>⚠️</span><div><span class="msg"></span>' + (detail ? '<small>' + esc(detail) + '</small>' : '') + '</div>';
   b.querySelector('.msg').textContent = msg;
   b.classList.remove('show');
   void b.offsetWidth;
   b.classList.add('show');
 }
-function hideBanner(id){ el(id).classList.remove('show'); }
+function hideBanner(id){ var b = el(id); if(b) b.classList.remove('show'); }
 function classifyGhError(e){
   var status = e.http || 0;
   var msg = (e.message || '').toLowerCase();
@@ -264,11 +279,12 @@ function handlePublishError(e, btn, label){
   if(btn){ btn.disabled = false; btn.textContent = label; }
 }
 
-/* ===== طبقة API الجديدة (D1) ===== */
+/* ===== طبقة API (D1) ===== */
 async function apiFetch(path, opts){
   opts = opts || {};
   var headers = Object.assign({ 'Content-Type':'application/json' }, opts.headers || {});
-  if(CFG && CFG.token) headers['Authorization'] = 'Bearer ' + CFG.token;
+  var tok = (CFG && CFG.token) ? CFG.token : sessionStorage.getItem('mk_admin_token');
+  if(tok) headers['Authorization'] = 'Bearer ' + tok;
   var r = await fetch(API_BASE + path, Object.assign({}, opts, { headers: headers, cache:'no-store' }));
   if(!r.ok){
     var e = new Error('HTTP ' + r.status);
@@ -313,7 +329,7 @@ function ensureAssetToken(){
 
 /* ===== طبقة GitHub للصور فقط ===== */
 const GH_API = 'https://api.github.com';
-async function gh(path, opts){
+async function ghAsset(path, opts){
   var tok = await ensureAssetToken();
   opts = opts || {};
   var headers = {
@@ -333,6 +349,9 @@ async function gh(path, opts){
   if(ct.includes('json')) return r.json();
   return { text: await r.text(), sha: r.headers.get('etag') };
 }
+/* توافق: أي استدعاء قديم لـ gh يمر عبر طبقة الصور */
+async function gh(path, opts){ return ghAsset(path, opts); }
+
 function b64ToUtf8(b64){
   var bin = atob(b64);
   var bytes = new Uint8Array(bin.length);
@@ -340,26 +359,55 @@ function b64ToUtf8(b64){
   if(window.TextDecoder) return new TextDecoder('utf-8').decode(bytes);
   return decodeURIComponent(escape(bin));
 }
+
+/* ===== طبقة بيانات ذكية: menu.js/settings.js → D1، والباقي → GitHub ===== */
+function extractData(text, kind){
+  try{
+    var w = parseJs(text);
+    return kind === 'menu' ? w.MENU : w.APP_SETTINGS;
+  }catch(e){
+    var j = JSON.parse(text);
+    return kind === 'menu' ? (j.menu || j) : (j.settings || j);
+  }
+}
 async function getFile(path){
+  if(path === 'menu.js'){
+    var jm = await apiFetch('/api/data/menu');
+    return { text: 'window.MENU = ' + JSON.stringify(jm.menu) + ';\n', sha: null };
+  }
+  if(path === 'settings.js'){
+    var js = await apiFetch('/api/data/settings');
+    return { text: 'window.APP_SETTINGS = ' + JSON.stringify(js.settings) + ';\n', sha: null };
+  }
   var q = '/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/' + path + '?ref=' + GH_BRANCH + '&_cb=' + Date.now();
-  var r = await gh(q);
+  var r = await ghAsset(q);
   return { text: b64ToUtf8(r.content), sha: r.sha };
 }
 async function putFile(path, content, sha, msg){
+  if(path === 'menu.js'){
+    var menu = extractData(content, 'menu');
+    await apiFetch('/api/data/menu', { method:'PUT', body: JSON.stringify({ menu: menu }) });
+    return { content:{ sha:null } };
+  }
+  if(path === 'settings.js'){
+    var settings = extractData(content, 'settings');
+    await apiFetch('/api/data/settings', { method:'PUT', body: JSON.stringify({ settings: settings }) });
+    return { content:{ sha:null } };
+  }
   var body = { message: msg, content: btoa(unescape(encodeURIComponent(content))), branch: GH_BRANCH };
   if(sha) body.sha = sha;
   var q = '/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/' + path;
-  return gh(q, { method:'PUT', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(body) });
+  return ghAsset(q, { method:'PUT', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(body) });
 }
 async function ghDeleteFile(path, sha, msg){
   var body = { message: msg || ('حذف ملف: ' + path), sha: sha, branch: GH_BRANCH };
   var q = '/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/' + path;
-  return gh(q, { method:'DELETE', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(body) });
+  return ghAsset(q, { method:'DELETE', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(body) });
 }
 async function listDir(dirPath){
   var q = '/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/' + dirPath + '?ref=' + GH_BRANCH + '&_cb=' + Date.now();
   try{
-    var r = await gh(q);
+    var r = await ghAsset(q);
     if(!Array.isArray(r)) return [];
     return r.filter(function(x){ return x.type === 'file'; }).map(function(x){ return { name:x.name, path:x.path, sha:x.sha }; });
   }catch(e){
@@ -381,7 +429,7 @@ async function uploadItemImgById(id, file){
   var cur = await getFile(path).catch(function(){ return { sha:null }; });
   var body = { message:'رفع صورة صنف: ' + id, content: await b64OfFile(file), branch: GH_BRANCH };
   if(cur.sha) body.sha = cur.sha;
-  await gh('/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/' + path, {
+  await ghAsset('/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/' + path, {
     method:'PUT', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(body)
   });
   return path;
@@ -390,7 +438,7 @@ async function uploadAppImage(path, file){
   var cur = await getFile(path).catch(function(){ return { sha:null }; });
   var body = { message:'تحديث صورة: ' + path, content: await b64OfFile(file), branch: GH_BRANCH };
   if(cur.sha) body.sha = cur.sha;
-  await gh('/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/' + path, {
+  await ghAsset('/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/' + path, {
     method:'PUT', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(body)
   });
   return path;
@@ -503,12 +551,13 @@ document.querySelectorAll('.tab').forEach(function(t){
     document.querySelectorAll('.tab').forEach(function(x){ x.classList.remove('active'); });
     t.classList.add('active');
     document.querySelectorAll('main > section').forEach(function(s){ s.classList.add('hidden'); });
-    el('tab-' + t.dataset.tab).classList.remove('hidden');
+    var sec = el('tab-' + t.dataset.tab);
+    if(sec) sec.classList.remove('hidden');
   });
 });
 
 /* ===== الخروج ===== */
-el('btnLogout').addEventListener('click', async function(){
+on('btnLogout', 'click', async function(){
   var ok = await askConfirm(L('logoutMsg'), L('logoutTitle'), '🚪', L('logoutYes'));
   if(!ok) return;
   sessionStorage.removeItem('mk_admin');
@@ -546,24 +595,23 @@ async function loadAll(){
   migrateBestSellers();
   migrateSocial();
   migratePayments();
-  el('renewScreen').classList.add('hidden');
-  el('loginScreen').classList.add('hidden');
-  el('app').classList.remove('hidden');
-  renderAll();
+  if(el('renewScreen')) el('renewScreen').classList.add('hidden');
+  if(el('loginScreen')) el('loginScreen').classList.add('hidden');
+  if(el('app')) el('app').classList.remove('hidden');
+  if(typeof renderAll === 'function') renderAll();
 }
 
 /* ===== تسجيل الدخول عبر API ===== */
-el('btnLogin').addEventListener('click', async function(){
-  var username = el('inOwner').value.trim();
-  var password = el('inToken').value.trim();
+on('btnLogin', 'click', async function(){
+  var username = mv('inOwner').trim();
+  var password = mv('inToken').trim();
   hideBanner('loginErr');
   if(!username || !password){
     showBanner('loginErr', 'اسم المستخدم وكلمة المرور مطلوبان');
     return;
   }
   var btn = el('btnLogin');
-  btn.textContent = 'جارٍ تسجيل الدخول...';
-  btn.disabled = true;
+  if(btn){ btn.textContent = 'جارٍ تسجيل الدخول...'; btn.disabled = true; }
   try{
     var response = await fetch(API_BASE + '/api/auth/login', {
       method:'POST',
@@ -586,37 +634,35 @@ el('btnLogin').addEventListener('click', async function(){
     sessionStorage.removeItem('mk_admin_user');
     CFG = null;
   }
-  btn.disabled = false;
-  btn.textContent = L('btnLogin');
+  if(btn){ btn.disabled = false; btn.textContent = L('btnLogin'); }
 });
 ['inOwner','inToken'].forEach(function(id){
-  el(id).addEventListener('keydown', function(e){ if(e.key === 'Enter') el('btnLogin').click(); });
+  on(id, 'keydown', function(e){ if(e.key === 'Enter'){ var b = el('btnLogin'); if(b) b.click(); } });
 });
 
 /* ===== شاشة تجديد الجلسة (كلمة المرور) ===== */
 function showRenew(){
-  el('loginScreen').classList.add('hidden');
-  el('app').classList.add('hidden');
-  el('renewScreen').classList.remove('hidden');
+  if(el('loginScreen')) el('loginScreen').classList.add('hidden');
+  if(el('app')) el('app').classList.add('hidden');
+  if(el('renewScreen')) el('renewScreen').classList.remove('hidden');
   var inp = el('inRenewToken');
   if(inp){ inp.type = 'password'; inp.placeholder = 'كلمة المرور'; inp.value = ''; }
 }
-el('btnRenew').addEventListener('click', async function(){
-  var p = el('inRenewToken').value.trim();
+on('btnRenew', 'click', async function(){
+  var p = mv('inRenewToken').trim();
   hideBanner('renewErr');
   if(!p){ showBanner('renewErr', L('errRenewEmpty')); return; }
   var u = 'owner';
   try{ u = (JSON.parse(sessionStorage.getItem('mk_admin_user') || '{}').username) || 'owner'; }catch(e){}
   var btn = el('btnRenew');
-  btn.textContent = L('publishing');
-  btn.disabled = true;
+  if(btn){ btn.textContent = L('publishing'); btn.disabled = true; }
   try{
     var r = await fetch(API_BASE + '/api/auth/login', {
       method:'POST', headers:{ 'Content-Type':'application/json' },
       body: JSON.stringify({ username: u, password: p })
     });
     var d = await r.json();
-    if(!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    if(!r.ok){ var er = new Error(d.error || 'HTTP ' + r.status); er.http = r.status; throw er; }
     CFG = { owner: GH_OWNER, repo: GH_REPO, branch: GH_BRANCH, token: d.token };
     sessionStorage.setItem('mk_admin', JSON.stringify(CFG));
     sessionStorage.setItem('mk_admin_token', d.token);
@@ -627,17 +673,16 @@ el('btnRenew').addEventListener('click', async function(){
     var cls = classifyGhError(e);
     showBanner('renewErr', (e.http===401||e.http===403) ? L('errRenewBad') : L(cls.key), cls.detail || (e && e.message));
   }
-  btn.disabled = false;
-  btn.textContent = L('btnRenew');
+  if(btn){ btn.disabled = false; btn.textContent = L('btnRenew'); }
 });
 
 /* ===== تحديث من D1 ===== */
-el('btnRefresh').addEventListener('click', async function(){
+on('btnRefresh', 'click', async function(){
+  if(!CFG){ var t0 = sessionStorage.getItem('mk_admin_token'); if(t0) CFG = { owner:GH_OWNER, repo:GH_REPO, branch:GH_BRANCH, token:t0 }; }
   if(!CFG) return;
   var b = el('btnRefresh');
-  var old = b.textContent;
-  b.textContent = L('refreshing');
-  b.disabled = true;
+  var old = b ? b.textContent : '';
+  if(b){ b.textContent = L('refreshing'); b.disabled = true; }
   try{
     await loadAll();
     toast(L('refreshed'), 'success');
@@ -645,8 +690,7 @@ el('btnRefresh').addEventListener('click', async function(){
     if(e.http===401||e.http===403){ toast(L('errAuth'), 'error'); showRenew(); }
     else toast((L('refreshFail') + ' ') + (e && e.message ? e.message : ''), 'error');
   }
-  b.disabled = false;
-  b.textContent = old;
+  if(b){ b.disabled = false; b.textContent = old; }
 });
 
 /* ===== نصوص النشر (للمعاينة) ===== */
@@ -723,8 +767,8 @@ function ensureV15Cards(){
   fee.className = 'v15-card'; fee.id = 'v15FeeCard';
   fee.innerHTML = '<h3>🛵 رسوم توصيل المطعم / Restaurant Delivery Fee</h3><div class="v15-row"><select class="v15-sel" id="v15FeeMode"><option value="free">مجاني / Free</option><option value="fixed">ثابت لكل الفروع / Fixed</option><option value="perBranch">سعر لكل فرع / Per branch</option></select><input type="number" min="0" step="0.5" class="v15-fee" id="v15FeeInput"><span id="v15FeeUnit">ريال / SAR</span><button class="v15-pub" id="feePublishBtn">🚀 نشر / Publish</button></div><div class="v15-bfees" id="v15BranchFees"></div>';
   feeHost.insertBefore(fee, feeHost.firstChild);
-  el('bnAddBtn').addEventListener('click', function(){ el('bnFile').click(); });
-  el('bnFile').addEventListener('change', async function(e){
+  on('bnAddBtn', 'click', function(){ var f = el('bnFile'); if(f) f.click(); });
+  on('bnFile', 'change', async function(e){
     var f = e.target.files && e.target.files[0];
     e.target.value = '';
     if(!f) return;
@@ -736,21 +780,21 @@ function ensureV15Cards(){
       toast('✔ تم إضافة البانر — اضغط نشر', 'success');
     }catch(err){ toast('فشل الرفع: ' + err.message, 'error'); }
   });
-  el('bnPublishBtn').addEventListener('click', publishV15);
-  el('bnCleanBtn').addEventListener('click', cleanOrphanBanners);
-  el('feePublishBtn').addEventListener('click', publishV15);
-  el('v15FeeMode').addEventListener('change', function(e){
+  on('bnPublishBtn', 'click', publishV15);
+  on('bnCleanBtn', 'click', cleanOrphanBanners);
+  on('feePublishBtn', 'click', publishV15);
+  on('v15FeeMode', 'change', function(e){
     STATE.SETTINGS.deliveryFeeMode = e.target.value;
     if(e.target.value === 'perBranch'){
       branches().forEach(function(b){ if(typeof b.deliveryFee !== 'number') b.deliveryFee = STATE.SETTINGS.deliveryFee || 0; });
     }
     renderFeeAdmin();
   });
-  el('v15FeeInput').addEventListener('change', function(e){
+  on('v15FeeInput', 'change', function(e){
     var v = parseFloat(e.target.value);
     STATE.SETTINGS.deliveryFee = (isFinite(v) && v >= 0) ? v : 0;
   });
-  el('v15BranchFees').addEventListener('change', function(e){
+  on('v15BranchFees', 'change', function(e){
     var id = e.target.getAttribute ? e.target.getAttribute('data-bfee') : null;
     if(!id) return;
     var b = branches().find(function(x){ return x.id === id; });
@@ -758,7 +802,7 @@ function ensureV15Cards(){
     var v = parseFloat(e.target.value);
     b.deliveryFee = (isFinite(v) && v >= 0) ? v : 0;
   });
-  el('bnAdminList').addEventListener('click', async function(e){
+  on('bnAdminList', 'click', async function(e){
     var up = e.target.closest('[data-bnup]');
     var dn = e.target.closest('[data-bndn]');
     var del = e.target.closest('[data-bndel]');
@@ -849,15 +893,15 @@ async function uploadBannerImg(path, file){
   var cur = await getFile(path).catch(function(){ return { sha:null }; });
   var body = { message:'رفع بانر: ' + path, content: await b64OfFile(file), branch: GH_BRANCH };
   if(cur.sha) body.sha = cur.sha;
-  await gh('/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/' + path, {
+  await ghAsset('/repos/' + GH_OWNER + '/' + GH_REPO + '/contents/' + path, {
     method:'PUT', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(body)
   });
   return path;
 }
 async function publishV15(){
   var btn = el('bnPublishBtn');
-  var old = btn.textContent;
-  btn.disabled = true; btn.textContent = '...';
+  var old = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = '...'; }
   try{
     await publishSettings('🖼️ تحديث السلايدر ورسوم التوصيل');
     toast('✔ تم النشر — سيظهر بالتطبيق خلال دقيقة', 'success');
@@ -865,13 +909,13 @@ async function publishV15(){
     handlePublishError(e, btn, old);
     return;
   }
-  btn.disabled = false; btn.textContent = old;
+  if(btn){ btn.disabled = false; btn.textContent = old; }
 }
 async function cleanOrphanBanners(){
   if(!STATE || !CFG){ toast('سجّل الدخول أولاً', 'error'); return; }
   var btn = el('bnCleanBtn');
-  var old = btn.textContent;
-  btn.disabled = true; btn.textContent = '... جاري الفحص ...';
+  var old = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = '... جاري الفحص ...'; }
   try{
     var files = await listDir('img/banners');
     var used = {};
@@ -879,12 +923,13 @@ async function cleanOrphanBanners(){
     var orphans = files.filter(function(f){ return !used[f.path]; });
     if(!orphans.length){
       toast('✔ لا توجد صور يتيمة — المستودع نظيف', 'success');
-      btn.disabled = false; btn.textContent = old; return;
+      if(btn){ btn.disabled = false; btn.textContent = old; }
+      return;
     }
     var list = orphans.map(function(f){ return '• ' + f.name; }).join('\n');
     var msg = 'يوجد ' + orphans.length + ' صورة يتيمة في المستودع:\n\n' + list + '\n\nهل تريد حذفها نهائياً من GitHub؟';
     var ok = await askConfirm(msg, 'تنظيف اليتيمة', '🧹', 'حذف الكل', true);
-    if(!ok){ btn.disabled = false; btn.textContent = old; return; }
+    if(!ok){ if(btn){ btn.disabled = false; btn.textContent = old; } return; }
     var successCount = 0, failCount = 0;
     for(var i=0; i<orphans.length; i++){
       try{
@@ -895,7 +940,7 @@ async function cleanOrphanBanners(){
     }
     toast('انتهى التنظيف: ' + successCount + ' تم، ' + failCount + ' فشل', successCount > 0 ? 'success' : 'error');
   }catch(err){ toast('⚠️ فشل التنظيف: ' + err.message, 'error'); }
-  btn.disabled = false; btn.textContent = old;
+  if(btn){ btn.disabled = false; btn.textContent = old; }
 }
 
 /* ===== لفّ loadAll ===== */
@@ -907,4 +952,4 @@ loadAll = async function(){
   renderBannersAdmin();
   return r;
 };
-/* ===== END admin-core.js (v5.0) ===== */
+/* ===== END admin-core.js (v5.1) ===== */
