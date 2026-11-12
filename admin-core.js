@@ -1,8 +1,9 @@
-/* ===== admin-core.js — النواة: دخول سحابي D1 + صور R2 مضغوطة + سلة مهملات (v6.2) =====
-   v6.2: • ضغط كل صورة قبل رفعها (WebP/JPEG + تصغير الأبعاد + هدف حجم)
-         • بطاقة تحكم في الضغط: الصيغة/الأبعاد/الجودة/الحجم المستهدف
-         • سلة مهملات الصور: عرض + استرجاع + حذف نهائي (30 يوماً)
-         • بطاقة النسخ الاحتياطي: نسخة فورية تشمل المنيو والإعدادات
+/* ===== admin-core.js — النواة: D1 + صور R2 مضغوطة + سلة مهملات (v6.3) =====
+   v6.3: • زر «تنظيف صور الأصناف اليتيمة» مع عرض القائمة والأحجام
+         • حمايات: رفض عند منيو فارغ + تحذير النسبة العالية + تأكيد delete
+         • النقل إلى سلة المهملات (لا حذف نهائي) قابل للاسترجاع
+   v6.2: ضغط كل صورة قبل رفعها (WebP/JPEG + تصغير الأبعاد + هدف حجم)
+         + بطاقة تحكم في الضغط + سلة مهملات الصور + بطاقة النسخ الاحتياطي
    v6.1: حذف زر «نقل صور المستودع إلى السحابة» (النقل صار ذاتياً في الووركر)
          + إخفاء «إظهار الوصف / إظهار الأسعار» وفرضهما دائمين
          + نقل «عنوان فوق الإضافات» إلى الإعدادات (عام لكل الأصناف)
@@ -97,7 +98,7 @@ return [].slice.call(list).map(function(c){
 return c.value;
 });
 }
-/* v6.2: تنسيق أحجام الملفات */
+/* تنسيق أحجام الملفات */
 function fmtKB(bytes){
 if(!isFinite(bytes)) return `—`;
 if(bytes < 1024) return bytes + ` B`;
@@ -431,7 +432,7 @@ return r.json();
 }
 
 /* =====================================================
-   ===== v6.2: ضغط الصور قبل الرفع =====
+   ===== ضغط الصور قبل الرفع =====
 ===================================================== */
 const CMP_KEY = `mk_img_compress`;
 const CMP_DEFAULTS = {
@@ -678,7 +679,7 @@ async function listDir(dirPath){
 var prefix = String(dirPath || ``).replace(/\/?$/, `/`);
 return imgList(prefix);
 }
-/* v6.2: كل الرفع يمرّ بالضغط */
+/* كل الرفع يمرّ بالضغط */
 async function uploadItemImgById(id, file){
 var path = `img/items/` + id + `.png`;
 var res = await compressImage(file, `item`);
@@ -816,7 +817,7 @@ publishableKey: ``
 };
 }
 }
-/* v6.1: عنوان الإضافات العام + فرض الوصف والسعرات */
+/* عنوان الإضافات العام + فرض الوصف والسعرات */
 function migrateModsTitles(){
 var s = STATE.SETTINGS;
 if(!s.modsTitles || typeof s.modsTitles !== `object`){
@@ -1205,7 +1206,7 @@ var out = [];
 });
 return out;
 }
-/* v6.1: حقن عنوان الإضافات العام في كل الأصناف */
+/* حقن عنوان الإضافات العام في كل الأصناف */
 function applyGlobalModsTitles(){
 if(!STATE || !STATE.MENU || !STATE.SETTINGS) return;
 var t = STATE.SETTINGS.modsTitles || { ar:``, en:`` };
@@ -1274,7 +1275,6 @@ st.textContent =
 `.v15-inp{width:100%;padding:.6rem .7rem;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-weight:800;font-size:.9rem;background:#fff;color:var(--ink);outline:none}` +
 `.v15-inp:focus{border-color:var(--rust)}` +
 `.v15-empty{color:var(--muted);font-weight:700;font-size:.8rem;padding:.6rem;border:1.5px dashed var(--line);border-radius:10px;text-align:center}` +
-/* ===== v6.2: الضغط + سلة المهملات + النسخ ===== */
 `.cmp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.7rem}` +
 `.cmp-fld{display:flex;flex-direction:column;gap:.3rem}` +
 `.cmp-fld label{font-size:.72rem;font-weight:900;color:var(--muted)}` +
@@ -1329,6 +1329,7 @@ card.innerHTML =
 `<button class="v15-add" id="bnAddBtn">➕ إضافة بانر / Add</button>` +
 `<button class="v15-pub" id="bnPublishBtn">🚀 نشر / Publish</button>` +
 `<button class="v15-clean" id="bnCleanBtn">🧹 تنظيف اليتيمة / Clean orphans</button>` +
+`<button class="v15-clean" id="itCleanBtn">🍝 تنظيف صور الأصناف اليتيمة</button>` +
 `<input type="file" id="bnFile" accept="image/*" hidden>` +
 `</div>`;
 host.insertBefore(card, host.firstChild);
@@ -1377,6 +1378,7 @@ toast(`فشل الرفع: ` + err.message, `error`);
 });
 el(`bnPublishBtn`).addEventListener(`click`, publishV15);
 el(`bnCleanBtn`).addEventListener(`click`, cleanOrphanBanners);
+el(`itCleanBtn`).addEventListener(`click`, cleanOrphanItems);
 el(`feePublishBtn`).addEventListener(`click`, publishV15);
 el(`v15FeeMode`).addEventListener(`change`, function(e){
 STATE.SETTINGS.deliveryFeeMode = e.target.value;
@@ -1532,7 +1534,7 @@ btn.disabled = false;
 btn.textContent = old;
 }
 
-/* ===== تنظيف الصور اليتيمة (إلى سلة المهملات) ===== */
+/* ===== تنظيف صور البانرات اليتيمة (إلى سلة المهملات) ===== */
 async function cleanOrphanBanners(){
 if(!STATE || !CFG){
 toast(`سجّل الدخول أولاً`, `error`);
@@ -1590,7 +1592,60 @@ btn.textContent = old;
 }
 
 /* =====================================================
-   ===== v6.2: بطاقة ضغط الصور =====
+   ===== v6.3: تنظيف صور الأصناف اليتيمة =====
+   يقرأ القائمة من الووركر، يعرضها، ثم ينقلها للمهملات
+===================================================== */
+async function cleanOrphanItems(){
+if(!STATE || !CFG){
+toast(`سجّل الدخول أولاً`, `error`);
+return;
+}
+var btn = el(`itCleanBtn`);
+var old = btn ? btn.textContent : ``;
+if(btn){ btn.disabled = true; btn.textContent = `... جاري الفحص ...`; }
+try{
+var scan = await apiFetch(`/api/admin/item-orphans`);
+if(!scan.success){
+toast(scan.error || `أُلغي الفحص`, `warn`);
+if(btn){ btn.disabled = false; btn.textContent = old; }
+return;
+}
+if(!scan.orphan_count){
+toast(`✔ لا توجد صور أصناف يتيمة — التخزين نظيف`, `success`,
+`${scan.images_total} صورة / ${scan.menu_items} صنف`);
+if(btn){ btn.disabled = false; btn.textContent = old; }
+return;
+}
+var names = (scan.orphans || []).slice(0,40).map(function(o){
+return `• ` + o.name + ` (` + fmtKB(o.size) + `)`;
+}).join(`\n`);
+if(scan.orphan_count > 40){
+names += `\n… و` + (scan.orphan_count - 40) + ` غيرها`;
+}
+var warn = scan.high_risk
+? `\n\n⚠️ تحذير: عدد اليتيم كبير جداً مقارنة بالإجمالي — تأكد أن المنيو منشور وكامل قبل المتابعة.`
+: ``;
+var msg = `المنيو: ` + scan.menu_items + ` صنف · صور الأصناف: ` + scan.images_total +
+`\nاليتيمة: ` + scan.orphan_count + ` (` + fmtKB(scan.orphan_bytes) + `)\n\n` +
+names + warn + `\n\nستُنقل إلى سلة المهملات (30 يوماً) ويمكن استرجاعها. متابعة؟`;
+var ok = await askConfirm(msg, `تنظيف صور الأصناف`, `🍝`, `نقل للمهملات`, true);
+if(!ok){
+if(btn){ btn.disabled = false; btn.textContent = old; }
+return;
+}
+if(btn){ btn.textContent = `... جاري النقل ...`; }
+var r = await apiFetch(`/api/admin/item-orphans-clean`, { method:`POST` });
+toast(`انتهى: ${r.moved} نُقلت للمهملات، ${r.failed} فشلت`,
+r.moved > 0 ? `success` : `warn`);
+renderTrash();
+}catch(e){
+toast(`⚠️ فشل التنظيف: ` + e.message, `error`);
+}
+if(btn){ btn.disabled = false; btn.textContent = old; }
+}
+
+/* =====================================================
+   ===== بطاقة ضغط الصور =====
 ===================================================== */
 function ensureCompressCard(){
 var sec = uiSettingsSection() ||
@@ -1694,7 +1749,7 @@ sec.insertBefore(card, anchor2.nextSibling);
 }
 
 /* =====================================================
-   ===== v6.2: سلة مهملات الصور =====
+   ===== سلة مهملات الصور =====
 ===================================================== */
 function ensureTrashCard(){
 if(el(`trashCard`)) return;
@@ -1791,7 +1846,7 @@ box.innerHTML = `<div class="v15-empty">تعذر التحميل: ` + esc(e.messa
 }
 
 /* =====================================================
-   ===== v6.2: النسخ الاحتياطي =====
+   ===== النسخ الاحتياطي =====
 ===================================================== */
 function ensureBackupCard(){
 if(el(`bkCard`)) return;
@@ -1847,7 +1902,7 @@ b.disabled = false; b.textContent = old;
 }
 
 /* =====================================================
-   ===== v6.1: تخصيصات واجهة اللوحة =====
+   ===== تخصيصات واجهة اللوحة =====
    • إخفاء «إظهار الوصف / إظهار الأسعار» وفرضهما دائمين
    • عنوان الإضافات عام في الإعدادات بدل نافذة كل صنف
    • نقل «توفر خدمة التوصيل» أسفل بطاقة رسوم التوصيل
@@ -2018,4 +2073,4 @@ uiApplyAll();
 renderTrash();
 return r;
 };
-/* ===== END admin-core.js (v6.2) ===== */
+/* ===== END admin-core.js (v6.3) ===== */
