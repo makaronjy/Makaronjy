@@ -1,8 +1,8 @@
 /* =====================================================
 مكرونجي — سكربت التطبيق الرئيسي (app.js)
-v16.0: الفاحص الحي من D1 مدمج هنا (لا يحتاج index.html)
-       + الصور تُقرأ من R2 عبر imgUrl
-       + إزالة الفاحص الميت ولقطة الملفات الثابتة
+v16.1: إصلاح حرج للفاحص الحي (liveBusy كان يبقى عالقاً بعد أول فحص
+       فيتوقف التحديث نهائياً) + تسريع الفحص إلى 8 ثوانٍ
+v16.0: الفاحص الحي من D1 مدمج + الصور من R2 عبر imgUrl
 v15.8: سطر واحد للعنوان + تأكيد عند اختيار الفرع + فقاعة فوق الدبوس
 ===================================================== */
 /* ===== استعادة لقطة محلية عند فشل تحميل الملفات ===== */
@@ -30,7 +30,7 @@ function pushGuard(){
   if(guardOn) return;
   try{ history.pushState({rb:1}, ''); guardOn = true; }catch(e){}
 }
-/* ===== Stack للنوافذ ===== */
+/* ===== Stack للنوافذ: حالة تاريخ + موضع تمرير لكل نافذة ===== */
 let overlayStack = [];
 const LOCK_TYPES = ['detail','featured','sidemenu','fav','slot','welcome'];
 function restoreScroll(y){
@@ -195,14 +195,16 @@ function itemAvailable(id, brId){
   if(itemSoldOut(it, brId)) return false;
   return itemViewState(sec, it, brId) === 'normal';
 }
+/* ===== خيارات العرض (الوصف والسعرات دائمان) ===== */
 function displayOpts(){
   const d = (S() && S().display) || {};
   return {
     mode: (d.mode === 'list') ? 'list' : 'grid',
-    showDesc: d.showDesc !== false,
-    showCal: d.showCal !== false
+    showDesc: true,
+    showCal: true
   };
 }
+/* ===== الإضافات ===== */
 function modsRefs(it){
   if(!it.mods) return [];
   if(Array.isArray(it.mods)){
@@ -216,12 +218,23 @@ function modsRefs(it){
   }
   return Array.isArray(it.mods.refs) ? it.mods.refs.slice() : [];
 }
+function globalModsTitles(){
+  const g = (S() && S().modsTitles) || null;
+  return {
+    ar: (g && g.ar) ? g.ar : '',
+    en: (g && g.en) ? g.en : ''
+  };
+}
 function modsTitleAr(it){
+  const g = globalModsTitles();
+  if(g.ar) return g.ar;
   if(it.mods && !Array.isArray(it.mods) && it.mods.tAr) return it.mods.tAr;
   if(Array.isArray(it.mods) && it.mods.length && it.mods[0].tAr) return it.mods[0].tAr;
   return tt('oftenWith','غالبًا ما يتم طلبه مع','Often ordered with');
 }
 function modsTitleEn(it){
+  const g = globalModsTitles();
+  if(g.en) return g.en;
   if(it.mods && !Array.isArray(it.mods) && it.mods.tEn) return it.mods.tEn;
   if(Array.isArray(it.mods) && it.mods.length && it.mods[0].tEn) return it.mods[0].tEn;
   return tt('oftenWithEn','Often ordered with','Often ordered with');
@@ -232,6 +245,7 @@ function modPriceFor(it, ref){
   const rit = findMenuItem(ref);
   return rit ? rit.prices[0] : 0;
 }
+/* ===== تحديث موضعي لبطاقة إضافة واحدة (بدون وميض) ===== */
 function updateAddOnCard(ref){
   const box = el('dtMods');
   if(!box || !dtState) return;
@@ -246,6 +260,7 @@ function updateAddOnCard(ref){
     ctrl.innerHTML = '<button class="dt-pick" data-mact="inc" data-ref="'+ref+'">+</button>';
   }
 }
+/* ===== مفاتيح السلة ===== */
 function cartKey(id, sizeIdx){ return id+'|'+sizeIdx; }
 function keyId(k){ return String(k).split('|')[0]; }
 function keySize(k){ return +String(k).split('|')[1]; }
@@ -398,6 +413,8 @@ function renderSocial(){
     smT.textContent = tt('followUs','تابعنا على','Follow us on');
     smT.style.display = list.length ? '' : 'none';
   }
+  const ms = el('menuSocial');
+  if(ms) ms.innerHTML = html;
 }
 /* ===== إصدار الصور ===== */
 function imagesVersion(){ const s = S(); return (s && s.imagesVersion) || 0; }
@@ -409,7 +426,7 @@ function applyImageVersions(){
     if(im.getAttribute('src') !== want) im.src = want;
   });
 }
-/* ===== شركاء التوصيل ===== */
+/* ===== شركاء التوصيل: احتياطي مدمج ===== */
 const DEFAULT_DELIVERY_APPS = [
   { id:'d-jahez', nameAr:'جاهز', nameEn:'Jahez', url:'https://jahez.go.link/avE5E', color:'#e30613', img:'img/d-jahez.png' },
   { id:'d-hungerstation', nameAr:'هنقرستيشن', nameEn:'HungerStation', url:'https://hungerstation.go.link/?c=SA&s=c&v=96730', color:'#ffb700', img:'img/d-hungerstation.png' },
@@ -546,7 +563,7 @@ function applyLang(lang){
   searchStats.classList.remove('show');
   updateStatus();
   buildMenu();
-  showSection(currentSection, false);
+  showSection(Math.min(currentSection, Math.max(0, cats.children.length-1)), false);
   refreshSteps();
   updateCart();
   updateFavBadge();
@@ -554,7 +571,7 @@ function applyLang(lang){
   setTimeout(()=>{ catsSign = 0; catsPos = 0; cats.scrollLeft = 0; }, 50);
 }
 function toggleLang(){ applyLang(currentLang==='ar' ? 'en' : 'ar'); }
-/* ===== الحالة ===== */
+/* ===== الحالة (داخلية فقط) ===== */
 function updateStatus(){
   const pill = el('statusPill');
   const txt = el('statusText');
@@ -749,7 +766,7 @@ if(firstVisit){
     document.body.style.overflow='hidden';
     pushOverlay('welcome');
   }, 250);
-  const assets = ['img/logo.png','img/welcome.png','img/bg.png',
+  const assets = [imgUrl('img/logo.png'), imgUrl('img/welcome.png'), imgUrl('img/bg.png'),
     ...bestItems().map(it=> itemImgUrl(it)).filter(Boolean)];
   let imgLoaded = 0, done = false;
   const tick = ()=>{
@@ -790,7 +807,7 @@ function skipIntro(){
   afterWelcome();
 }
 el('welcome').addEventListener('click', e=>{ if(e.target.id==='welcome') skipIntro(); });
-/* ===== محرك المسارات (OSRM) ===== */
+/* ===== محرك المسارات الدقيقة (OSRM) ===== */
 const OSRM_HOSTS = ['https://routing.openstreetmap.de/routed-car','https://router.project-osrm.org'];
 let routeInfo = {};
 function round3(n){ return Math.round(n*1000)/1000; }
@@ -1092,7 +1109,7 @@ window.addEventListener('popstate', ()=>{
     pushGuard();
   }
 });
-/* ===== بناء المنيو + بحث ===== */
+/* ===== بناء المنيو + بحث ثنائي اللغة ===== */
 const cats = el('cats'), search = el('search'), main = el('menu');
 const searchStats = el('searchStats'), statsCount = el('statsCount');
 let currentSection = 0;
@@ -1106,19 +1123,21 @@ function buildMenu(){
   const grayTxt = tt('notAvailableBranch','غير متوفر في هذا الفرع','Not available at this branch');
   const bestTxt = tt('bestBadge','الأكثر مبيعًا','Best Seller');
   const brId = savedBranchId() || '';
+  const visibleSections = [];
   MENU.forEach((sec,si)=>{
     if(sec.hidden === true) return;
     if(sectionViewState(sec, brId) === 'hide') return;
     const views = sec.items.map(it=> (it.hidden === true) ? 'hide' : itemViewState(sec, it, brId));
     const renderable = sec.items.filter((it,idx)=> views[idx] !== 'hide');
     if(!renderable.length) return;
+    visibleSections.push(si);
     const secTitle = (currentLang==='ar') ? sec.t : sec.tEn;
     const chip = document.createElement('button');
     chip.className='chip';
     chip.textContent = sec.i+' '+secTitle;
     chip.onclick = ()=>{
       if(isSearching) clearSearch();
-      showSection(si, true);
+      showSection(visibleSections.indexOf(si), true);
       pauseCats(3000);
       chip.scrollIntoView({behavior:'smooth', inline:'center', block:'nearest'});
     };
@@ -1201,23 +1220,30 @@ function buildMenu(){
         </div>`;
       g.appendChild(card);
     });
-    const n = MENU.length;
-    const prev = (si-1+n)%n, next = (si+1)%n;
+    main.appendChild(s);
+  });
+  /* أزرار تنقل بين الأقسام الظاهرة فقط */
+  const secNodes = [...main.querySelectorAll('.section')];
+  secNodes.forEach((s, idx)=>{
+    if(!secNodes.length) return;
+    const prev = (idx-1+secNodes.length)%secNodes.length;
+    const next = (idx+1)%secNodes.length;
+    const pSi = +secNodes[prev].id.replace('sec-','');
+    const nSi = +secNodes[next].id.replace('sec-','');
+    const prevT = (currentLang==='ar') ? MENU[pSi].t : MENU[pSi].tEn;
+    const nextT = (currentLang==='ar') ? MENU[nSi].t : MENU[nSi].tEn;
     const nav = document.createElement('div');
     nav.className='sec-nav';
-    const prevT = (currentLang==='ar') ? MENU[prev].t : MENU[prev].tEn;
-    const nextT = (currentLang==='ar') ? MENU[next].t : MENU[next].tEn;
     nav.innerHTML = `
       <button class="nav-btn" data-go="${prev}">
         <span class="arr">→</span>
-        <span class="lbl"><small>${TT.prevSec}</small><b>${MENU[prev].i} ${prevT}</b></span>
+        <span class="lbl"><small>${TT.prevSec}</small><b>${MENU[pSi].i} ${prevT}</b></span>
       </button>
       <button class="nav-btn" data-go="${next}">
-        <span class="lbl"><small>${TT.nextSec}</small><b>${MENU[next].i} ${nextT}</b></span>
+        <span class="lbl"><small>${TT.nextSec}</small><b>${MENU[nSi].i} ${nextT}</b></span>
         <span class="arr">←</span>
       </button>`;
     s.appendChild(nav);
-    main.appendChild(s);
   });
   const calNote = document.createElement('div');
   calNote.className='cal-note';
@@ -1283,7 +1309,10 @@ main.addEventListener('click', e=>{
 document.addEventListener('change', e=>{ if(e.target.matches('.size')) refreshSteps(); });
 function refreshSteps(){
   document.querySelectorAll('.step').forEach(st=>{
-    const it = MENU[+st.dataset.si].items[+st.dataset.ii];
+    const sec = MENU[+st.dataset.si];
+    if(!sec) return;
+    const it = sec.items[+st.dataset.ii];
+    if(!it) return;
     const sel = st.closest('.card').querySelector('select');
     const sizeIdx = sel ? +sel.value : -1;
     const q = qtyForItemSize(it.id, sizeIdx);
@@ -1296,11 +1325,14 @@ main.addEventListener('click', e=>{
   showSection(+b.dataset.go, true);
 });
 function showSection(si, scroll=false){
+  const nodes = document.querySelectorAll('.section');
+  if(!nodes.length){ currentSection = 0; return; }
+  if(si < 0 || si >= nodes.length) si = 0;
   currentSection = si;
-  document.querySelectorAll('.section').forEach((s,i)=> s.style.display = (i===si)? '' : 'none');
+  nodes.forEach((s,i)=> s.style.display = (i===si)? '' : 'none');
   document.querySelectorAll('.chip').forEach((c,i)=> c.classList.toggle('active', i===si));
   if(scroll){
-    const target = document.getElementById('sec-'+si);
+    const target = nodes[si];
     if(target) requestAnimationFrame(()=>{
       const tb = document.querySelector('.topbar');
       const sr = el('stickyRow');
@@ -1804,7 +1836,7 @@ function openFavsFromMenu(){
   openFavSheet();
 }
 
-/* ===== وضع البحث ===== */
+/* ===== وضع البحث داخل الصف الثابت ===== */
 function searchModeOn(){
   const sr = el('stickyRow');
   return !!sr && sr.classList.contains('searching');
@@ -2069,6 +2101,7 @@ function confirmOrderType(){
   closeOrderType();
   updateStatus();
 }
+/* توجيه البوابة القديمة */
 let gateMode = null;
 function openGate(mode){
   gateMode = mode || 'switch';
@@ -2202,7 +2235,7 @@ function updateBranchFooter(){
   if(otpShown()) refreshOtpTexts();
 }
 
-/* ===== الدفع واتساب (النسخة الاحتياطية — cloud.js يتجاوزها) ===== */
+/* ===== الدفع واتساب (احتياطي — cloud.js يتجاوزه) ===== */
 function checkout(){
   if(orderLocked()) return;
   const TT = T();
@@ -2257,10 +2290,11 @@ ${brandize(TT.waThanks)}`;
 }
 
 /* =====================================================
-   ===== v16: التحديث الحي من D1 (مدمج — لا يحتاج index.html) =====
+   ===== v16.1: التحديث الحي من D1 (مُصلَح) =====
+   الإصلاح: finally يضمن تحرير liveBusy في كل المسارات
 ===================================================== */
 const LIVE_API = 'https://makaronjy-api.makaronjy.workers.dev';
-const LIVE_POLL_MS = 20000;
+const LIVE_POLL_MS = 8000;
 let liveMenuSnap = null, liveSettingsSnap = null, liveBusy = false;
 function liveSnap(v){ try{ return JSON.stringify(v); }catch(e){ return ''; } }
 function liveJget(path){
@@ -2287,7 +2321,7 @@ async function liveCheck(){
     const ms = liveSnap(menu), ss = liveSnap(settings);
     if(liveMenuSnap === null){ liveMenuSnap = ms; liveSettingsSnap = ss; return; }
     const menuChanged = ms !== liveMenuSnap;
-    const setChanged = ss !== liveSettingsSnap;
+    const setChanged  = ss !== liveSettingsSnap;
     if(!menuChanged && !setChanged) return;
     const prev = window.APP_SETTINGS;
     window.MENU = menu;
@@ -2302,12 +2336,12 @@ async function liveCheck(){
     }
     liveMenuSnap = ms; liveSettingsSnap = ss;
     applyLive(imgsOnly);
-    try{
-      if(otpShown()) renderOtpList();
-    }catch(e){}
+    try{ if(otpShown()) renderOtpList(); }catch(e){}
     saveLocalSnap();
-  }catch(e){}
-  liveBusy = false;
+  }catch(e){
+  }finally{
+    liveBusy = false;
+  }
 }
 function applyLive(imgsOnly){
   reconcileCart();
@@ -2396,3 +2430,4 @@ function goHome(){
     })();
   }
 })();
+/* ===== END app.js (v16.1) ===== */
