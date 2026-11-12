@@ -1,5 +1,8 @@
 /* =====================================================
 مكرونجي — سكربت التطبيق الرئيسي (app.js)
+v16.0: الفاحص الحي من D1 مدمج هنا (لا يحتاج index.html)
+       + الصور تُقرأ من R2 عبر imgUrl
+       + إزالة الفاحص الميت ولقطة الملفات الثابتة
 v15.8: سطر واحد للعنوان + تأكيد عند اختيار الفرع + فقاعة فوق الدبوس
 ===================================================== */
 /* ===== استعادة لقطة محلية عند فشل تحميل الملفات ===== */
@@ -27,7 +30,7 @@ function pushGuard(){
   if(guardOn) return;
   try{ history.pushState({rb:1}, ''); guardOn = true; }catch(e){}
 }
-/* ===== Stack للنوافذ: حالة تاريخ + موضع تمرير لكل نافذة ===== */
+/* ===== Stack للنوافذ ===== */
 let overlayStack = [];
 const LOCK_TYPES = ['detail','featured','sidemenu','fav','slot','welcome'];
 function restoreScroll(y){
@@ -123,7 +126,10 @@ function brandize(str){
 function bestSellers(){ return Array.isArray(S().bestSellers) ? S().bestSellers : []; }
 function bestItems(){ return bestSellers().map(id=> findMenuItem(id)).filter(Boolean); }
 function isBestSeller(it){ return bestSellers().includes(it.id); }
-function itemImgUrl(it){ return it.imgv ? ('img/items/' + it.id + '.png?v=' + it.imgv) : null; }
+/* ===== v16: الصور من R2 ===== */
+const IMG_BASE = 'https://makaronjy-api.makaronjy.workers.dev/api/img/';
+function imgUrl(p){ return IMG_BASE + p; }
+function itemImgUrl(it){ return it.imgv ? (imgUrl('img/items/' + it.id + '.png') + '?v=' + it.imgv) : null; }
 function itemPlaceholder(name){
   const safe = String(name).replace(/[&<>"]/g, '');
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="800" height="600" fill="#e8a04c"/><rect y="330" width="800" height="80" fill="#8e2a4a"/><text x="400" y="290" font-size="90" text-anchor="middle">🍝</text><text x="400" y="500" font-size="40" text-anchor="middle" fill="#8e2a4a" font-family="Cairo,sans-serif" font-weight="bold">${safe}</text><text x="400" y="555" font-size="24" text-anchor="middle" fill="#f2b95f" font-family="Cairo,sans-serif">مكرونجي ⭐</text></svg>`;
@@ -189,7 +195,6 @@ function itemAvailable(id, brId){
   if(itemSoldOut(it, brId)) return false;
   return itemViewState(sec, it, brId) === 'normal';
 }
-/* ===== خيارات العرض ===== */
 function displayOpts(){
   const d = (S() && S().display) || {};
   return {
@@ -198,7 +203,6 @@ function displayOpts(){
     showCal: d.showCal !== false
   };
 }
-/* ===== الإضافات ===== */
 function modsRefs(it){
   if(!it.mods) return [];
   if(Array.isArray(it.mods)){
@@ -228,7 +232,6 @@ function modPriceFor(it, ref){
   const rit = findMenuItem(ref);
   return rit ? rit.prices[0] : 0;
 }
-/* ===== تحديث موضعي لبطاقة إضافة واحدة (بدون وميض) ===== */
 function updateAddOnCard(ref){
   const box = el('dtMods');
   if(!box || !dtState) return;
@@ -243,7 +246,6 @@ function updateAddOnCard(ref){
     ctrl.innerHTML = '<button class="dt-pick" data-mact="inc" data-ref="'+ref+'">+</button>';
   }
 }
-/* ===== مفاتيح السلة ===== */
 function cartKey(id, sizeIdx){ return id+'|'+sizeIdx; }
 function keyId(k){ return String(k).split('|')[0]; }
 function keySize(k){ return +String(k).split('|')[1]; }
@@ -403,11 +405,11 @@ function applyImageVersions(){
   const v = imagesVersion();
   document.querySelectorAll('img[data-appimg]').forEach(im=>{
     const p = im.getAttribute('data-appimg');
-    const want = p + (v ? '?v='+v : '');
+    const want = imgUrl(p) + (v ? '?v='+v : '');
     if(im.getAttribute('src') !== want) im.src = want;
   });
 }
-/* ===== شركاء التوصيل: احتياطي مدمج ===== */
+/* ===== شركاء التوصيل ===== */
 const DEFAULT_DELIVERY_APPS = [
   { id:'d-jahez', nameAr:'جاهز', nameEn:'Jahez', url:'https://jahez.go.link/avE5E', color:'#e30613', img:'img/d-jahez.png' },
   { id:'d-hungerstation', nameAr:'هنقرستيشن', nameEn:'HungerStation', url:'https://hungerstation.go.link/?c=SA&s=c&v=96730', color:'#ffb700', img:'img/d-hungerstation.png' },
@@ -424,7 +426,7 @@ function renderDelivery(){
   if(!d.length){ box.innerHTML = ''; return; }
   const name = x=> currentLang==='ar' ? x.nameAr : (x.nameEn || x.nameAr);
   box.innerHTML = `<div class="gd-tiles">${d.map((x,i)=>`<button class="gd-btn" aria-label="${name(x)}" onclick="return openDeliveryApp(event, ${i});">
-      <img src="${x.img || 'img/missing.png'}" alt="${name(x)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <img src="${imgUrl(x.img || 'img/missing.png')}" alt="${name(x)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
       <span class="gd-fallback" style="display:none;background:${x.color || '#8e2a4a'}">${name(x).charAt(0)}</span>
       <span class="gd-name">${name(x)}</span></button>`).join('')}</div>`;
 }
@@ -442,7 +444,7 @@ function openDeliveryApp(event, idx){
   }, 1500);
   return false;
 }
-/* ===== أكورديون تطبيقات التوصيل: زر واحد + طي ذكي ===== */
+/* ===== أكورديون تطبيقات التوصيل ===== */
 let appsAutoTimer = null;
 function appsZoneOpen(){
   const z = el('otpAppsZone');
@@ -552,7 +554,7 @@ function applyLang(lang){
   setTimeout(()=>{ catsSign = 0; catsPos = 0; cats.scrollLeft = 0; }, 50);
 }
 function toggleLang(){ applyLang(currentLang==='ar' ? 'en' : 'ar'); }
-/* ===== الحالة (داخلية فقط) ===== */
+/* ===== الحالة ===== */
 function updateStatus(){
   const pill = el('statusPill');
   const txt = el('statusText');
@@ -788,7 +790,7 @@ function skipIntro(){
   afterWelcome();
 }
 el('welcome').addEventListener('click', e=>{ if(e.target.id==='welcome') skipIntro(); });
-/* ===== محرك المسارات الدقيقة (OSRM) ===== */
+/* ===== محرك المسارات (OSRM) ===== */
 const OSRM_HOSTS = ['https://routing.openstreetmap.de/routed-car','https://router.project-osrm.org'];
 let routeInfo = {};
 function round3(n){ return Math.round(n*1000)/1000; }
@@ -1090,7 +1092,7 @@ window.addEventListener('popstate', ()=>{
     pushGuard();
   }
 });
-/* ===== بناء المنيو + بحث ثنائي اللغة ===== */
+/* ===== بناء المنيو + بحث ===== */
 const cats = el('cats'), search = el('search'), main = el('menu');
 const searchStats = el('searchStats'), statsCount = el('statsCount');
 let currentSection = 0;
@@ -1488,7 +1490,7 @@ function renderFavSheet(){
         <p class="fav-items-preview">${preview}</p>
         <div class="fav-actions">
           <button class="fav-order-btn" onclick="orderFav(${i})">${tt('favOrderNow','🛒 اطلبها الآن','🛒 Order Now')}</button>
-          <button class="fav-del-btn" onclick="deleteFav(${i})">${tt('favDelete','🗑 حذف','🗑 Delete')}</button>
+          <button class="fav-del-btn" onclick="deleteFav(${i})">${tt('favDelete','🗑 حذف',' Delete')}</button>
         </div></div>`;
     } else {
       html += `<div class="fav-empty-slot">💭 ${tt('favEmptySlot','خانة فارغة — احفظ وجبة من السلة','Empty slot — save a meal from the cart')}</div>`;
@@ -1604,8 +1606,6 @@ cats.addEventListener('wheel', ()=> pauseCats(3000), {passive:true});
 /* =====================================================
    ===== طبقة الترقية v15.4 =====
 ===================================================== */
-
-/* ===== تنسيقات جديدة تُحقن ذاتياً ===== */
 (function injectUpgradeCss(){
   const st = document.createElement('style');
   st.textContent =
@@ -1740,7 +1740,7 @@ function renderBanners(){
   const ar = currentLang==='ar';
   track.innerHTML = list.map(b=>{
     const cap = ar ? (b.titleAr||'') : (b.titleEn||b.titleAr||'');
-    return `<div class="bn-slide"><img src="${b.img}${b.v ? '?v='+b.v : ''}" alt="${socEsc(cap||'')}" loading="lazy" onerror="retryBannerImg(this)">${cap ? `<div class="bn-cap">${socEsc(cap)}</div>` : ''}</div>`;
+    return `<div class="bn-slide"><img src="${imgUrl(b.img)}${b.v ? '?v='+b.v : ''}" alt="${socEsc(cap||'')}" loading="lazy" onerror="retryBannerImg(this)">${cap ? `<div class="bn-cap">${socEsc(cap)}</div>` : ''}</div>`;
   }).join('');
   if(dots){
     dots.innerHTML = list.map((_,i)=> `<i data-bn="${i}" class="${i===0?'on':''}"></i>`).join('');
@@ -1804,7 +1804,7 @@ function openFavsFromMenu(){
   openFavSheet();
 }
 
-/* ===== وضع البحث داخل الصف الثابت ===== */
+/* ===== وضع البحث ===== */
 function searchModeOn(){
   const sr = el('stickyRow');
   return !!sr && sr.classList.contains('searching');
@@ -1888,13 +1888,11 @@ function refreshOtpTexts(){
   const cf = el('otpConfirm'); if(cf) cf.textContent = tt('confirm','تأكيد','Confirm');
   syncOtpConfirm();
 }
-/* ===== v15.8: زر تأكيد اختيار الفرع يظهر فقط عند وجود فرع ===== */
 function syncOtpConfirm(){
   const cf = el('otpConfirm');
   if(!cf) return;
   cf.classList.toggle('show', !!currentBranch());
 }
-/* v15.4: بطاقة الفرع + شريحة الرسوم + زرّا الاتصال والتوجه */
 function renderOtpList(){
   const box = el('otpList');
   if(!box) return;
@@ -1905,7 +1903,7 @@ function renderOtpList(){
   const deliv = (getOrderMode()==='delivery');
   const LVTXT = [
     tt('trafficLight','🟢 زحمة خفيفة','🟢 light traffic'),
-    tt('trafficMed','🟠 زحمة متوسطة','🟠 moderate traffic'),
+    tt('trafficMed','🟠 زحمة متوسطة','🟠 medium traffic'),
     tt('trafficHeavy','🔴 زحمة شديدة','🔴 heavy traffic')
   ];
   const nearestTxt = tt('branchNearestBadge','🎯 الأقرب لك','🎯 Nearest to You');
@@ -1943,7 +1941,6 @@ function renderOtpList(){
     </div>`;
   }).join('');
 }
-/* v15.4: اختيار الفرع + تنبيه إن لم يكن الأقرب */
 function applyBranchSelect(id){
   localStorage.setItem('mk_branch', id);
   const b = branches().find(x=>x.id===id);
@@ -1959,7 +1956,6 @@ function requestBranchSelect(id){
     const b = branches().find(x=>x.id===id);
     const n = branches().find(x=>x.id===nearestId);
     if(b && n){
-      const ri = routeInfo[id], rn = routeInfo[nearestId];
       const dTxt = x=> routeInfo[x] ? (routeInfo[x].km.toFixed(1) + ' ' + tt('kmUnit','كم','km')) : '';
       const msg = '⚠️ ' + tt('notNearestWarn','فرع اختيارك ليس الأقرب لك.','Your chosen branch is not the nearest.') +
         '<br>📍 ' + branchName(b) + (dTxt(id) ? ' (' + dTxt(id) + ')' : '') +
@@ -1981,7 +1977,6 @@ el('otpList').addEventListener('click', e=>{
   if(!id) return;
   requestBranchSelect(id);
 });
-/* تحديد الأقرب: دقة OSRM + ومضة */
 function pickNearestBranch(){
   if(geoBusy) return;
   geoBusy = true;
@@ -2074,7 +2069,6 @@ function confirmOrderType(){
   closeOrderType();
   updateStatus();
 }
-/* توجيه البوابة القديمة */
 let gateMode = null;
 function openGate(mode){
   gateMode = mode || 'switch';
@@ -2208,7 +2202,7 @@ function updateBranchFooter(){
   if(otpShown()) refreshOtpTexts();
 }
 
-/* ===== الدفع واتساب ===== */
+/* ===== الدفع واتساب (النسخة الاحتياطية — cloud.js يتجاوزها) ===== */
 function checkout(){
   if(orderLocked()) return;
   const TT = T();
@@ -2262,44 +2256,56 @@ ${brandize(TT.waThanks)}`;
   toast(TT.orderSent);
 }
 
-/* ===== التحديث الحي ===== */
-let liveMarks = { 'menu.js': null, 'settings.js': null };
-let liveBusy = false;
+/* =====================================================
+   ===== v16: التحديث الحي من D1 (مدمج — لا يحتاج index.html) =====
+===================================================== */
+const LIVE_API = 'https://makaronjy-api.makaronjy.workers.dev';
+const LIVE_POLL_MS = 20000;
+let liveMenuSnap = null, liveSettingsSnap = null, liveBusy = false;
+function liveSnap(v){ try{ return JSON.stringify(v); }catch(e){ return ''; } }
+function liveJget(path){
+  const ctrl = new AbortController();
+  const to = setTimeout(()=> ctrl.abort(), 9000);
+  return fetch(LIVE_API + path, { cache:'no-store', signal: ctrl.signal })
+    .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .finally(()=> clearTimeout(to));
+}
+function saveLocalSnap(){
+  try{
+    localStorage.setItem('mk_snap_menu', 'window.MENU = ' + JSON.stringify(window.MENU) + ';');
+    localStorage.setItem('mk_snap_settings', 'window.APP_SETTINGS = ' + JSON.stringify(window.APP_SETTINGS) + ';');
+  }catch(e){}
+}
 async function liveCheck(){
   if(liveBusy) return;
+  if(document.hidden || !navigator.onLine) return;
   liveBusy = true;
   try{
-    const stamps = {};
-    for(const f of ['menu.js','settings.js']){
-      const r = await fetch(f + '?live=' + Date.now(), { method:'HEAD', cache:'no-store' });
-      if(r.ok) stamps[f] = r.headers.get('last-modified') || r.headers.get('etag') || '';
-    }
-    const changed = [];
-    for(const f in stamps){
-      if(liveMarks[f] === null){ liveMarks[f] = stamps[f]; }
-      else if(liveMarks[f] !== stamps[f]){ changed.push(f); liveMarks[f] = stamps[f]; }
-    }
-    if(changed.length){
-      let prevSettings = null;
-      for(const f of changed){
-        const t = await (await fetch(f + '?live=' + Date.now(), { cache:'no-store' })).text();
-        const w = {};
-        new Function('window', t)(w);
-        if(f === 'menu.js'){
-          if(w.MENU) window.MENU = w.MENU;
-        } else {
-          prevSettings = window.APP_SETTINGS;
-          if(w.APP_SETTINGS) window.APP_SETTINGS = w.APP_SETTINGS;
-        }
-      }
-      let imgsOnly = false;
-      if(changed.length===1 && changed[0]==='settings.js' && prevSettings && window.APP_SETTINGS){
-        const a = JSON.parse(JSON.stringify(prevSettings)); delete a.imagesVersion;
-        const b = JSON.parse(JSON.stringify(window.APP_SETTINGS)); delete b.imagesVersion;
+    const [mj, sj] = await Promise.all([ liveJget('/api/data/menu'), liveJget('/api/data/settings') ]);
+    const menu = mj.menu, settings = sj.settings;
+    if(!Array.isArray(menu) || !settings || typeof settings !== 'object') return;
+    const ms = liveSnap(menu), ss = liveSnap(settings);
+    if(liveMenuSnap === null){ liveMenuSnap = ms; liveSettingsSnap = ss; return; }
+    const menuChanged = ms !== liveMenuSnap;
+    const setChanged = ss !== liveSettingsSnap;
+    if(!menuChanged && !setChanged) return;
+    const prev = window.APP_SETTINGS;
+    window.MENU = menu;
+    window.APP_SETTINGS = settings;
+    let imgsOnly = false;
+    if(!menuChanged && setChanged && prev){
+      try{
+        const a = JSON.parse(JSON.stringify(prev)); delete a.imagesVersion;
+        const b = JSON.parse(JSON.stringify(settings)); delete b.imagesVersion;
         imgsOnly = JSON.stringify(a) === JSON.stringify(b);
-      }
-      applyLive(imgsOnly);
+      }catch(e){}
     }
+    liveMenuSnap = ms; liveSettingsSnap = ss;
+    applyLive(imgsOnly);
+    try{
+      if(otpShown()) renderOtpList();
+    }catch(e){}
+    saveLocalSnap();
   }catch(e){}
   liveBusy = false;
 }
@@ -2314,8 +2320,10 @@ function applyLive(imgsOnly){
   if(el('favSheet').classList.contains('show')) renderFavSheet();
   if(!imgsOnly) toast(tt('liveUpdated','تم تحديث القائمة','Menu updated'));
 }
-setInterval(liveCheck, 60000);
+setInterval(liveCheck, LIVE_POLL_MS);
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) liveCheck(); });
+window.addEventListener('online', liveCheck);
+window.addEventListener('focus', liveCheck);
 
 /* ===== الرجوع الشامل ===== */
 function goHome(){
@@ -2360,13 +2368,9 @@ function goHome(){
   applyLang(currentLang);
   updateCart();
   applyImageVersions();
+  saveLocalSnap();
   liveCheck();
   if(navigator.onLine){
-    ['menu.js','settings.js'].forEach(function(f){
-      fetch(f).then(function(r){ return r.ok ? r.text() : ''; }).then(function(t){
-        if(t) localStorage.setItem('mk_snap_' + (f === 'menu.js' ? 'menu' : 'settings'), t);
-      }).catch(function(){});
-    });
     (function prefetchAllImages(){
       const urls = [];
       MENU.forEach(sec=>{
@@ -2377,16 +2381,16 @@ function goHome(){
       });
       bannersList().forEach(b=>{
         if(b.img){
-          const u = b.img + (b.v ? '?v='+b.v : '');
+          const u = imgUrl(b.img) + (b.v ? '?v='+b.v : '');
           if(urls.indexOf(u) < 0) urls.push(u);
         }
       });
       const delivery = (S() && S().delivery) || [];
       delivery.forEach(d=>{
-        if(d.img && urls.indexOf(d.img) < 0) urls.push(d.img);
+        if(d.img){ const du = imgUrl(d.img); if(urls.indexOf(du) < 0) urls.push(du); }
       });
-      ['img/logo.png','img/bg.png','img/welcome.png','img/closed.png','img/icon-192.png'].forEach(u=>{
-        if(urls.indexOf(u) < 0) urls.push(u);
+      ['img/logo.png','img/bg.png','img/welcome.png','img/closed.png','img/icon-192.png'].forEach(p=>{
+        const u = imgUrl(p); if(urls.indexOf(u) < 0) urls.push(u);
       });
       urls.forEach(u=>{ fetch(u).catch(()=>{}); });
     })();
