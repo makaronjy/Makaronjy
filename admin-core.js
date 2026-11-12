@@ -1,10 +1,12 @@
-/* ===== admin-core.js — النواة: دخول سحابي D1 + نوافذ (v5.3) ===== */
-/* v5.3: نفس الملف الأصلي v3.7 بدون حذف أي دالة أو قسم.
-   التغيير فقط: الدخول عبر API، وقراءة/حفظ menu.js و settings.js من D1.
-   الصور تبقى على GitHub (رمز اختياري يُحفظ في الجلسة عند الحاجة فقط).
-   v3.7: إصلاح معالج التبويبات (add hidden بدل remove hidden)
-   v3.6: تعطيل الدخول المحلي للأمان
-   v3.5: كسر كاش المتصفح/Service Worker في قراءات GitHub
+/* ===== admin-core.js — النواة: دخول سحابي D1 + صور R2 + نوافذ (v6.0) =====
+   v6.0: الصور تُرفع/تُحذف من R2 عبر الووركر بصلاحيات JWT — لا توكن GitHub إطلاقاً
+         + حذف صورة الصنف المحذوف عند نشر المنيو
+         + حذف صور البانرات المحذوفة عند نشر الإعدادات
+         + استبدال صورة التطبيق يمسح القديمة ويحدّث imagesVersion
+         + زر «نقل صور المستودع إلى السحابة» (مرة واحدة)
+   v5.3: الدخول عبر API، وقراءة/حفظ menu.js و settings.js من D1
+   v3.7: إصلاح معالج التبويبات
+   v3.5: كسر كاش المتصفح/Service Worker
    v3.4: نشر صلب 4 محاولات + التقاط SHA
    v3.2: حذف البانر الفعلي + تنظيف اليتيمة
    v3.1: try-catch شامل + هجرات */
@@ -25,17 +27,20 @@ function(e){ e.preventDefault(); });
 });
 document.addEventListener(`dblclick`,
 function(e){ e.preventDefault(); });
+
 /* ===== ثوابت الدخول والنشر ===== */
-const API_BASE = `https://makaronjy-api.makaronjy.workers.dev`; /* v5.3 */
+const API_BASE = `https://makaronjy-api.makaronjy.workers.dev`;
+const IMG_BASE = API_BASE + `/api/img/`;           /* v6.0: صور R2 */
 const GH_OWNER = `makaronjy`;
 const GH_REPO = `Makaronjy`;
 const GH_BRANCH = `main`;
-const GH_TOKEN = ``;
+const RAW_BASE = `https://raw.githubusercontent.com/` + GH_OWNER + `/` + GH_REPO + `/` + GH_BRANCH + `/`;
 let CFG = null;
 let STATE = null;
 let modalOnSave = null;
 let ALANG =
 (localStorage.getItem(`mk_admin_lang`) === `en`) ? `en` : `ar`;
+
 /* ===== أدوات عامة ===== */
 const el = function(id){
 return document.getElementById(id);
@@ -54,18 +59,20 @@ return m[c];
 });
 }
 function L(k, a){
-var d = ASTR[ALANG] || ASTR.ar;
+var src = (typeof ASTR !== `undefined`) ? ASTR : {};
+var d = src[ALANG] || src.ar || {};
 var v = d[k];
-if(v === undefined) v = ASTR.ar[k];
+if(v === undefined && src.ar) v = src.ar[k];
 if(v === undefined) v = k;
 if(typeof v === `function`) return v(a);
 return v;
 }
 function LF(k){
 var args = [].slice.call(arguments, 1);
-var d = ASTR[ALANG] || ASTR.ar;
+var src = (typeof ASTR !== `undefined`) ? ASTR : {};
+var d = src[ALANG] || src.ar || {};
 var v = d[k];
-if(v === undefined) v = ASTR.ar[k];
+if(v === undefined && src.ar) v = src.ar[k];
 if(typeof v === `function`) return v.apply(null, args);
 return v;
 }
@@ -85,6 +92,7 @@ return [].slice.call(list).map(function(c){
 return c.value;
 });
 }
+
 /* ===== حاجز زر الرجوع ===== */
 let guardDepth = 0;
 let suppressCount = 0;
@@ -127,6 +135,7 @@ if(im && im.getAttribute(`src`)){
 window.open(im.getAttribute(`src`), `_blank`);
 }
 });
+
 /* ===== اللغة ===== */
 function applyAdminLang(){
 document.documentElement.lang = ALANG;
@@ -150,13 +159,15 @@ var s = e.target.closest(`.lang-seg`);
 if(!s) return;
 ALANG = s.getAttribute(`data-alang`);
 applyAdminLang();
-if(STATE) renderAll();
+if(STATE && typeof renderAll === `function`) renderAll();
 });
+
 /* ===== التوستات ===== */
 let toastSeq = 0;
 function toast(title, kind, sub){
 kind = kind || `info`;
 var wrap = el(`toasts`);
+if(!wrap) return;
 var icons = {
 success:`✔`, error:`✖`, info:`ℹ`, warn:`⚠`
 };
@@ -174,6 +185,7 @@ div.classList.add(`out`);
 setTimeout(function(){ div.remove(); }, 350);
 }, 3400);
 }
+
 /* ===== نافذة التأكيد + حقل كتابة delete ===== */
 let confirmResolve = null;
 let cfRequireDelete = false;
@@ -199,10 +211,12 @@ cfDeleteHint.style.cssText =
 `display:block;color:var(--muted);font-weight:700;` +
 `font-size:.7rem;margin:0 0 .8rem;line-height:1.6`;
 var msgEl = el(`cfMsg`);
+if(msgEl && msgEl.parentNode){
 msgEl.parentNode.insertBefore(cfDeleteInput,
 msgEl.nextSibling);
 msgEl.parentNode.insertBefore(cfDeleteHint,
 cfDeleteInput.nextSibling);
+}
 cfDeleteInput.addEventListener(`input`,
 refreshCfDelete);
 return cfDeleteInput;
@@ -215,6 +229,7 @@ function refreshCfDelete(){
 if(!cfRequireDelete) return;
 var ok = cfDeleteOk();
 var yes = el(`cfYes`);
+if(!yes) return;
 yes.disabled = !ok;
 yes.style.opacity = ok ? `1` : `.45`;
 yes.style.cursor = ok ? `pointer` : `default`;
@@ -283,6 +298,7 @@ if(e.target === el(`confirmModal`)){
 settleConfirm(false);
 }
 });
+
 /* ===== نافذة النماذج ===== */
 function openModal(title, bodyHtml, onSave){
 el(`modalTitle`).textContent = title;
@@ -314,9 +330,11 @@ var m = (err && err.message) ? err.message : err;
 toast(L(`errGeneric`) + m, `error`);
 }
 });
+
 /* ===== لافتات الأخطاء ===== */
 function showBanner(id, msg, detail){
 var b = el(id);
+if(!b) return;
 b.innerHTML =
 `<span>⚠️</span><div><span class="msg"></span>` +
 (detail ? `<small>` + esc(detail) + `</small>` : ``) +
@@ -327,7 +345,8 @@ void b.offsetWidth;
 b.classList.add(`show`);
 }
 function hideBanner(id){
-el(id).classList.remove(`show`);
+var b = el(id);
+if(b) b.classList.remove(`show`);
 }
 function classifyGhError(e){
 var status = e.http || 0;
@@ -369,7 +388,8 @@ btn.disabled = false;
 btn.textContent = label;
 }
 }
-/* ===== v5.3: طبقة السحابة D1 (جديدة) ===== */
+
+/* ===== طبقة السحابة D1 ===== */
 async function apiFetch(path, opts){
 opts = opts || {};
 var headers = {
@@ -397,49 +417,41 @@ throw e;
 }
 return r.json();
 }
-/* v5.3: رمز GitHub اختياري للصور فقط — يُحفظ في الجلسة */
-function ensureAssetToken(){
-var cached = sessionStorage.getItem(`mk_gh_asset_token`);
-if(cached) return Promise.resolve(cached);
-return new Promise(function(resolve, reject){
-var ov = document.createElement(`div`);
-ov.style.cssText =
-`position:fixed;inset:0;background:rgba(42,26,16,.55);` +
-`z-index:9999;display:flex;align-items:center;` +
-`justify-content:center;padding:16px`;
-var box = document.createElement(`div`);
-box.style.cssText =
-`background:#FFFBF4;border-radius:18px;max-width:430px;` +
-`width:100%;padding:20px;font-family:inherit;direction:rtl;` +
-`box-shadow:0 20px 60px rgba(0,0,0,.35)`;
-box.innerHTML =
-`<h3 style="margin:0 0 8px;font-size:1rem;font-weight:900">🔑 صلاحية إدارة الصور (اختيارية)</h3>` +
-`<p style="margin:0 0 12px;font-size:.78rem;color:#7A6A55;line-height:1.8">المنيو والإعدادات تُحفظ في D1 بدون أي رمز. رفع/حذف الصور فقط يحتاج رمز GitHub بصلاحيات repo، يُحفظ في هذه الجلسة فقط ولا يُكتب في الكود.</p>` +
-`<input id="mkAssetTok" type="password" placeholder="ghp_... أو github_pat_..." autocomplete="off" style="width:100%;padding:12px;border:1.5px solid #EAD9BE;border-radius:12px;font-size:16px;direction:ltr;margin-bottom:12px;font-family:inherit">` +
-`<div style="display:flex;gap:8px">` +
-`<button id="mkAssetOk" style="flex:1;padding:12px;border:none;border-radius:12px;background:linear-gradient(135deg,#C2571B,#D63A2F);color:#fff;font-weight:900;font-family:inherit;cursor:pointer">حفظ ومتابعة</button>` +
-`<button id="mkAssetNo" style="flex:1;padding:12px;border:1.5px solid #EAD9BE;border-radius:12px;background:#fff;font-weight:900;font-family:inherit;cursor:pointer">إلغاء</button></div>`;
-ov.appendChild(box);
-document.body.appendChild(ov);
-box.querySelector(`#mkAssetOk`).addEventListener(`click`,
-function(){
-var v = box.querySelector(`#mkAssetTok`).value.trim();
-if(!v){ toast(`أدخل الرمز أو ألغِ العملية`, `error`); return; }
-sessionStorage.setItem(`mk_gh_asset_token`, v);
-ov.remove();
-resolve(v);
-});
-box.querySelector(`#mkAssetNo`).addEventListener(`click`,
-function(){
-ov.remove();
-reject(new Error(`أُلغيت إدارة الصور — لم يُدخل رمز GitHub`));
-});
-setTimeout(function(){
-try{ box.querySelector(`#mkAssetTok`).focus(); }catch(e){}
-}, 60);
+
+/* ===== v6.0: طبقة الصور عبر R2 (بدون GitHub / بدون توكن صور) ===== */
+async function imgPut(path, base64){
+return apiFetch(`/api/img/` + path, {
+method:`PUT`,
+body: JSON.stringify({ data: base64 })
 });
 }
-/* v5.3: استخراج البيانات من نص JS أو JSON */
+async function imgDelete(path){
+if(!path) return;
+try{
+await apiFetch(`/api/img/` + path, { method:`DELETE` });
+}catch(e){ /* الحذف幂等 — نتجاهل غير الموجود */ }
+}
+async function imgList(prefix){
+var j = await apiFetch(`/api/img?prefix=` + encodeURIComponent(prefix || ``));
+return j.files || [];
+}
+function bumpImagesVersion(){
+if(STATE && STATE.SETTINGS){
+STATE.SETTINGS.imagesVersion = Date.now();
+}
+}
+function b64OfFile(file){
+return file.arrayBuffer().then(function(buf){
+var bytes = ``;
+var u8 = new Uint8Array(buf);
+for(var i=0;i<u8.length;i+=32768){
+bytes += String.fromCharCode.apply(null,
+u8.subarray(i, i+32768));
+}
+return btoa(bytes);
+});
+}
+/* استخراج البيانات من نص JS أو JSON */
 function extractData(text, kind){
 try{
 var w = parseJs(text);
@@ -449,55 +461,9 @@ var j = JSON.parse(text);
 return kind === `menu` ? (j.menu || j) : (j.settings || j);
 }
 }
-/* ===== طبقة GitHub (v3.5: بلا كاش أبداً) ===== */
-const GH_API = `https://api.github.com`;
-async function gh(path, opts){
-opts = opts || {};
-var assetTok = await ensureAssetToken(); /* v5.3 */
-var headers = {
-[`Accept`]:`application/vnd.github+json`,
-[`Authorization`]:`Bearer ` + assetTok, /* v5.3 */
-[`X-GitHub-Api-Version`]:`2022-11-28`
-};
-if(opts.headers){
-Object.assign(headers, opts.headers);
-}
-var init = Object.assign({}, opts, {
-headers: headers,
-cache: `no-store`
-});
-var r = await fetch(GH_API + path, init);
-if(!r.ok){
-var e = new Error(`HTTP ` + r.status);
-e.http = r.status;
-try{
-var j = await r.json();
-e.message = j.message || e.message;
-}catch(err){}
-throw e;
-}
-var ct = r.headers.get(`content-type`) || ``;
-if(ct.includes(`json`)) return r.json();
-return {
-text: await r.text(),
-sha: r.headers.get(`etag`)
-};
-}
-/* فك Base64 إلى نص UTF-8 سليم */
-function b64ToUtf8(b64){
-var bin = atob(b64);
-var bytes = new Uint8Array(bin.length);
-for(var i=0;i<bin.length;i++){
-bytes[i] = bin.charCodeAt(i);
-}
-if(window.TextDecoder){
-return new TextDecoder(`utf-8`).decode(bytes);
-}
-return decodeURIComponent(escape(bin));
-}
-/* v3.5: بصمة زمنية تكسر كاش المتصفح والـ Service Worker */
+
+/* ===== قراءة/حفظ: المنيو والإعدادات من D1، والصور من R2 ===== */
 async function getFile(path){
-/* v5.3: المنيو والإعدادات من D1 */
 if(path === `menu.js`){
 var jm = await apiFetch(`/api/data/menu`);
 return {
@@ -512,14 +478,9 @@ text: `window.APP_SETTINGS = ` + JSON.stringify(js.settings) + `;\n`,
 sha: null
 };
 }
-var q = `/repos/` + CFG.owner + `/` + CFG.repo +
-`/contents/` + path + `?ref=` + CFG.branch +
-`&_cb=` + Date.now();
-var r = await gh(q);
-return { text: b64ToUtf8(r.content), sha: r.sha };
+return { text:``, sha:null, url: IMG_BASE + path };
 }
 async function putFile(path, content, sha, msg){
-/* v5.3: المنيو والإعدادات إلى D1 */
 if(path === `menu.js`){
 var menu = extractData(content, `menu`);
 await apiFetch(`/api/data/menu`, {
@@ -536,104 +497,36 @@ body: JSON.stringify({ settings: settings })
 });
 return { content:{ sha:null } };
 }
-var body = {
-message: msg,
-content: btoa(unescape(encodeURIComponent(content))),
-branch: CFG.branch
-};
-if(sha) body.sha = sha;
-var q = `/repos/` + CFG.owner + `/` + CFG.repo +
-`/contents/` + path;
-return gh(q, {
-method:`PUT`,
-headers:{ [`Content-Type`]:`application/json` },
-body: JSON.stringify(body)
-});
+await imgPut(path, content);
+return { content:{ sha:null } };
 }
-/* حذف ملف من GitHub */
+/* حذف صورة من السحابة */
 async function ghDeleteFile(path, sha, msg){
-var body = {
-message: msg || (`حذف ملف: ` + path),
-sha: sha,
-branch: CFG.branch
-};
-var q = `/repos/` + CFG.owner + `/` + CFG.repo +
-`/contents/` + path;
-return gh(q, {
-method:`DELETE`,
-headers:{ [`Content-Type`]:`application/json` },
-body: JSON.stringify(body)
-});
+await imgDelete(path);
+return { success:true };
 }
-/* v3.5: سرد مجلد بلا كاش */
+/* سرد صور مجلد من السحابة */
 async function listDir(dirPath){
-var q = `/repos/` + CFG.owner + `/` + CFG.repo +
-`/contents/` + dirPath + `?ref=` + CFG.branch +
-`&_cb=` + Date.now();
-try{
-var r = await gh(q);
-if(!Array.isArray(r)) return [];
-return r.filter(function(x){
-return x.type === `file`;
-}).map(function(x){
-return { name: x.name, path: x.path, sha: x.sha };
-});
-}catch(e){
-if(e.http === 404) return [];
-throw e;
-}
-}
-function b64OfFile(file){
-return file.arrayBuffer().then(function(buf){
-var bytes = ``;
-var u8 = new Uint8Array(buf);
-for(var i=0;i<u8.length;i+=32768){
-bytes += String.fromCharCode.apply(null,
-u8.subarray(i, i+32768));
-}
-return btoa(bytes);
-});
+var prefix = String(dirPath || ``).replace(/\/?$/, `/`);
+return imgList(prefix);
 }
 async function uploadItemImgById(id, file){
-var cur = await getFile(path0(id)).catch(function(){
-return { sha:null };
-});
-function path0(x){ return `img/items/` + x + `.png`; }
-var path = path0(id);
-var body = {
-message:`رفع صورة صنف: ` + id,
-content: await b64OfFile(file),
-branch: CFG.branch
-};
-if(cur.sha) body.sha = cur.sha;
-var q = `/repos/` + CFG.owner + `/` + CFG.repo +
-`/contents/` + path;
-await gh(q, {
-method:`PUT`,
-headers:{ [`Content-Type`]:`application/json` },
-body: JSON.stringify(body)
-});
+var path = `img/items/` + id + `.png`;
+await imgPut(path, await b64OfFile(file));
+bumpImagesVersion();
 return path;
 }
 async function uploadAppImage(path, file){
-var cur = await getFile(path).catch(function(){
-return { sha:null };
-});
-var body = {
-message:`تحديث صورة: ` + path,
-content: await b64OfFile(file),
-branch: CFG.branch
-};
-if(cur.sha) body.sha = cur.sha;
-var q = `/repos/` + CFG.owner + `/` + CFG.repo +
-`/contents/` + path;
-await gh(q, {
-method:`PUT`,
-headers:{ [`Content-Type`]:`application/json` },
-body: JSON.stringify(body)
-});
+/* الاستبدال على نفس المفتاح يمسح الصورة القديمة تلقائياً */
+await imgPut(path, await b64OfFile(file));
+bumpImagesVersion();
 return path;
 }
+async function uploadBannerImg(path, file){
+await imgPut(path, await b64OfFile(file));
+return path;
+}
+
 /* parseJs محمي من النصوص الفارغة أو المكسورة */
 function parseJs(text){
 if(!text || typeof text !== `string`){
@@ -647,6 +540,7 @@ throw new Error(`خطأ في قراءة الملف: ` + e.message);
 }
 return w.window;
 }
+
 /* ===== الحالة والهجرات ===== */
 function branches(){
 return STATE.SETTINGS.branches ||
@@ -747,6 +641,7 @@ publishableKey: ``
 };
 }
 }
+
 /* ===== أدوات الوقت ===== */
 function clamp12(v){
 var n = parseInt(v,10);
@@ -805,6 +700,7 @@ msg.className=`wa-preview bad`;
 msg.textContent = L(`waBad`);
 }
 }
+
 /* ===== التبويبات (v3.7: إصلاح الإخفاء) ===== */
 document.querySelectorAll(`.tab`).forEach(function(t){
 t.addEventListener(`click`, function(){
@@ -814,10 +710,12 @@ x.classList.remove(`active`);
 t.classList.add(`active`);
 document.querySelectorAll(`main > section`).forEach(
 function(s){ s.classList.add(`hidden`); });
-el(`tab-` + t.dataset.tab).classList.remove(`hidden`);
+var sec = el(`tab-` + t.dataset.tab);
+if(sec) sec.classList.remove(`hidden`);
 });
 });
-/* ===== الخروج (v5.3: مسح مفاتيح الجلسة الجديدة) ===== */
+
+/* ===== الخروج ===== */
 el(`btnLogout`).addEventListener(`click`,
 async function(){
 var ok = await askConfirm(
@@ -829,7 +727,8 @@ sessionStorage.removeItem(`mk_admin_user`);
 sessionStorage.removeItem(`mk_gh_asset_token`);
 location.reload();
 });
-/* ===== تحميل البيانات (كما هو — المصدر أصبح D1 عبر getFile) ===== */
+
+/* ===== تحميل البيانات (المصدر D1) ===== */
 async function loadAll(){
 var menuText, settingsText;
 try{
@@ -897,9 +796,10 @@ migratePayments();
 el(`renewScreen`).classList.add(`hidden`);
 el(`loginScreen`).classList.add(`hidden`);
 el(`app`).classList.remove(`hidden`);
-renderAll();
+if(typeof renderAll === `function`) renderAll();
 }
-/* ===== الدخول (v5.3: عبر السحابة — اسم مستخدم + كلمة مرور) ===== */
+
+/* ===== الدخول عبر API (اسم مستخدم + كلمة مرور) ===== */
 el(`btnLogin`).addEventListener(`click`,
 async function(){
 var username = el(`inOwner`).value.trim();
@@ -954,7 +854,8 @@ el(id).addEventListener(`keydown`, function(e){
 if(e.key === `Enter`) el(`btnLogin`).click();
 });
 });
-/* ===== شاشة تجديد الجلسة (v5.3: كلمة المرور) ===== */
+
+/* ===== شاشة تجديد الجلسة (كلمة المرور) ===== */
 function showRenew(){
 el(`loginScreen`).classList.add(`hidden`);
 el(`app`).classList.add(`hidden`);
@@ -1010,9 +911,14 @@ cls.detail || (e && e.message));
 btn.disabled = false;
 btn.textContent = L(`btnRenew`);
 });
-/* ===== تحديث من المستودع ===== */
+
+/* ===== تحديث ===== */
 el(`btnRefresh`).addEventListener(`click`,
 async function(){
+if(!CFG){
+var t0 = sessionStorage.getItem(`mk_admin_token`);
+if(t0) CFG = { owner:GH_OWNER, repo:GH_REPO, branch:GH_BRANCH, token:t0 };
+}
 if(!CFG) return;
 var b = el(`btnRefresh`);
 var old = b.textContent;
@@ -1036,6 +942,7 @@ toast(
 b.disabled = false;
 b.textContent = old;
 });
+
 /* ===== نصوص النشر ===== */
 function menuText(){
 return `window.MENU = ` +
@@ -1045,7 +952,8 @@ function settingsText(){
 return `window.APP_SETTINGS = ` +
 JSON.stringify(STATE.SETTINGS, null, 2) + `;\n`;
 }
-/* ===== v3.4: نشر صلب — 4 محاولات + التقاط SHA ===== */
+
+/* ===== أدوات تعارض SHA (توافق) ===== */
 function isShaConflict(e){
 if(!e) return false;
 if(e.http === 409 || e.http === 412 || e.http === 422) return true;
@@ -1058,66 +966,51 @@ var m = (e && e.message) ? e.message : ``;
 var hit = m.match(/[0-9a-f]{40}/);
 return hit ? hit[0] : null;
 }
+
+/* ===== v6.0: النشر إلى D1 + حذف الصور القديمة تلقائياً ===== */
+var LAST_MENU = null;
+var LAST_SETTINGS = null;
+
 async function publishSettings(msg){
-var lastErr = null;
-for(var attempt = 0; attempt < 4; attempt++){
-try{
-var sha;
-var extracted = shaFromError(lastErr);
-if(lastErr && extracted && attempt >= 2){
-sha = extracted;
-}else{
-var cur = await getFile(`settings.js`);
-sha = cur.sha;
+var prevBanners = (LAST_SETTINGS && Array.isArray(LAST_SETTINGS.banners))
+? LAST_SETTINGS.banners.map(function(b){ return b && b.img; }).filter(Boolean) : [];
+var nowBanners = (STATE.SETTINGS.banners || [])
+.map(function(b){ return b && b.img; }).filter(Boolean);
+for(var i=0;i<prevBanners.length;i++){
+if(nowBanners.indexOf(prevBanners[i]) < 0){
+await imgDelete(prevBanners[i]);
 }
-STATE.shas.settings = sha;
-var r = await putFile(`settings.js`,
-settingsText(), sha, msg);
-STATE.shas.settings =
-(r.content && r.content.sha) ? r.content.sha : sha;
-return;
-}catch(e){
-lastErr = e;
-if(!isShaConflict(e)) throw e;
-await new Promise(function(res){
-setTimeout(res, 350 * (attempt + 1));
+}
+await apiFetch(`/api/data/settings`, {
+method:`PUT`,
+body: JSON.stringify({ settings: STATE.SETTINGS })
 });
+STATE.shas.settings = null;
+LAST_SETTINGS = JSON.parse(JSON.stringify(STATE.SETTINGS));
 }
-}
-lastErr.message = (lastErr.message || ``) +
-` — حل يدوي: اضغط «تحديث من المستودع» ثم أعد النشر`;
-throw lastErr;
-}
+
 async function publishMenu(msg){
-var lastErr = null;
-for(var attempt = 0; attempt < 4; attempt++){
-try{
-var sha;
-var extracted = shaFromError(lastErr);
-if(lastErr && extracted && attempt >= 2){
-sha = extracted;
-}else{
-var cur = await getFile(`menu.js`);
-sha = cur.sha;
-}
-STATE.shas.menu = sha;
-var r = await putFile(`menu.js`,
-menuText(), sha, msg);
-STATE.shas.menu =
-(r.content && r.content.sha) ? r.content.sha : sha;
-return;
-}catch(e){
-lastErr = e;
-if(!isShaConflict(e)) throw e;
-await new Promise(function(res){
-setTimeout(res, 350 * (attempt + 1));
+function ids(m){
+var out = [];
+(m || []).forEach(function(s){
+(s.items || []).forEach(function(it){ out.push(it.id); });
 });
+return out;
+}
+var prev = ids(LAST_MENU), now = ids(STATE.MENU);
+for(var i=0;i<prev.length;i++){
+if(now.indexOf(prev[i]) < 0){
+await imgDelete(`img/items/` + prev[i] + `.png`);
 }
 }
-lastErr.message = (lastErr.message || ``) +
-` — حل يدوي: اضغط «تحديث من المستودع» ثم أعد النشر`;
-throw lastErr;
+await apiFetch(`/api/data/menu`, {
+method:`PUT`,
+body: JSON.stringify({ menu: STATE.MENU })
+});
+STATE.shas.menu = null;
+LAST_MENU = JSON.parse(JSON.stringify(STATE.MENU));
 }
+
 /* =====================================================
    ===== v15.4: السلايدر + أنظمة رسوم التوصيل =====
 ===================================================== */
@@ -1164,6 +1057,7 @@ st.textContent =
 `.v15-add{border:none;border-radius:12px;padding:.7rem 1.2rem;background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--dark);font-weight:900;cursor:pointer;font-family:inherit}` +
 `.v15-pub{border:none;border-radius:12px;padding:.7rem 1.2rem;background:var(--wa);color:#fff;font-weight:900;cursor:pointer;font-family:inherit}` +
 `.v15-clean{border:none;border-radius:12px;padding:.7rem 1.2rem;background:#fff6e6;color:#a06b1c;border:1.5px dashed #e0912f;font-weight:900;cursor:pointer;font-family:inherit}` +
+`.v15-mig{border:none;border-radius:12px;padding:.7rem 1.2rem;background:#eef4ff;color:#1d4ed8;border:1.5px dashed #93b4f5;font-weight:900;cursor:pointer;font-family:inherit}` +
 `.v15-fee{width:110px;border:1.5px solid var(--line);border-radius:10px;padding:.55rem .6rem;font-family:inherit;font-weight:900;font-size:1rem;text-align:center}` +
 `.v15-sel{width:110px;border:1.5px solid var(--line);border-radius:10px;padding:.55rem .6rem;font-family:inherit;font-weight:800;background:#fff;color:var(--ink)}` +
 `.v15-bfees{display:flex;flex-direction:column;gap:.5rem;margin-top:.7rem}` +
@@ -1205,6 +1099,7 @@ card.innerHTML =
 `<button class="v15-add" id="bnAddBtn">➕ إضافة بانر / Add</button>` +
 `<button class="v15-pub" id="bnPublishBtn">🚀 نشر / Publish</button>` +
 `<button class="v15-clean" id="bnCleanBtn">🧹 تنظيف اليتيمة / Clean orphans</button>` +
+`<button class="v15-mig" id="imgMigBtn">☁️ نقل صور المستودع إلى السحابة (مرة واحدة)</button>` +
 `<input type="file" id="bnFile" accept="image/*" hidden>` +
 `</div>`;
 host.insertBefore(card, host.firstChild);
@@ -1235,7 +1130,7 @@ var f = e.target.files && e.target.files[0];
 e.target.value = ``;
 if(!f) return;
 try{
-toast(`جارٍ رفع البانر...`, `info`);
+toast(`جارٍ رفع البانر إلى السحابة...`, `info`);
 var path = await uploadBannerImg(
 `img/banners/bn-` + Date.now() + `.png`, f);
 STATE.SETTINGS.banners.push({
@@ -1253,6 +1148,7 @@ toast(`فشل الرفع: ` + err.message, `error`);
 });
 el(`bnPublishBtn`).addEventListener(`click`, publishV15);
 el(`bnCleanBtn`).addEventListener(`click`, cleanOrphanBanners);
+el(`imgMigBtn`).addEventListener(`click`, migrateRepoImagesToCloud);
 el(`feePublishBtn`).addEventListener(`click`, publishV15);
 el(`v15FeeMode`).addEventListener(`change`, function(e){
 STATE.SETTINGS.deliveryFeeMode = e.target.value;
@@ -1305,26 +1201,18 @@ if(del){
 var k = +del.dataset.bndel;
 var bn = list[k];
 var ok = await askConfirm(
-`سيُحذف البانر من السلايدر ومن المستودع نهائياً.\n\nالملف: ` +
+`سيُحذف البانر من السلايدر ومن التخزين السحابي نهائياً.\n\nالملف: ` +
 (bn && bn.img ? bn.img : `—`),
 `حذف بانر`, `🗑`, `حذف`);
 if(!ok) return;
 list.splice(k, 1);
 if(bn && bn.img){
 try{
-toast(`جارٍ حذف الملف من المستودع...`, `info`);
-var f = await getFile(bn.img).catch(function(){
-return null;
-});
-if(f && f.sha){
-await ghDeleteFile(bn.img, f.sha,
-`حذف بانر: ` + bn.img);
-toast(`✔ حُذف الملف من GitHub`, `success`);
-}else{
-toast(`الملف غير موجود بالمستودع أصلاً`, `info`);
-}
+toast(`جارٍ حذف الصورة من السحابة...`, `info`);
+await imgDelete(bn.img);
+toast(`✔ حُذفت الصورة من السحابة`, `success`);
 }catch(err){
-toast(`⚠️ تعذر حذف الملف: ` + err.message, `warn`);
+toast(`⚠️ تعذر حذف الصورة: ` + err.message, `warn`);
 }
 }
 renderBannersAdmin();
@@ -1358,7 +1246,7 @@ box.innerHTML = list.map(function(b, i){
 var bq = (b.v ? `?v=` + b.v : ``) + (b.v ? `&r=` : `?r=`) + bnAdmStamp;
 return `<div class="bn-adm">` +
 `<div class="img-prev"><img src="` +
-esc(b.img) + bq + `" onerror="retryAdminBn(this)"></div>` +
+IMG_BASE + esc(b.img) + bq + `" onerror="retryAdminBn(this)"></div>` +
 `<div class="bn-adm-act">` +
 `<button class="bn-up" data-bnup="` + i + `">↑</button>` +
 `<button class="bn-dn" data-bndn="` + i + `">↓</button>` +
@@ -1399,25 +1287,6 @@ wrap.innerHTML = ``;
 }
 }
 }
-async function uploadBannerImg(path, file){
-var cur = await getFile(path).catch(function(){
-return { sha:null };
-});
-var body = {
-message:`رفع بانر: ` + path,
-content: await b64OfFile(file),
-branch: CFG.branch
-};
-if(cur.sha) body.sha = cur.sha;
-var q = `/repos/` + CFG.owner + `/` + CFG.repo +
-`/contents/` + path;
-await gh(q, {
-method:`PUT`,
-headers:{ [`Content-Type`]:`application/json` },
-body: JSON.stringify(body)
-});
-return path;
-}
 async function publishV15(){
 var btn = el(`bnPublishBtn`);
 var old = btn.textContent;
@@ -1425,7 +1294,7 @@ btn.disabled = true;
 btn.textContent = `...`;
 try{
 await publishSettings(`🖼️ تحديث السلايدر ورسوم التوصيل`);
-toast(`✔ تم النشر — سيظهر بالتطبيق خلال دقيقة`,
+toast(`✔ تم النشر — سيظهر بالتطبيق خلال ثوانٍ`,
 `success`);
 }catch(e){
 handlePublishError(e, btn, old);
@@ -1434,7 +1303,8 @@ return;
 btn.disabled = false;
 btn.textContent = old;
 }
-/* ===== تنظيف الصور اليتيمة ===== */
+
+/* ===== تنظيف الصور اليتيمة (من السحابة) ===== */
 async function cleanOrphanBanners(){
 if(!STATE || !CFG){
 toast(`سجّل الدخول أولاً`, `error`);
@@ -1454,13 +1324,13 @@ var orphans = files.filter(function(f){
 return !used[f.path];
 });
 if(!orphans.length){
-toast(`✔ لا توجد صور يتيمة — المستودع نظيف`, `success`);
+toast(`✔ لا توجد صور يتيمة — التخزين نظيف`, `success`);
 btn.disabled = false;
 btn.textContent = old;
 return;
 }
 var list = orphans.map(function(f){ return `• ${f.name}`; }).join(`\n`);
-var msg = `يوجد ${orphans.length} صورة يتيمة في المستودع:\n\n${list}\n\nهل تريد حذفها نهائياً من GitHub؟`;
+var msg = `يوجد ${orphans.length} صورة يتيمة في التخزين السحابي:\n\n${list}\n\nهل تريد حذفها نهائياً؟`;
 var ok = await askConfirm(msg, `تنظيف اليتيمة`, `🧹`, `حذف الكل`, true);
 if(!ok){
 btn.disabled = false;
@@ -1471,11 +1341,7 @@ var successCount = 0;
 var failCount = 0;
 for(var i=0; i<orphans.length; i++){
 try{
-await ghDeleteFile(
-orphans[i].path,
-orphans[i].sha,
-`تنظيف صورة بانر يتيمة: ` + orphans[i].name
-);
+await imgDelete(orphans[i].path);
 successCount++;
 toast(`✔ ${orphans[i].name}`, `success`);
 }catch(err){
@@ -1493,6 +1359,57 @@ toast(`⚠️ فشل التنظيف: ` + err.message, `error`);
 btn.disabled = false;
 btn.textContent = old;
 }
+
+/* ===== v6.0: نقل صور المستودع إلى السحابة (مرة واحدة) ===== */
+async function migrateRepoImagesToCloud(){
+if(!STATE || !CFG){ toast(`سجّل الدخول أولاً`, `error`); return; }
+var btn = el(`imgMigBtn`);
+var old = btn ? btn.textContent : ``;
+var ok = await askConfirm(
+`سيتم نسخ كل صور التطبيق والأصناف والبانرات من المستودع إلى التخزين السحابي.\nالصور الموجودة سحابياً تُتخطّى. العملية آمنة وقابلة للتكرار.`,
+`نقل الصور إلى السحابة`, `☁️`, `ابدأ النقل`);
+if(!ok) return;
+if(btn){ btn.disabled = true; btn.textContent = `... جاري النقل ...`; }
+try{
+var paths = [];
+function add(p){ if(p && paths.indexOf(p) < 0) paths.push(p); }
+[`img/logo.png`,`img/bg.png`,`img/welcome.png`,`img/closed.png`,
+ `img/icon-192.png`,`img/icon-512.png`,`img/missing.png`].forEach(add);
+(STATE.SETTINGS.banners || []).forEach(function(b){ add(b && b.img); });
+(STATE.SETTINGS.delivery || []).forEach(function(d){ add(d && d.img); });
+(STATE.MENU || []).forEach(function(s){
+(s.items || []).forEach(function(it){
+if(it.imgv) add(`img/items/` + it.id + `.png`);
+});
+});
+var existing = {};
+try{
+var cloudFiles = await imgList(`img/`);
+cloudFiles.forEach(function(f){ existing[f.path] = true; });
+}catch(e){}
+var done = 0, skipped = 0, failed = 0;
+for(var i=0;i<paths.length;i++){
+var p = paths[i];
+if(existing[p]){ skipped++; continue; }
+try{
+var r = await fetch(RAW_BASE + p + `?mig=` + Date.now(), { cache:`no-store` });
+if(!r.ok){ failed++; continue; }
+var blob = await r.blob();
+await imgPut(p, await b64OfFile(blob));
+done++;
+if(done % 5 === 0) toast(`☁️ تم نقل ${done} صورة...`, `info`);
+}catch(e){ failed++; }
+}
+bumpImagesVersion();
+toast(`انتهى النقل: ${done} نُقلت، ${skipped} موجودة، ${failed} تعذّرت`,
+done > 0 ? `success` : `warn`,
+failed ? `اضغط «حفظ ونشر الإعدادات» لتثبيت imagesVersion` : `اضغط «حفظ ونشر الإعدادات»`);
+}catch(err){
+toast(`⚠️ فشل النقل: ` + err.message, `error`);
+}
+if(btn){ btn.disabled = false; btn.textContent = old; }
+}
+
 /* لفّ loadAll لتشغيل هجرات وواجهة v15 بعد كل تحميل */
 var _loadAllOrig = loadAll;
 loadAll = async function(){
@@ -1500,6 +1417,8 @@ var r = await _loadAllOrig();
 migrateBanners();
 ensureV15Cards();
 renderBannersAdmin();
+LAST_MENU = JSON.parse(JSON.stringify(STATE.MENU));
+LAST_SETTINGS = JSON.parse(JSON.stringify(STATE.SETTINGS));
 return r;
 };
-/* ===== END admin-core.js (v5.3) ===== */
+/* ===== END admin-core.js (v6.0) ===== */
