@@ -1,9 +1,11 @@
-/* ===== admin-core.js — النواة: دخول سحابي D1 + صور R2 + نوافذ (v6.0) =====
-   v6.0: الصور تُرفع/تُحذف من R2 عبر الووركر بصلاحيات JWT — لا توكن GitHub إطلاقاً
+/* ===== admin-core.js — النواة: دخول سحابي D1 + صور R2 + تخصيص الواجهة (v6.1) =====
+   v6.1: حذف زر «نقل صور المستودع إلى السحابة» (النقل صار ذاتياً في الووركر)
+         + إخفاء «إظهار الوصف / إظهار الأسعار» وفرضهما دائمين
+         + نقل «عنوان فوق الإضافات» إلى الإعدادات (عام لكل الأصناف)
+         + نقل «توفر خدمة التوصيل» أسفل بطاقة رسوم التوصيل
+   v6.0: الصور تُرفع/تُحذف من R2 عبر الووركر بصلاحيات JWT — لا توكن GitHub
          + حذف صورة الصنف المحذوف عند نشر المنيو
          + حذف صور البانرات المحذوفة عند نشر الإعدادات
-         + استبدال صورة التطبيق يمسح القديمة ويحدّث imagesVersion
-         + زر «نقل صور المستودع إلى السحابة» (مرة واحدة)
    v5.3: الدخول عبر API، وقراءة/حفظ menu.js و settings.js من D1
    v3.7: إصلاح معالج التبويبات
    v3.5: كسر كاش المتصفح/Service Worker
@@ -30,11 +32,10 @@ function(e){ e.preventDefault(); });
 
 /* ===== ثوابت الدخول والنشر ===== */
 const API_BASE = `https://makaronjy-api.makaronjy.workers.dev`;
-const IMG_BASE = API_BASE + `/api/img/`;           /* v6.0: صور R2 */
+const IMG_BASE = API_BASE + `/api/img/`;
 const GH_OWNER = `makaronjy`;
 const GH_REPO = `Makaronjy`;
 const GH_BRANCH = `main`;
-const RAW_BASE = `https://raw.githubusercontent.com/` + GH_OWNER + `/` + GH_REPO + `/` + GH_BRANCH + `/`;
 let CFG = null;
 let STATE = null;
 let modalOnSave = null;
@@ -418,7 +419,7 @@ throw e;
 return r.json();
 }
 
-/* ===== v6.0: طبقة الصور عبر R2 (بدون GitHub / بدون توكن صور) ===== */
+/* ===== طبقة الصور عبر R2 (بدون GitHub / بدون توكن صور) ===== */
 async function imgPut(path, base64){
 return apiFetch(`/api/img/` + path, {
 method:`PUT`,
@@ -429,7 +430,7 @@ async function imgDelete(path){
 if(!path) return;
 try{
 await apiFetch(`/api/img/` + path, { method:`DELETE` });
-}catch(e){ /* الحذف幂等 — نتجاهل غير الموجود */ }
+}catch(e){ /* الحذف متسامح — نتجاهل غير الموجود */ }
 }
 async function imgList(prefix){
 var j = await apiFetch(`/api/img?prefix=` + encodeURIComponent(prefix || ``));
@@ -439,6 +440,13 @@ function bumpImagesVersion(){
 if(STATE && STATE.SETTINGS){
 STATE.SETTINGS.imagesVersion = Date.now();
 }
+}
+function b64ToUtf8(b64){
+var bin = atob(b64);
+var bytes = new Uint8Array(bin.length);
+for(var i=0;i<bin.length;i++){ bytes[i] = bin.charCodeAt(i); }
+if(window.TextDecoder){ return new TextDecoder(`utf-8`).decode(bytes); }
+return decodeURIComponent(escape(bin));
 }
 function b64OfFile(file){
 return file.arrayBuffer().then(function(buf){
@@ -641,6 +649,22 @@ publishableKey: ``
 };
 }
 }
+/* v6.1: عنوان الإضافات العام + فرض الوصف والسعرات */
+function migrateModsTitles(){
+var s = STATE.SETTINGS;
+if(!s.modsTitles || typeof s.modsTitles !== `object`){
+s.modsTitles = { ar:`غالبًا ما يتم طلبه مع`, en:`Often ordered with` };
+}
+if(typeof s.modsTitles.ar !== `string`) s.modsTitles.ar = ``;
+if(typeof s.modsTitles.en !== `string`) s.modsTitles.en = ``;
+}
+function forceDisplayFlags(){
+if(!STATE || !STATE.SETTINGS) return;
+var d = STATE.SETTINGS.display = STATE.SETTINGS.display || {};
+d.showDesc = true;
+d.showCal = true;
+if(d.mode !== `list` && d.mode !== `grid`) d.mode = `grid`;
+}
 
 /* ===== أدوات الوقت ===== */
 function clamp12(v){
@@ -793,6 +817,8 @@ migrateHours();
 migrateBestSellers();
 migrateSocial();
 migratePayments();
+migrateModsTitles();
+forceDisplayFlags();
 el(`renewScreen`).classList.add(`hidden`);
 el(`loginScreen`).classList.add(`hidden`);
 el(`app`).classList.remove(`hidden`);
@@ -967,11 +993,12 @@ var hit = m.match(/[0-9a-f]{40}/);
 return hit ? hit[0] : null;
 }
 
-/* ===== v6.0: النشر إلى D1 + حذف الصور القديمة تلقائياً ===== */
+/* ===== النشر إلى D1 + حذف الصور القديمة تلقائياً ===== */
 var LAST_MENU = null;
 var LAST_SETTINGS = null;
 
 async function publishSettings(msg){
+forceDisplayFlags();
 var prevBanners = (LAST_SETTINGS && Array.isArray(LAST_SETTINGS.banners))
 ? LAST_SETTINGS.banners.map(function(b){ return b && b.img; }).filter(Boolean) : [];
 var nowBanners = (STATE.SETTINGS.banners || [])
@@ -990,14 +1017,8 @@ LAST_SETTINGS = JSON.parse(JSON.stringify(STATE.SETTINGS));
 }
 
 async function publishMenu(msg){
-function ids(m){
-var out = [];
-(m || []).forEach(function(s){
-(s.items || []).forEach(function(it){ out.push(it.id); });
-});
-return out;
-}
-var prev = ids(LAST_MENU), now = ids(STATE.MENU);
+applyGlobalModsTitles();
+var prev = menuItemIds(LAST_MENU), now = menuItemIds(STATE.MENU);
 for(var i=0;i<prev.length;i++){
 if(now.indexOf(prev[i]) < 0){
 await imgDelete(`img/items/` + prev[i] + `.png`);
@@ -1009,6 +1030,26 @@ body: JSON.stringify({ menu: STATE.MENU })
 });
 STATE.shas.menu = null;
 LAST_MENU = JSON.parse(JSON.stringify(STATE.MENU));
+}
+function menuItemIds(m){
+var out = [];
+(m || []).forEach(function(s){
+(s.items || []).forEach(function(it){ out.push(it.id); });
+});
+return out;
+}
+/* v6.1: حقن عنوان الإضافات العام في كل الأصناف */
+function applyGlobalModsTitles(){
+if(!STATE || !STATE.MENU || !STATE.SETTINGS) return;
+var t = STATE.SETTINGS.modsTitles || { ar:``, en:`` };
+STATE.MENU.forEach(function(s){
+(s.items || []).forEach(function(it){
+if(it.mods && !Array.isArray(it.mods)){
+it.mods.tAr = t.ar || ``;
+it.mods.tEn = t.en || ``;
+}
+});
+});
 }
 
 /* =====================================================
@@ -1057,13 +1098,14 @@ st.textContent =
 `.v15-add{border:none;border-radius:12px;padding:.7rem 1.2rem;background:linear-gradient(135deg,var(--gold),var(--gold2));color:var(--dark);font-weight:900;cursor:pointer;font-family:inherit}` +
 `.v15-pub{border:none;border-radius:12px;padding:.7rem 1.2rem;background:var(--wa);color:#fff;font-weight:900;cursor:pointer;font-family:inherit}` +
 `.v15-clean{border:none;border-radius:12px;padding:.7rem 1.2rem;background:#fff6e6;color:#a06b1c;border:1.5px dashed #e0912f;font-weight:900;cursor:pointer;font-family:inherit}` +
-`.v15-mig{border:none;border-radius:12px;padding:.7rem 1.2rem;background:#eef4ff;color:#1d4ed8;border:1.5px dashed #93b4f5;font-weight:900;cursor:pointer;font-family:inherit}` +
 `.v15-fee{width:110px;border:1.5px solid var(--line);border-radius:10px;padding:.55rem .6rem;font-family:inherit;font-weight:900;font-size:1rem;text-align:center}` +
 `.v15-sel{width:110px;border:1.5px solid var(--line);border-radius:10px;padding:.55rem .6rem;font-family:inherit;font-weight:800;background:#fff;color:var(--ink)}` +
 `.v15-bfees{display:flex;flex-direction:column;gap:.5rem;margin-top:.7rem}` +
 `.v15-bfee-row{display:flex;align-items:center;gap:.6rem;background:#fff;border:1.5px solid var(--line);border-radius:10px;padding:.45rem .6rem}` +
 `.v15-bfee-row span{flex:1;font-weight:800;font-size:.85rem;color:var(--ink)}` +
 `.v15-bfee-row small{color:var(--muted);font-weight:700}` +
+`.v15-inp{width:100%;padding:.6rem .7rem;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-weight:800;font-size:.9rem;background:#fff;color:var(--ink);outline:none}` +
+`.v15-inp:focus{border-color:var(--rust)}` +
 `.v15-empty{color:var(--muted);font-weight:700;font-size:.8rem;padding:.6rem;border:1.5px dashed var(--line);border-radius:10px;text-align:center}`;
 document.head.appendChild(st);
 }
@@ -1099,7 +1141,6 @@ card.innerHTML =
 `<button class="v15-add" id="bnAddBtn">➕ إضافة بانر / Add</button>` +
 `<button class="v15-pub" id="bnPublishBtn">🚀 نشر / Publish</button>` +
 `<button class="v15-clean" id="bnCleanBtn">🧹 تنظيف اليتيمة / Clean orphans</button>` +
-`<button class="v15-mig" id="imgMigBtn">☁️ نقل صور المستودع إلى السحابة (مرة واحدة)</button>` +
 `<input type="file" id="bnFile" accept="image/*" hidden>` +
 `</div>`;
 host.insertBefore(card, host.firstChild);
@@ -1148,7 +1189,6 @@ toast(`فشل الرفع: ` + err.message, `error`);
 });
 el(`bnPublishBtn`).addEventListener(`click`, publishV15);
 el(`bnCleanBtn`).addEventListener(`click`, cleanOrphanBanners);
-el(`imgMigBtn`).addEventListener(`click`, migrateRepoImagesToCloud);
 el(`feePublishBtn`).addEventListener(`click`, publishV15);
 el(`v15FeeMode`).addEventListener(`change`, function(e){
 STATE.SETTINGS.deliveryFeeMode = e.target.value;
@@ -1360,55 +1400,160 @@ btn.disabled = false;
 btn.textContent = old;
 }
 
-/* ===== v6.0: نقل صور المستودع إلى السحابة (مرة واحدة) ===== */
-async function migrateRepoImagesToCloud(){
-if(!STATE || !CFG){ toast(`سجّل الدخول أولاً`, `error`); return; }
-var btn = el(`imgMigBtn`);
-var old = btn ? btn.textContent : ``;
-var ok = await askConfirm(
-`سيتم نسخ كل صور التطبيق والأصناف والبانرات من المستودع إلى التخزين السحابي.\nالصور الموجودة سحابياً تُتخطّى. العملية آمنة وقابلة للتكرار.`,
-`نقل الصور إلى السحابة`, `☁️`, `ابدأ النقل`);
-if(!ok) return;
-if(btn){ btn.disabled = true; btn.textContent = `... جاري النقل ...`; }
-try{
-var paths = [];
-function add(p){ if(p && paths.indexOf(p) < 0) paths.push(p); }
-[`img/logo.png`,`img/bg.png`,`img/welcome.png`,`img/closed.png`,
- `img/icon-192.png`,`img/icon-512.png`,`img/missing.png`].forEach(add);
-(STATE.SETTINGS.banners || []).forEach(function(b){ add(b && b.img); });
-(STATE.SETTINGS.delivery || []).forEach(function(d){ add(d && d.img); });
-(STATE.MENU || []).forEach(function(s){
-(s.items || []).forEach(function(it){
-if(it.imgv) add(`img/items/` + it.id + `.png`);
+/* =====================================================
+   ===== v6.1: تخصيصات واجهة اللوحة =====
+   • إخفاء «إظهار الوصف / إظهار الأسعار» وفرضهما دائمين
+   • عنوان الإضافات عام في الإعدادات بدل نافذة كل صنف
+   • نقل «توفر خدمة التوصيل» أسفل بطاقة رسوم التوصيل
+===================================================== */
+function uiTxt(n){
+return (n && n.textContent || ``).trim();
+}
+function uiSettingsSection(){
+return adminSection([/settings?|إعداد|ضبط/i]);
+}
+/* 1) فرض الوصف + السعرات وإخفاء مفاتيحهما */
+function uiHideDisplayToggles(){
+var labels = document.querySelectorAll(`label`);
+for(var i=0;i<labels.length;i++){
+var l = labels[i];
+var t = uiTxt(l);
+if(t.indexOf(`إظهار الوصف`) >= 0 ||
+   t.indexOf(`إظهار الأسعار`) >= 0 ||
+   t.indexOf(`إظهار السعرات`) >= 0){
+var cb = l.querySelector(`input[type=checkbox]`);
+if(cb){ cb.checked = true; cb.disabled = true; }
+if(l.style.display !== `none`) l.style.display = `none`;
+var fs = l.closest(`fieldset`);
+if(fs && uiTxt(fs).indexOf(`عناصر البطاقة`) >= 0){
+if(fs.style.display !== `none`) fs.style.display = `none`;
+}
+}
+}
+}
+/* 2) إخفاء حقول عنوان الإضافات من نافذة الصنف */
+function uiHideModsTitleFields(){
+var labels = document.querySelectorAll(`label`);
+for(var i=0;i<labels.length;i++){
+var l = labels[i];
+if(uiTxt(l).indexOf(`عنوان فوق الإضافات`) >= 0){
+if(l.style.display !== `none`) l.style.display = `none`;
+var nx = l.nextElementSibling;
+if(nx && (nx.tagName === `INPUT` || nx.tagName === `TEXTAREA`)){
+if(nx.style.display !== `none`) nx.style.display = `none`;
+}
+}
+}
+}
+/* 3) بطاقة عنوان الإضافات العام داخل الإعدادات */
+function uiEnsureModsTitlesCard(){
+var sec = uiSettingsSection();
+if(!sec || !STATE || !STATE.SETTINGS) return;
+var fee = el(`v15FeeCard`);
+var anchor = (fee && fee.parentNode === sec) ? fee : null;
+var card = el(`modsTitlesCard`);
+if(!card){
+card = document.createElement(`div`);
+card.className = `v15-card`;
+card.id = `modsTitlesCard`;
+card.innerHTML =
+`<h3>🧩 عنوان قسم الإضافات (عام لكل الأصناف)</h3>` +
+`<div style="display:flex;flex-direction:column;gap:.55rem">` +
+`<input id="gmAr" class="v15-inp" type="text" placeholder="عنوان فوق الإضافات (عربي)">` +
+`<input id="gmEn" class="v15-inp" type="text" dir="ltr" placeholder="Title above add-ons (English)">` +
+`<button class="v15-pub" id="gmPub" style="align-self:flex-start">🚀 نشر العنوان لكل الأصناف</button>` +
+`</div>`;
+if(anchor) sec.insertBefore(card, anchor.nextSibling);
+else sec.insertBefore(card, sec.firstChild);
+var t = STATE.SETTINGS.modsTitles || { ar:``, en:`` };
+el(`gmAr`).value = t.ar || ``;
+el(`gmEn`).value = t.en || ``;
+el(`gmAr`).addEventListener(`input`, function(){
+STATE.SETTINGS.modsTitles = STATE.SETTINGS.modsTitles || { ar:``, en:`` };
+STATE.SETTINGS.modsTitles.ar = this.value;
 });
+el(`gmEn`).addEventListener(`input`, function(){
+STATE.SETTINGS.modsTitles = STATE.SETTINGS.modsTitles || { ar:``, en:`` };
+STATE.SETTINGS.modsTitles.en = this.value;
 });
-var existing = {};
+el(`gmPub`).addEventListener(`click`, async function(){
+var b = this, old = b.textContent;
+b.disabled = true; b.textContent = `...`;
 try{
-var cloudFiles = await imgList(`img/`);
-cloudFiles.forEach(function(f){ existing[f.path] = true; });
+STATE.SETTINGS.modsTitles = {
+ar: (el(`gmAr`).value || ``).trim(),
+en: (el(`gmEn`).value || ``).trim()
+};
+applyGlobalModsTitles();
+await publishMenu(`تحديث عنوان الإضافات`);
+await publishSettings(`تحديث عنوان الإضافات`);
+toast(`✔ نُشر العنوان لكل الأصناف`, `success`);
+}catch(e){
+handlePublishError(e, b, old);
+return;
+}
+b.disabled = false; b.textContent = old;
+});
+return;
+}
+/* إعادة التموضع إن أُعيد رسم القسم */
+if(anchor && card.previousElementSibling !== anchor &&
+   card.parentNode === sec){
+sec.insertBefore(card, anchor.nextSibling);
+}
+}
+/* 4) نقل بطاقة توفر التوصيل أسفل بطاقة الرسوم */
+function uiMoveDeliveryCard(){
+var sec = uiSettingsSection();
+var fee = el(`v15FeeCard`);
+if(!sec || !fee || fee.parentNode !== sec) return;
+var heads = sec.querySelectorAll(`legend, h3, h4, b, strong`);
+var target = null;
+for(var i=0;i<heads.length;i++){
+if(uiTxt(heads[i]).indexOf(`توفر خدمة التوصيل`) >= 0){
+target = heads[i].closest(`fieldset`) ||
+         heads[i].closest(`.v15-card`) ||
+         heads[i].parentElement;
+break;
+}
+}
+if(!target || target === fee) return;
+if(target.parentNode !== sec) return;
+var anchor = el(`modsTitlesCard`) || fee;
+if(anchor.parentNode !== sec) anchor = fee;
+if(target.previousElementSibling !== anchor){
+sec.insertBefore(target, anchor.nextSibling);
+}
+}
+/* تطبيق شامل */
+function uiApplyAll(){
+try{ forceDisplayFlags(); }catch(e){}
+try{ uiHideDisplayToggles(); }catch(e){}
+try{ uiHideModsTitleFields(); }catch(e){}
+try{ uiEnsureModsTitlesCard(); }catch(e){}
+try{ uiMoveDeliveryCard(); }catch(e){}
+}
+var uiBusy = false;
+function uiSchedule(){
+if(uiBusy) return;
+uiBusy = true;
+setTimeout(function(){
+uiBusy = false;
+uiApplyAll();
+}, 60);
+}
+try{
+var uiObserver = new MutationObserver(function(){ uiSchedule(); });
+uiObserver.observe(document.body, { childList:true, subtree:true });
 }catch(e){}
-var done = 0, skipped = 0, failed = 0;
-for(var i=0;i<paths.length;i++){
-var p = paths[i];
-if(existing[p]){ skipped++; continue; }
-try{
-var r = await fetch(RAW_BASE + p + `?mig=` + Date.now(), { cache:`no-store` });
-if(!r.ok){ failed++; continue; }
-var blob = await r.blob();
-await imgPut(p, await b64OfFile(blob));
-done++;
-if(done % 5 === 0) toast(`☁️ تم نقل ${done} صورة...`, `info`);
-}catch(e){ failed++; }
-}
-bumpImagesVersion();
-toast(`انتهى النقل: ${done} نُقلت، ${skipped} موجودة، ${failed} تعذّرت`,
-done > 0 ? `success` : `warn`,
-failed ? `اضغط «حفظ ونشر الإعدادات» لتثبيت imagesVersion` : `اضغط «حفظ ونشر الإعدادات»`);
-}catch(err){
-toast(`⚠️ فشل النقل: ` + err.message, `error`);
-}
-if(btn){ btn.disabled = false; btn.textContent = old; }
-}
+var uiTries = 0;
+var uiInterval = setInterval(function(){
+uiTries++;
+uiApplyAll();
+if(uiTries > 240) clearInterval(uiInterval);
+}, 500);
+document.addEventListener(`DOMContentLoaded`, uiApplyAll);
+window.addEventListener(`load`, uiApplyAll);
 
 /* لفّ loadAll لتشغيل هجرات وواجهة v15 بعد كل تحميل */
 var _loadAllOrig = loadAll;
@@ -1419,6 +1564,7 @@ ensureV15Cards();
 renderBannersAdmin();
 LAST_MENU = JSON.parse(JSON.stringify(STATE.MENU));
 LAST_SETTINGS = JSON.parse(JSON.stringify(STATE.SETTINGS));
+uiApplyAll();
 return r;
 };
-/* ===== END admin-core.js (v6.0) ===== */
+/* ===== END admin-core.js (v6.1) ===== */
