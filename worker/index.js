@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════
 //  مكرونجي - Cloudflare Worker API (كامل)
-//  الإصدار: 2.3
+//  الإصدار: 2.4
+//  v2.4: مسار استعادة كلمة مرور المالك (GET + مفتاح) — يُحذف بعد الاستخدام
 //  v2.3: نظام صور R2 (رفع/حذف/عرض/سرد) بصلاحيات JWT — بدون GitHub
-//        + إزالة مساري /api/bootstrap و /api/fix-password (أمان)
 //  v2.2: جسر المالك يقبل التوكن السحابي JWT مباشرة
 //  v2.1: endpoints المنيو والإعدادات من D1 + نقل البيانات
 // ═══════════════════════════════════════════
@@ -243,37 +243,23 @@ async function requireAuth(request, env, allowedRoles) {
 }
 
 // ═══════════════════════════════════════════
-//  0) Bootstrap - إنشاء حساب المالك الأول
-//     (الدالة محفوظة للمرجع — المسار مُزال في v2.3)
+//  0) Bootstrap (مرجع — المسار مُزال)
 // ═══════════════════════════════════════════
 async function handleBootstrap(env) {
   try {
     const existing = await env.DB.prepare("SELECT id, username FROM users WHERE role = 'super_admin' LIMIT 1").first();
     if (existing) {
-      return json({ 
-        success: false, 
-        error: 'حساب المالك موجود بالفعل',
-        existing_username: existing.username
-      }, 409);
+      return json({ success: false, error: 'حساب المالك موجود بالفعل', existing_username: existing.username }, 409);
     }
-    
     const username = 'owner';
     const password = '123456';
     const salt = generateSalt();
     const hash = await hashPassword(password, salt);
-    
     await env.DB.prepare(`
       INSERT INTO users (name, phone, username, password_hash, password_salt, role, is_active, must_change_password)
       VALUES (?, ?, ?, ?, ?, ?, 1, 0)
     `).bind('مالك النظام', '966500000000', username, hash, salt, 'super_admin').run();
-    
-    return json({
-      success: true,
-      message: 'تم إنشاء حساب المالك بنجاح',
-      username: username,
-      password: password,
-      note: 'يمكنك الآن تسجيل الدخول باستخدام هذه البيانات'
-    }, 201);
+    return json({ success: true, message: 'تم إنشاء حساب المالك بنجاح', username, password }, 201);
   } catch (e) {
     console.error('Bootstrap error:', e);
     return json({ success: false, error: e.message }, 500);
@@ -281,35 +267,73 @@ async function handleBootstrap(env) {
 }
 
 // ═══════════════════════════════════════════
-//  0.5) إصلاح كلمة مرور المالك
-//       (الدالة محفوظة للمرجع — المسار مُزال في v2.3)
+//  0.5) إصلاح كلمة مرور المالك (مرجع)
 // ═══════════════════════════════════════════
 async function handleFixOwnerPassword(env) {
   try {
     const user = await env.DB.prepare("SELECT id FROM users WHERE username = 'owner' AND role = 'super_admin'").first();
-    if (!user) {
-      return json({ success: false, error: 'حساب المالك غير موجود' }, 404);
-    }
-    
+    if (!user) return json({ success: false, error: 'حساب المالك غير موجود' }, 404);
     const password = '123456';
     const salt = generateSalt();
     const hash = await hashPassword(password, salt);
-    
     await env.DB.prepare(`
-      UPDATE users SET password_hash = ?, password_salt = ?, must_change_password = 0
-      WHERE id = ?
+      UPDATE users SET password_hash = ?, password_salt = ?, must_change_password = 0 WHERE id = ?
     `).bind(hash, salt, user.id).run();
-    
-    return json({
-      success: true,
-      message: 'تم تحديث كلمة المرور بنجاح',
-      username: 'owner',
-      password: '123456',
-      note: 'يمكنك الآن تسجيل الدخول'
-    });
+    return json({ success: true, message: 'تم تحديث كلمة المرور بنجاح', username: 'owner', password: '123456' });
   } catch (e) {
     console.error('Fix password error:', e);
     return json({ success: false, error: e.message }, 500);
+  }
+}
+
+// ═══════════════════════════════════════════
+//  0.55) ⚠️ استعادة كلمة مرور المالك (v2.4 — مؤقت)
+//  GET /api/recover-owner?key=...&new=...
+//  بدون new → تعود إلى 123456
+//  مع new   → تُضبط على الكلمة الجديدة (8+ أحرف، كبير وصغير ورقم)
+//  🔴 احذف سطر المسار من Router فوراً بعد الاستخدام
+// ═══════════════════════════════════════════
+async function handleRecoverOwner(request, env) {
+  const url = new URL(request.url);
+  const key = url.searchParams.get('key') || '';
+  if (key !== 'MkRecover-7391-Xz') return error('مفتاح غير صحيح', 403);
+
+  const ip = getIP(request);
+  const rate = await checkRateLimit(env, `recover:${ip}`, 5, 900);
+  if (!rate.allowed) return error('محاولات كثيرة، حاول بعد 15 دقيقة', 429);
+
+  try {
+    const user = await env.DB.prepare(
+      "SELECT id, username FROM users WHERE role = 'super_admin' ORDER BY id LIMIT 1"
+    ).first();
+    if (!user) return error('حساب المالك غير موجود في قاعدة البيانات', 404);
+
+    let newPass = url.searchParams.get('new') || '123456';
+    const usingCustom = !!url.searchParams.get('new');
+    if (usingCustom) {
+      if (newPass.length < 8) return error('كلمة المرور 8 أحرف على الأقل', 400);
+      if (!/[A-Z]/.test(newPass) || !/[a-z]/.test(newPass) || !/[0-9]/.test(newPass)) {
+        return error('يجب أن تحتوي حرف كبير وصغير ورقم', 400);
+      }
+    }
+
+    const salt = generateSalt();
+    const hash = await hashPassword(newPass, salt);
+    await env.DB.prepare(`
+      UPDATE users SET password_hash = ?, password_salt = ?, must_change_password = 0,
+      is_active = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+    `).bind(hash, salt, user.id).run();
+
+    return json({
+      success: true,
+      message: 'تم تعيين كلمة المرور بنجاح',
+      username: user.username,
+      password: newPass,
+      next: 'سجّل الدخول الآن، ثم احذف سطر مسار /api/recover-owner من worker/index.js فوراً'
+    });
+  } catch (e) {
+    console.error('Recover error:', e);
+    return error('فشل الاستعادة: ' + e.message, 500);
   }
 }
 
@@ -319,9 +343,7 @@ async function handleFixOwnerPassword(env) {
 async function handleGetMenu(env) {
   try {
     const data = await env.DB.prepare('SELECT menu_json FROM app_data WHERE id = 1').first();
-    if (!data) {
-      return json({ menu: [] });
-    }
+    if (!data) return json({ menu: [] });
     return json({ menu: JSON.parse(data.menu_json) });
   } catch (e) {
     console.error('Get menu error:', e);
@@ -335,17 +357,12 @@ async function handleGetMenu(env) {
 async function handleSaveMenu(request, env) {
   const auth = await requireAuth(request, env, ['super_admin']);
   if (auth.error) return auth.error;
-  
   try {
     const body = await request.json();
-    if (!body.menu || !Array.isArray(body.menu)) {
-      return error('بيانات المنيو غير صالحة', 400);
-    }
-    
+    if (!body.menu || !Array.isArray(body.menu)) return error('بيانات المنيو غير صالحة', 400);
     await env.DB.prepare(`
       UPDATE app_data SET menu_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1
     `).bind(JSON.stringify(body.menu)).run();
-    
     return json({ success: true, message: 'تم حفظ المنيو بنجاح' });
   } catch (e) {
     console.error('Save menu error:', e);
@@ -359,9 +376,7 @@ async function handleSaveMenu(request, env) {
 async function handleGetSettings(env) {
   try {
     const data = await env.DB.prepare('SELECT settings_json FROM app_data WHERE id = 1').first();
-    if (!data) {
-      return json({ settings: {} });
-    }
+    if (!data) return json({ settings: {} });
     return json({ settings: JSON.parse(data.settings_json) });
   } catch (e) {
     console.error('Get settings error:', e);
@@ -375,17 +390,12 @@ async function handleGetSettings(env) {
 async function handleSaveSettings(request, env) {
   const auth = await requireAuth(request, env, ['super_admin']);
   if (auth.error) return auth.error;
-  
   try {
     const body = await request.json();
-    if (!body.settings || typeof body.settings !== 'object') {
-      return error('بيانات الإعدادات غير صالحة', 400);
-    }
-    
+    if (!body.settings || typeof body.settings !== 'object') return error('بيانات الإعدادات غير صالحة', 400);
     await env.DB.prepare(`
       UPDATE app_data SET settings_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1
     `).bind(JSON.stringify(body.settings)).run();
-    
     return json({ success: true, message: 'تم حفظ الإعدادات بنجاح' });
   } catch (e) {
     console.error('Save settings error:', e);
@@ -399,19 +409,14 @@ async function handleSaveSettings(request, env) {
 async function handleMigrateFromGithub(request, env) {
   const auth = await requireAuth(request, env, ['super_admin']);
   if (auth.error) return auth.error;
-  
   try {
     const body = await request.json();
-    if (!body.menu || !body.settings) {
-      return error('بيانات النقل غير صالحة', 400);
-    }
-    
+    if (!body.menu || !body.settings) return error('بيانات النقل غير صالحة', 400);
     await env.DB.prepare(`
       UPDATE app_data SET menu_json = ?, settings_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1
     `).bind(JSON.stringify(body.menu), JSON.stringify(body.settings)).run();
-    
-    return json({ 
-      success: true, 
+    return json({
+      success: true,
       message: 'تم نقل البيانات من GitHub إلى D1 بنجاح',
       menu_items: body.menu.length || 0,
       settings_keys: Object.keys(body.settings).length || 0
@@ -464,7 +469,7 @@ async function handleLogin(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  2) جسر المالك (v2.2: يقبل التوكن السحابي JWT مباشرة)
+//  2) جسر المالك (يقبل JWT مباشرة)
 // ═══════════════════════════════════════════
 async function handleAdminBridge(request, env) {
   const ip = getIP(request);
@@ -473,7 +478,6 @@ async function handleAdminBridge(request, env) {
   const body = await request.json().catch(() => null);
   if (!body || !body.github_token) return error('التوكن مطلوب');
 
-  /* v2.2: توكن سحابي صالح (JWT) لمالك النظام → قبول مباشر بدون GitHub */
   const jwtPayload = await verifyJWT(body.github_token, env.JWT_SECRET);
   if (jwtPayload && jwtPayload.role === 'super_admin') {
     const ownerUser = await env.DB.prepare(
@@ -483,17 +487,11 @@ async function handleAdminBridge(request, env) {
       return json({
         success: true,
         token: body.github_token,
-        user: {
-          id: ownerUser.id,
-          name: ownerUser.name,
-          username: ownerUser.username,
-          role: 'super_admin'
-        }
+        user: { id: ownerUser.id, name: ownerUser.name, username: ownerUser.username, role: 'super_admin' }
       });
     }
   }
 
-  /* الاحتياط الأصلي: التحقق عبر GitHub */
   const ghHeaders = {
     'Authorization': `Bearer ${body.github_token}`,
     'Accept': 'application/vnd.github+json',
@@ -1177,11 +1175,7 @@ async function handleReportsAccounting(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  20) صور R2 (v2.3) — بدون GitHub
-//      GET  /api/img/<key>        عام (عرض الصورة)
-//      PUT  /api/img/<key>        مالك فقط (رفع/استبدال)
-//      DELETE /api/img/<key>      مالك فقط (حذف)
-//      GET  /api/img?prefix=...   مالك فقط (سرد)
+//  20) صور R2 — بدون GitHub
 // ═══════════════════════════════════════════
 function imgCt(key) {
   if (/\.png$/i.test(key)) return 'image/png';
@@ -1243,7 +1237,12 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
     try {
-      if (path === '/api/health' && request.method === 'GET') return json({ status: 'ok', version: '2.3', live_mode: env.LIVE_MODE || 'polling' });
+      if (path === '/api/health' && request.method === 'GET') return json({ status: 'ok', version: '2.4', live_mode: env.LIVE_MODE || 'polling' });
+
+      /* 🔴🔴 سطر الاستعادة المؤقت — احذفه فوراً بعد نجاح الاستعادة 🔴🔴 */
+      if (path === '/api/recover-owner' && request.method === 'GET') return await handleRecoverOwner(request, env);
+      /* 🔴🔴 نهاية السطر المؤقت 🔴🔴 */
+
       if (path === '/api/data/menu' && request.method === 'GET') return await handleGetMenu(env);
       if (path === '/api/data/menu' && request.method === 'PUT') return await handleSaveMenu(request, env);
       if (path === '/api/data/settings' && request.method === 'GET') return await handleGetSettings(env);
@@ -1278,7 +1277,6 @@ export default {
       if (m && request.method === 'PUT') return await handleAdminUsersUpdate(parseInt(m[1]), request, env);
       if (path === '/api/reports/summary' && request.method === 'GET') return await handleReportsSummary(request, env);
       if (path === '/api/reports/accounting' && request.method === 'GET') return await handleReportsAccounting(request, env);
-      /* ===== v2.3: صور R2 ===== */
       if (path === '/api/img' && request.method === 'GET') return await handleImgList(request, env);
       if (path.startsWith('/api/img/')) {
         const key = decodeURIComponent(path.slice('/api/img/'.length));
@@ -1354,5 +1352,5 @@ export default {
 };
 
 // ═══════════════════════════════════════════
-//  نهاية worker/index.js (v2.3)
+//  نهاية worker/index.js (v2.4)
 // ═══════════════════════════════════════════
