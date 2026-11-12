@@ -1,8 +1,11 @@
 // ═══════════════════════════════════════════
 //  مكرونجي - Cloudflare Worker API (كامل)
-//  الإصدار: 2.4
-//  v2.4: مسار استعادة كلمة مرور المالك (GET + مفتاح) — يُحذف بعد الاستخدام
-//  v2.3: نظام صور R2 (رفع/حذف/عرض/سرد) بصلاحيات JWT — بدون GitHub
+//  الإصدار: 2.5
+//  v2.5: عرض الصور بخاصية Read-Through — إن لم توجد في R2
+//        تُجلب من المستودع العام وتُخزَّن في R2 تلقائياً (نقل ذاتي)
+//        + استعادة كلمة المرور محمية بمتغير سري RECOVERY_KEY (لا مفتاح مكشوف)
+//  v2.4: مسار استعادة كلمة مرور المالك
+//  v2.3: نظام صور R2 (رفع/حذف/عرض/سرد) بصلاحيات JWT
 //  v2.2: جسر المالك يقبل التوكن السحابي JWT مباشرة
 //  v2.1: endpoints المنيو والإعدادات من D1 + نقل البيانات
 // ═══════════════════════════════════════════
@@ -13,6 +16,9 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Access-Control-Max-Age': '86400',
 };
+
+/* v2.5: مصدر الصور الاحتياطي (المستودع عام) */
+const RAW_BASE = 'https://raw.githubusercontent.com/makaronjy/Makaronjy/main/';
 
 const STATUS_TEXT = {
   pending: 'بانتظار القبول',
@@ -287,16 +293,16 @@ async function handleFixOwnerPassword(env) {
 }
 
 // ═══════════════════════════════════════════
-//  0.55) ⚠️ استعادة كلمة مرور المالك (v2.4 — مؤقت)
-//  GET /api/recover-owner?key=...&new=...
-//  بدون new → تعود إلى 123456
-//  مع new   → تُضبط على الكلمة الجديدة (8+ أحرف، كبير وصغير ورقم)
-//  🔴 احذف سطر المسار من Router فوراً بعد الاستخدام
+//  0.55) استعادة كلمة مرور المالك (v2.5 — محمية بمتغير سري)
+//  GET /api/recover-owner?key=<RECOVERY_KEY>&new=<كلمة جديدة>
+//  المفتاح يُضبط في Cloudflare → Settings → Variables and Secrets
+//  باسم RECOVERY_KEY (غير موجود في الكود ولا في المستودع)
 // ═══════════════════════════════════════════
 async function handleRecoverOwner(request, env) {
+  if (!env.RECOVERY_KEY) return error('الاستعادة غير مفعّلة — أضف متغير RECOVERY_KEY في إعدادات الووركر', 403);
   const url = new URL(request.url);
   const key = url.searchParams.get('key') || '';
-  if (key !== 'MkRecover-7391-Xz') return error('مفتاح غير صحيح', 403);
+  if (key !== env.RECOVERY_KEY) return error('مفتاح غير صحيح', 403);
 
   const ip = getIP(request);
   const rate = await checkRateLimit(env, `recover:${ip}`, 5, 900);
@@ -328,8 +334,7 @@ async function handleRecoverOwner(request, env) {
       success: true,
       message: 'تم تعيين كلمة المرور بنجاح',
       username: user.username,
-      password: newPass,
-      next: 'سجّل الدخول الآن، ثم احذف سطر مسار /api/recover-owner من worker/index.js فوراً'
+      password: newPass
     });
   } catch (e) {
     console.error('Recover error:', e);
@@ -1175,7 +1180,7 @@ async function handleReportsAccounting(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  20) صور R2 — بدون GitHub
+//  20) صور R2 + Read-Through من المستودع (v2.5)
 // ═══════════════════════════════════════════
 function imgCt(key) {
   if (/\.png$/i.test(key)) return 'image/png';
@@ -1183,22 +1188,58 @@ function imgCt(key) {
   if (/\.webp$/i.test(key)) return 'image/webp';
   if (/\.svg$/i.test(key)) return 'image/svg+xml';
   if (/\.gif$/i.test(key)) return 'image/gif';
+  if (/\.ico$/i.test(key)) return 'image/x-icon';
   return 'application/octet-stream';
 }
+
+/* v2.5: إن لم توجد الصورة في R2 → تُجلب من المستودع وتُخزَّن تلقائياً */
 async function handleImgServe(key, env) {
-  const obj = await env.IMAGES.get(key);
-  if (!obj) return error('الصورة غير موجودة', 404);
-  return new Response(obj.body, {
-    headers: {
-      'Content-Type': imgCt(key),
-      'Cache-Control': 'public, max-age=31536000, immutable',
-      ...CORS_HEADERS
+  if (!key || key.indexOf('..') >= 0) return error('مفتاح صورة غير صالح', 400);
+
+  /* 1) من R2 (السريع) */
+  try {
+    const obj = await env.IMAGES.get(key);
+    if (obj) {
+      return new Response(obj.body, {
+        headers: {
+          'Content-Type': imgCt(key),
+          'Cache-Control': 'public, max-age=31536000, immutable',
+          ...CORS_HEADERS
+        }
+      });
     }
-  });
+  } catch (e) { /* نتابع للاحتياطي */ }
+
+  /* 2) احتياطي: من المستودع العام + تخزينه في R2 للمرة القادمة */
+  if (key.indexOf('img/') === 0) {
+    try {
+      const safeUrl = RAW_BASE + key.split('/').map(encodeURIComponent).join('/');
+      const r = await fetch(safeUrl, { headers: { 'User-Agent': 'makaronjy-worker' } });
+      if (r.ok) {
+        const buf = await r.arrayBuffer();
+        if (buf && buf.byteLength > 0) {
+          try {
+            await env.IMAGES.put(key, buf, { httpMetadata: { contentType: imgCt(key) } });
+          } catch (e) { /* التخزين اختياري */ }
+          return new Response(buf, {
+            headers: {
+              'Content-Type': imgCt(key),
+              'Cache-Control': 'public, max-age=86400',
+              ...CORS_HEADERS
+            }
+          });
+        }
+      }
+    } catch (e) { /* نتابع للـ404 */ }
+  }
+
+  return error('الصورة غير موجودة', 404);
 }
+
 async function handleImgPut(request, env, key) {
   const auth = await requireAuth(request, env, ['super_admin']);
   if (auth.error) return auth.error;
+  if (!key || key.indexOf('..') >= 0) return error('مفتاح صورة غير صالح', 400);
   const body = await request.json().catch(() => null);
   if (!body || !body.data) return error('لا توجد بيانات صورة', 400);
   let bin, bytes;
@@ -1237,11 +1278,10 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
     try {
-      if (path === '/api/health' && request.method === 'GET') return json({ status: 'ok', version: '2.4', live_mode: env.LIVE_MODE || 'polling' });
+      if (path === '/api/health' && request.method === 'GET') return json({ status: 'ok', version: '2.5', live_mode: env.LIVE_MODE || 'polling' });
 
-      /* 🔴🔴 سطر الاستعادة المؤقت — احذفه فوراً بعد نجاح الاستعادة 🔴🔴 */
+      /* استعادة كلمة المرور — محمية بمتغير RECOVERY_KEY السري */
       if (path === '/api/recover-owner' && request.method === 'GET') return await handleRecoverOwner(request, env);
-      /* 🔴🔴 نهاية السطر المؤقت 🔴🔴 */
 
       if (path === '/api/data/menu' && request.method === 'GET') return await handleGetMenu(env);
       if (path === '/api/data/menu' && request.method === 'PUT') return await handleSaveMenu(request, env);
@@ -1352,5 +1392,5 @@ export default {
 };
 
 // ═══════════════════════════════════════════
-//  نهاية worker/index.js (v2.4)
+//  نهاية worker/index.js (v2.5)
 // ═══════════════════════════════════════════
