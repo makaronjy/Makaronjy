@@ -1,4 +1,8 @@
-/* ===== admin-core.js — النواة: دخول سحابي D1 + صور R2 + تخصيص الواجهة (v6.1) =====
+/* ===== admin-core.js — النواة: دخول سحابي D1 + صور R2 مضغوطة + سلة مهملات (v6.2) =====
+   v6.2: • ضغط كل صورة قبل رفعها (WebP/JPEG + تصغير الأبعاد + هدف حجم)
+         • بطاقة تحكم في الضغط: الصيغة/الأبعاد/الجودة/الحجم المستهدف
+         • سلة مهملات الصور: عرض + استرجاع + حذف نهائي (30 يوماً)
+         • بطاقة النسخ الاحتياطي: نسخة فورية تشمل المنيو والإعدادات
    v6.1: حذف زر «نقل صور المستودع إلى السحابة» (النقل صار ذاتياً في الووركر)
          + إخفاء «إظهار الوصف / إظهار الأسعار» وفرضهما دائمين
          + نقل «عنوان فوق الإضافات» إلى الإعدادات (عام لكل الأصناف)
@@ -92,6 +96,13 @@ var list = document.querySelectorAll(sel);
 return [].slice.call(list).map(function(c){
 return c.value;
 });
+}
+/* v6.2: تنسيق أحجام الملفات */
+function fmtKB(bytes){
+if(!isFinite(bytes)) return `—`;
+if(bytes < 1024) return bytes + ` B`;
+if(bytes < 1024*1024) return (bytes/1024).toFixed(0) + ` KB`;
+return (bytes/1024/1024).toFixed(2) + ` MB`;
 }
 
 /* ===== حاجز زر الرجوع ===== */
@@ -419,6 +430,155 @@ throw e;
 return r.json();
 }
 
+/* =====================================================
+   ===== v6.2: ضغط الصور قبل الرفع =====
+===================================================== */
+const CMP_KEY = `mk_img_compress`;
+const CMP_DEFAULTS = {
+enabled: true,
+format: `webp`,
+itemMax: 1200,
+bannerMax: 1600,
+appMax: 1600,
+quality: 0.82,
+targetKB: 320
+};
+let CMP = (function(){
+try{
+var raw = JSON.parse(localStorage.getItem(CMP_KEY) || `null`);
+if(raw && typeof raw === `object`){
+return Object.assign({}, CMP_DEFAULTS, raw);
+}
+}catch(e){}
+return Object.assign({}, CMP_DEFAULTS);
+})();
+function cmpSave(){
+try{ localStorage.setItem(CMP_KEY, JSON.stringify(CMP)); }catch(e){}
+}
+let LAST_CMP = null;
+function cmpPreset(kind){
+var max = CMP.itemMax;
+if(kind === `banner`) max = CMP.bannerMax;
+else if(kind === `app`) max = CMP.appMax;
+return {
+max: Math.max(320, Math.min(4000, +max || 1200)),
+quality: Math.max(0.4, Math.min(0.98, +CMP.quality || 0.82)),
+targetKB: Math.max(60, Math.min(2000, +CMP.targetKB || 320))
+};
+}
+function cmpLoadViaImg(file){
+return new Promise(function(resolve, reject){
+var url = URL.createObjectURL(file);
+var im = new Image();
+im.onload = function(){
+URL.revokeObjectURL(url);
+resolve(im);
+};
+im.onerror = function(){
+URL.revokeObjectURL(url);
+reject(new Error(`تعذر قراءة الصورة — جرّب صيغة PNG أو JPG`));
+};
+im.src = url;
+});
+}
+function cmpLoadSource(file){
+if(window.createImageBitmap){
+return createImageBitmap(file).catch(function(){
+return cmpLoadViaImg(file);
+});
+}
+return cmpLoadViaImg(file);
+}
+function cmpToBlob(cv, type, q){
+return new Promise(function(resolve){
+try{
+cv.toBlob(function(b){ resolve(b); }, type, q);
+}catch(e){ resolve(null); }
+});
+}
+/* الضغط: تصغير الأبعاد ثم خفض الجودة تدريجياً حتى الهدف */
+async function compressImage(file, kind){
+var before = (file && file.size) || 0;
+if(!CMP.enabled || !file || !/^image\//.test(file.type || ``)){
+return {
+base64: await b64OfFile(file),
+before: before, after: before,
+type: (file && file.type) || `image/png`,
+width: 0, height: 0, skipped: true
+};
+}
+var p = cmpPreset(kind);
+var src = await cmpLoadSource(file);
+var sw = src.width || src.naturalWidth || 0;
+var sh = src.height || src.naturalHeight || 0;
+if(!sw || !sh){
+if(src.close) src.close();
+throw new Error(`أبعاد الصورة غير معروفة`);
+}
+var wanted = (CMP.format === `jpeg`) ? `image/jpeg` : `image/webp`;
+var maxDim = p.max;
+var q = p.quality;
+var blob = null, outType = wanted, tw = sw, th = sh;
+for(var attempt = 0; attempt < 8; attempt++){
+var scale = Math.min(1, maxDim / Math.max(sw, sh));
+tw = Math.max(1, Math.round(sw * scale));
+th = Math.max(1, Math.round(sh * scale));
+var cv = document.createElement(`canvas`);
+cv.width = tw; cv.height = th;
+var ctx = cv.getContext(`2d`);
+ctx.imageSmoothingEnabled = true;
+ctx.imageSmoothingQuality = `high`;
+if(wanted === `image/jpeg`){
+ctx.fillStyle = `#ffffff`;
+ctx.fillRect(0, 0, tw, th);
+}
+ctx.drawImage(src, 0, 0, tw, th);
+blob = await cmpToBlob(cv, wanted, q);
+outType = wanted;
+if(!blob || (wanted === `image/webp` && blob.type !== `image/webp`)){
+outType = `image/jpeg`;
+blob = await cmpToBlob(cv, `image/jpeg`, q);
+}
+if(!blob) break;
+if(blob.size <= p.targetKB * 1024) break;
+if(q > 0.56){ q = Math.max(0.5, q - 0.08); }
+else { maxDim = Math.max(320, Math.round(maxDim * 0.84)); }
+}
+if(src.close) src.close();
+if(!blob) throw new Error(`تعذر ضغط الصورة في هذا المتصفح`);
+/* لا نستخدم نسخة أكبر من الأصل */
+if(before && blob.size >= before){
+return {
+base64: await b64OfFile(file),
+before: before, after: before,
+type: file.type || `image/png`,
+width: sw, height: sh, skipped: true
+};
+}
+return {
+base64: await b64OfFile(blob),
+before: before, after: blob.size,
+type: outType, width: tw, height: th, skipped: false
+};
+}
+function cmpReport(res, label){
+LAST_CMP = res;
+var box = el(`cmpLast`);
+var pct = res.before ? Math.max(0, Math.round((1 - res.after/res.before)*100)) : 0;
+if(box){
+box.innerHTML = res.skipped
+? `آخر صورة: <b>` + esc(label) + `</b> — رُفعت كما هي (` + fmtKB(res.after) + `)`
+: `آخر صورة: <b>` + esc(label) + `</b> — ` +
+fmtKB(res.before) + ` ← <b style="color:var(--green)">` + fmtKB(res.after) + `</b> ` +
+`<span style="color:var(--green);font-weight:900">−` + pct + `%</span>` +
+` · ` + res.width + `×` + res.height + ` · ` + esc(String(res.type).replace(`image/`,``));
+}
+if(!res.skipped && res.before){
+toast(`🗜️ ضُغطت الصورة −` + pct + `%`, `success`,
+fmtKB(res.before) + ` ← ` + fmtKB(res.after));
+}
+}
+
 /* ===== طبقة الصور عبر R2 (بدون GitHub / بدون توكن صور) ===== */
 async function imgPut(path, base64){
 return apiFetch(`/api/img/` + path, {
@@ -427,10 +587,10 @@ body: JSON.stringify({ data: base64 })
 });
 }
 async function imgDelete(path){
-if(!path) return;
+if(!path) return null;
 try{
-await apiFetch(`/api/img/` + path, { method:`DELETE` });
-}catch(e){ /* الحذف متسامح — نتجاهل غير الموجود */ }
+return await apiFetch(`/api/img/` + path, { method:`DELETE` });
+}catch(e){ return null; /* الحذف متسامح — نتجاهل غير الموجود */ }
 }
 async function imgList(prefix){
 var j = await apiFetch(`/api/img?prefix=` + encodeURIComponent(prefix || ``));
@@ -508,7 +668,7 @@ return { content:{ sha:null } };
 await imgPut(path, content);
 return { content:{ sha:null } };
 }
-/* حذف صورة من السحابة */
+/* حذف صورة من السحابة (تنتقل لسلة المهملات) */
 async function ghDeleteFile(path, sha, msg){
 await imgDelete(path);
 return { success:true };
@@ -518,20 +678,27 @@ async function listDir(dirPath){
 var prefix = String(dirPath || ``).replace(/\/?$/, `/`);
 return imgList(prefix);
 }
+/* v6.2: كل الرفع يمرّ بالضغط */
 async function uploadItemImgById(id, file){
 var path = `img/items/` + id + `.png`;
-await imgPut(path, await b64OfFile(file));
+var res = await compressImage(file, `item`);
+await imgPut(path, res.base64);
+cmpReport(res, `صورة صنف`);
 bumpImagesVersion();
 return path;
 }
 async function uploadAppImage(path, file){
 /* الاستبدال على نفس المفتاح يمسح الصورة القديمة تلقائياً */
-await imgPut(path, await b64OfFile(file));
+var res = await compressImage(file, `app`);
+await imgPut(path, res.base64);
+cmpReport(res, `صورة التطبيق`);
 bumpImagesVersion();
 return path;
 }
 async function uploadBannerImg(path, file){
-await imgPut(path, await b64OfFile(file));
+var res = await compressImage(file, `banner`);
+await imgPut(path, res.base64);
+cmpReport(res, `بانر`);
 return path;
 }
 
@@ -1106,7 +1273,28 @@ st.textContent =
 `.v15-bfee-row small{color:var(--muted);font-weight:700}` +
 `.v15-inp{width:100%;padding:.6rem .7rem;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-weight:800;font-size:.9rem;background:#fff;color:var(--ink);outline:none}` +
 `.v15-inp:focus{border-color:var(--rust)}` +
-`.v15-empty{color:var(--muted);font-weight:700;font-size:.8rem;padding:.6rem;border:1.5px dashed var(--line);border-radius:10px;text-align:center}`;
+`.v15-empty{color:var(--muted);font-weight:700;font-size:.8rem;padding:.6rem;border:1.5px dashed var(--line);border-radius:10px;text-align:center}` +
+/* ===== v6.2: الضغط + سلة المهملات + النسخ ===== */
+`.cmp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.7rem}` +
+`.cmp-fld{display:flex;flex-direction:column;gap:.3rem}` +
+`.cmp-fld label{font-size:.72rem;font-weight:900;color:var(--muted)}` +
+`.cmp-fld input[type=range]{width:100%;accent-color:var(--rust)}` +
+`.cmp-val{font-size:.78rem;font-weight:900;color:var(--rust)}` +
+`.cmp-last{margin-top:.7rem;padding:.6rem .8rem;background:#fff;border:1.5px dashed var(--line);border-radius:10px;font-size:.76rem;font-weight:800;color:var(--ink);line-height:1.9}` +
+`.cmp-sw{display:inline-flex;align-items:center;gap:.45rem;font-size:.8rem;font-weight:900;cursor:pointer}` +
+`.trash-list{display:flex;flex-direction:column;gap:.5rem;max-height:340px;overflow-y:auto;padding:.2rem}` +
+`.trash-list::-webkit-scrollbar{width:9px}` +
+`.trash-list::-webkit-scrollbar-track{background:#f3e7d7;border-radius:9px}` +
+`.trash-list::-webkit-scrollbar-thumb{background:var(--rust);border-radius:9px;border:2px solid #f3e7d7}` +
+`.trash-row{display:flex;align-items:center;gap:.6rem;background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:.5rem .6rem}` +
+`.trash-ico{width:44px;height:44px;flex:0 0 auto;border-radius:10px;background:#f3e7d7;display:flex;align-items:center;justify-content:center;font-size:1.2rem}` +
+`.trash-meta{flex:1;min-width:0;font-size:.74rem;font-weight:800;line-height:1.6}` +
+`.trash-meta small{display:block;color:var(--muted);font-weight:700;font-size:.66rem;word-break:break-all}` +
+`.trash-act{display:flex;gap:.3rem;flex-shrink:0}` +
+`.trash-act button{border:none;border-radius:8px;padding:.4rem .55rem;font-family:inherit;font-weight:900;font-size:.7rem;cursor:pointer}` +
+`.tr-restore{background:#e8f5e9;color:#2d6a4f}` +
+`.tr-purge{background:#fee2e2;color:#b91c1c}` +
+`.bk-info{margin-top:.6rem;font-size:.74rem;font-weight:800;color:var(--muted);line-height:1.9}`;
 document.head.appendChild(st);
 }
 function adminSection(reList){
@@ -1171,7 +1359,7 @@ var f = e.target.files && e.target.files[0];
 e.target.value = ``;
 if(!f) return;
 try{
-toast(`جارٍ رفع البانر إلى السحابة...`, `info`);
+toast(`جارٍ ضغط ورفع البانر...`, `info`);
 var path = await uploadBannerImg(
 `img/banners/bn-` + Date.now() + `.png`, f);
 STATE.SETTINGS.banners.push({
@@ -1241,19 +1429,19 @@ if(del){
 var k = +del.dataset.bndel;
 var bn = list[k];
 var ok = await askConfirm(
-`سيُحذف البانر من السلايدر ومن التخزين السحابي نهائياً.\n\nالملف: ` +
+`سيُحذف البانر من السلايدر.\nالصورة تنتقل إلى سلة المهملات (30 يوماً) ويمكن استرجاعها.\n\nالملف: ` +
 (bn && bn.img ? bn.img : `—`),
 `حذف بانر`, `🗑`, `حذف`);
 if(!ok) return;
 list.splice(k, 1);
 if(bn && bn.img){
-try{
-toast(`جارٍ حذف الصورة من السحابة...`, `info`);
-await imgDelete(bn.img);
-toast(`✔ حُذفت الصورة من السحابة`, `success`);
-}catch(err){
-toast(`⚠️ تعذر حذف الصورة: ` + err.message, `warn`);
+var dr = await imgDelete(bn.img);
+if(dr && dr.trashed){
+toast(`✔ حُذف — نُسخ إلى سلة المهملات`, `success`);
+}else{
+toast(`✔ حُذف من السحابة`, `success`);
 }
+renderTrash();
 }
 renderBannersAdmin();
 toast(`✔ تم الحذف — اضغط نشر`, `success`);
@@ -1344,7 +1532,7 @@ btn.disabled = false;
 btn.textContent = old;
 }
 
-/* ===== تنظيف الصور اليتيمة (من السحابة) ===== */
+/* ===== تنظيف الصور اليتيمة (إلى سلة المهملات) ===== */
 async function cleanOrphanBanners(){
 if(!STATE || !CFG){
 toast(`سجّل الدخول أولاً`, `error`);
@@ -1370,8 +1558,8 @@ btn.textContent = old;
 return;
 }
 var list = orphans.map(function(f){ return `• ${f.name}`; }).join(`\n`);
-var msg = `يوجد ${orphans.length} صورة يتيمة في التخزين السحابي:\n\n${list}\n\nهل تريد حذفها نهائياً؟`;
-var ok = await askConfirm(msg, `تنظيف اليتيمة`, `🧹`, `حذف الكل`, true);
+var msg = `يوجد ${orphans.length} صورة بانر يتيمة:\n\n${list}\n\nستُنقل إلى سلة المهملات (30 يوماً). متابعة؟`;
+var ok = await askConfirm(msg, `تنظيف اليتيمة`, `🧹`, `نقل للمهملات`, true);
 if(!ok){
 btn.disabled = false;
 btn.textContent = old;
@@ -1380,24 +1568,282 @@ return;
 var successCount = 0;
 var failCount = 0;
 for(var i=0; i<orphans.length; i++){
-try{
-await imgDelete(orphans[i].path);
+var dr = await imgDelete(orphans[i].path);
+if(dr && dr.success){
 successCount++;
 toast(`✔ ${orphans[i].name}`, `success`);
-}catch(err){
+}else{
 failCount++;
-console.warn(`فشل حذف:`, orphans[i].path, err);
+console.warn(`فشل حذف:`, orphans[i].path);
 }
 }
 toast(
-`انتهى التنظيف: ${successCount} تم، ${failCount} فشل`,
+`انتهى التنظيف: ${successCount} نُقلت، ${failCount} فشلت`,
 successCount > 0 ? `success` : `error`
 );
+renderTrash();
 }catch(err){
 toast(`⚠️ فشل التنظيف: ` + err.message, `error`);
 }
 btn.disabled = false;
 btn.textContent = old;
+}
+
+/* =====================================================
+   ===== v6.2: بطاقة ضغط الصور =====
+===================================================== */
+function ensureCompressCard(){
+var sec = uiSettingsSection() ||
+document.querySelector(`main > section`);
+if(!sec) return;
+v15Style();
+var card = el(`cmpCard`);
+if(!card){
+card = document.createElement(`div`);
+card.className = `v15-card`;
+card.id = `cmpCard`;
+card.innerHTML =
+`<h3>🗜️ ضغط الصور قبل الرفع</h3>` +
+`<div class="v15-row" style="justify-content:space-between">` +
+`<label class="cmp-sw"><input type="checkbox" id="cmpOn"> تفعيل الضغط التلقائي</label>` +
+`<button class="v15-clean" id="cmpReset">↺ الإعدادات الافتراضية</button>` +
+`</div>` +
+`<div class="cmp-grid" style="margin-top:.7rem">` +
+`<div class="cmp-fld"><label>الصيغة</label>` +
+`<select class="v15-sel" id="cmpFmt" style="width:100%">` +
+`<option value="webp">WebP (الأفضل)</option>` +
+`<option value="jpeg">JPEG (توافق أوسع)</option>` +
+`</select></div>` +
+`<div class="cmp-fld"><label>أقصى بُعد — الأصناف <span class="cmp-val" id="cmpItemV"></span></label>` +
+`<input type="range" id="cmpItem" min="480" max="2400" step="40"></div>` +
+`<div class="cmp-fld"><label>أقصى بُعد — البانرات <span class="cmp-val" id="cmpBanV"></span></label>` +
+`<input type="range" id="cmpBan" min="640" max="3200" step="40"></div>` +
+`<div class="cmp-fld"><label>أقصى بُعد — صور التطبيق <span class="cmp-val" id="cmpAppV"></span></label>` +
+`<input type="range" id="cmpApp" min="480" max="3200" step="40"></div>` +
+`<div class="cmp-fld"><label>الجودة <span class="cmp-val" id="cmpQV"></span></label>` +
+`<input type="range" id="cmpQ" min="40" max="98" step="1"></div>` +
+`<div class="cmp-fld"><label>الحجم المستهدف <span class="cmp-val" id="cmpTKV"></span></label>` +
+`<input type="range" id="cmpTK" min="80" max="1200" step="20"></div>` +
+`</div>` +
+`<div class="cmp-last" id="cmpLast">لم تُرفع صورة بعد في هذه الجلسة.</div>`;
+var anchor = el(`modsTitlesCard`) || el(`v15FeeCard`);
+if(anchor && anchor.parentNode === sec) sec.insertBefore(card, anchor.nextSibling);
+else sec.insertBefore(card, sec.firstChild);
+
+var sync = function(){
+el(`cmpOn`).checked = !!CMP.enabled;
+el(`cmpFmt`).value = CMP.format;
+el(`cmpItem`).value = CMP.itemMax;
+el(`cmpBan`).value = CMP.bannerMax;
+el(`cmpApp`).value = CMP.appMax;
+el(`cmpQ`).value = Math.round(CMP.quality*100);
+el(`cmpTK`).value = CMP.targetKB;
+el(`cmpItemV`).textContent = CMP.itemMax + `px`;
+el(`cmpBanV`).textContent = CMP.bannerMax + `px`;
+el(`cmpAppV`).textContent = CMP.appMax + `px`;
+el(`cmpQV`).textContent = Math.round(CMP.quality*100) + `%`;
+el(`cmpTKV`).textContent = CMP.targetKB + `KB`;
+};
+sync();
+el(`cmpOn`).addEventListener(`change`, function(){
+CMP.enabled = this.checked; cmpSave();
+toast(CMP.enabled ? `الضغط مُفعّل` : `الضغط مُعطّل — سترفع الصور بأحجامها الأصلية`,
+CMP.enabled ? `success` : `warn`);
+});
+el(`cmpFmt`).addEventListener(`change`, function(){
+CMP.format = this.value; cmpSave();
+});
+el(`cmpItem`).addEventListener(`input`, function(){
+CMP.itemMax = +this.value;
+el(`cmpItemV`).textContent = CMP.itemMax + `px`;
+cmpSave();
+});
+el(`cmpBan`).addEventListener(`input`, function(){
+CMP.bannerMax = +this.value;
+el(`cmpBanV`).textContent = CMP.bannerMax + `px`;
+cmpSave();
+});
+el(`cmpApp`).addEventListener(`input`, function(){
+CMP.appMax = +this.value;
+el(`cmpAppV`).textContent = CMP.appMax + `px`;
+cmpSave();
+});
+el(`cmpQ`).addEventListener(`input`, function(){
+CMP.quality = (+this.value)/100;
+el(`cmpQV`).textContent = this.value + `%`;
+cmpSave();
+});
+el(`cmpTK`).addEventListener(`input`, function(){
+CMP.targetKB = +this.value;
+el(`cmpTKV`).textContent = CMP.targetKB + `KB`;
+cmpSave();
+});
+el(`cmpReset`).addEventListener(`click`, function(){
+CMP = Object.assign({}, CMP_DEFAULTS);
+cmpSave(); sync();
+toast(`↺ أُعيدت إعدادات الضغط الافتراضية`, `success`);
+});
+return;
+}
+/* إعادة التموضع إن أُعيد رسم القسم */
+var anchor2 = el(`modsTitlesCard`) || el(`v15FeeCard`);
+if(anchor2 && anchor2.parentNode === sec &&
+   card.previousElementSibling !== anchor2){
+sec.insertBefore(card, anchor2.nextSibling);
+}
+}
+
+/* =====================================================
+   ===== v6.2: سلة مهملات الصور =====
+===================================================== */
+function ensureTrashCard(){
+if(el(`trashCard`)) return;
+var bc = el(`v15BannerCard`);
+var host = bc ? bc.parentNode :
+(adminSection([/ads?|إعلان/i]) || document.querySelector(`main > section`));
+if(!host) return;
+v15Style();
+var card = document.createElement(`div`);
+card.className = `v15-card`;
+card.id = `trashCard`;
+card.innerHTML =
+`<h3>🗑️ سلة مهملات الصور (30 يوماً)</h3>` +
+`<div class="v15-row">` +
+`<button class="v15-clean" id="trashRefresh">🔄 تحديث القائمة</button>` +
+`<span id="trashCount" style="font-size:.76rem;font-weight:900;color:var(--muted)"></span>` +
+`</div>` +
+`<div class="trash-list" id="trashList" style="margin-top:.7rem"></div>`;
+if(bc && bc.parentNode === host) host.insertBefore(card, bc.nextSibling);
+else host.appendChild(card);
+el(`trashRefresh`).addEventListener(`click`, renderTrash);
+el(`trashList`).addEventListener(`click`, async function(e){
+var rs = e.target.closest(`[data-restore]`);
+var pg = e.target.closest(`[data-purge]`);
+if(rs){
+var key = rs.getAttribute(`data-restore`);
+rs.disabled = true; rs.textContent = `...`;
+try{
+var r = await apiFetch(`/api/img/restore`, {
+method:`POST`, body: JSON.stringify({ trashKey: key })
+});
+toast(`✔ استُرجعت الصورة`, `success`, r.restored);
+renderTrash();
+renderBannersAdmin();
+}catch(err){
+toast(`فشل الاسترجاع: ` + err.message, `error`);
+rs.disabled = false; rs.textContent = `↩ استرجاع`;
+}
+return;
+}
+if(pg){
+var key2 = pg.getAttribute(`data-purge`);
+var ok = await askConfirm(
+`حذف نهائي من سلة المهملات — لا يمكن التراجع.\n\n` + key2,
+`حذف نهائي`, `⛔`, `حذف نهائي`, true);
+if(!ok) return;
+pg.disabled = true; pg.textContent = `...`;
+try{
+await apiFetch(`/api/img/purge`, {
+method:`POST`, body: JSON.stringify({ trashKey: key2 })
+});
+toast(`⛔ حُذفت نهائياً`, `success`);
+renderTrash();
+}catch(err){
+toast(`فشل الحذف: ` + err.message, `error`);
+pg.disabled = false; pg.textContent = `⛔ نهائي`;
+}
+}
+});
+renderTrash();
+}
+async function renderTrash(){
+var box = el(`trashList`);
+if(!box) return;
+if(!CFG && !sessionStorage.getItem(`mk_admin_token`)){
+box.innerHTML = `<div class="v15-empty">سجّل الدخول لعرض سلة المهملات</div>`;
+return;
+}
+box.innerHTML = `<div class="v15-empty">⏳ جارٍ التحميل...</div>`;
+try{
+var j = await apiFetch(`/api/img/trash`);
+var items = j.items || [];
+var cnt = el(`trashCount`);
+if(cnt) cnt.textContent = items.length ? (items.length + ` عنصر`) : ``;
+if(!items.length){
+box.innerHTML = `<div class="v15-empty">سلة المهملات فارغة ✔</div>`;
+return;
+}
+box.innerHTML = items.map(function(it){
+return `<div class="trash-row">` +
+`<div class="trash-ico">🖼️</div>` +
+`<div class="trash-meta">` + esc(it.name) +
+`<small>` + esc(it.originalKey) + `</small>` +
+`<small>` + fmtKB(it.size) + ` · متبقٍ ` + it.daysLeft + ` يوم</small>` +
+`</div>` +
+`<div class="trash-act">` +
+`<button class="tr-restore" data-restore="` + esc(it.trashKey) + `">↩ استرجاع</button>` +
+`<button class="tr-purge" data-purge="` + esc(it.trashKey) + `">⛔ نهائي</button>` +
+`</div></div>`;
+}).join(``);
+}catch(e){
+box.innerHTML = `<div class="v15-empty">تعذر التحميل: ` + esc(e.message) + `</div>`;
+}
+}
+
+/* =====================================================
+   ===== v6.2: النسخ الاحتياطي =====
+===================================================== */
+function ensureBackupCard(){
+if(el(`bkCard`)) return;
+var sec = uiSettingsSection() ||
+document.querySelector(`main > section`);
+if(!sec) return;
+v15Style();
+var card = document.createElement(`div`);
+card.className = `v15-card`;
+card.id = `bkCard`;
+card.innerHTML =
+`<h3>🛡️ النسخ الاحتياطي (يشمل المنيو والإعدادات)</h3>` +
+`<div class="v15-row">` +
+`<button class="v15-pub" id="bkNow">💾 إنشاء نسخة الآن</button>` +
+`<button class="v15-clean" id="bkList">📋 عرض النسخ المحفوظة</button>` +
+`</div>` +
+`<div class="bk-info" id="bkInfo">النسخة الليلية تعمل تلقائياً وتحفظ المنيو والإعدادات والطلبات والمستخدمين وجرد الصور.</div>`;
+sec.appendChild(card);
+el(`bkNow`).addEventListener(`click`, async function(){
+var b = this, old = b.textContent;
+b.disabled = true; b.textContent = `... جارٍ النسخ ...`;
+try{
+var r = await apiFetch(`/api/admin/backup-now`, { method:`POST` });
+el(`bkInfo`).innerHTML =
+`✔ حُفظت: <b>` + esc(r.key) + `</b><br>` +
+`المنيو: ` + r.menu_sections + ` أقسام / ` + r.menu_items + ` صنف · ` +
+`الإعدادات: ` + r.settings_keys + ` مفتاح<br>` +
+`الصور: ` + r.images_count + ` · الطلبات: ` + r.orders + ` · المستخدمون: ` + r.users;
+toast(`✔ نسخة احتياطية كاملة`, `success`, `تشمل المنيو والإعدادات`);
+}catch(e){
+toast(`فشل النسخ: ` + e.message, `error`);
+}
+b.disabled = false; b.textContent = old;
+});
+el(`bkList`).addEventListener(`click`, async function(){
+var b = this, old = b.textContent;
+b.disabled = true; b.textContent = `...`;
+try{
+var r = await apiFetch(`/api/admin/backups`);
+var items = r.items || [];
+if(!items.length){
+el(`bkInfo`).textContent = `لا توجد نسخ محفوظة بعد.`;
+}else{
+el(`bkInfo`).innerHTML = items.slice(0,10).map(function(it){
+return `• <b>` + esc(it.name) + `</b> — ` + fmtKB(it.size);
+}).join(`<br>`);
+}
+}catch(e){
+toast(`فشل العرض: ` + e.message, `error`);
+}
+b.disabled = false; b.textContent = old;
+});
 }
 
 /* =====================================================
@@ -1417,6 +1863,7 @@ function uiHideDisplayToggles(){
 var labels = document.querySelectorAll(`label`);
 for(var i=0;i<labels.length;i++){
 var l = labels[i];
+if(l.closest(`#cmpCard`)) continue;
 var t = uiTxt(l);
 if(t.indexOf(`إظهار الوصف`) >= 0 ||
    t.indexOf(`إظهار الأسعار`) >= 0 ||
@@ -1519,7 +1966,7 @@ break;
 }
 if(!target || target === fee) return;
 if(target.parentNode !== sec) return;
-var anchor = el(`modsTitlesCard`) || fee;
+var anchor = el(`cmpCard`) || el(`modsTitlesCard`) || fee;
 if(anchor.parentNode !== sec) anchor = fee;
 if(target.previousElementSibling !== anchor){
 sec.insertBefore(target, anchor.nextSibling);
@@ -1531,6 +1978,9 @@ try{ forceDisplayFlags(); }catch(e){}
 try{ uiHideDisplayToggles(); }catch(e){}
 try{ uiHideModsTitleFields(); }catch(e){}
 try{ uiEnsureModsTitlesCard(); }catch(e){}
+try{ ensureCompressCard(); }catch(e){}
+try{ ensureTrashCard(); }catch(e){}
+try{ ensureBackupCard(); }catch(e){}
 try{ uiMoveDeliveryCard(); }catch(e){}
 }
 var uiBusy = false;
@@ -1565,6 +2015,7 @@ renderBannersAdmin();
 LAST_MENU = JSON.parse(JSON.stringify(STATE.MENU));
 LAST_SETTINGS = JSON.parse(JSON.stringify(STATE.SETTINGS));
 uiApplyAll();
+renderTrash();
 return r;
 };
-/* ===== END admin-core.js (v6.1) ===== */
+/* ===== END admin-core.js (v6.2) ===== */
