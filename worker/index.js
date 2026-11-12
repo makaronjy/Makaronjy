@@ -1,13 +1,14 @@
 // ═══════════════════════════════════════════
 //  مكرونجي - Cloudflare Worker API (كامل)
-//  الإصدار: 2.6
-//  v2.6: • المنيو والإعدادات (app_data) داخل النسخة الاحتياطية الليلية
-//        • حذف الصور صار نهائياً للأصناف/البانرات (النقل الذاتي للتطبيق فقط)
-//        • سلة مهملات 30 يوماً للصور المحذوفة + استرجاع + حذف نهائي
-//        • كشف نوع الصورة الحقيقي (WebP/JPEG داخل مفتاح .png)
-//        • نسخة احتياطية فورية عند الطلب + جرد مفاتيح الصور
-//  v2.5: عرض الصور Read-Through من المستودع
-//  v2.4: استعادة كلمة المرور بمتغير سري
+//  الإصدار: 2.7
+//  v2.7: • /api/health يُبلغ عن القدرات (features) لا الرقم فقط
+//        • فحص وتنظيف صور الأصناف اليتيمة (إلى سلة المهملات)
+//        • حمايات: رفض العمل عند منيو فارغ + تحذير النسبة العالية
+//  v2.6: المنيو والإعدادات داخل النسخة الاحتياطية الليلية
+//        + حذف نهائي للأصناف/البانرات + سلة مهملات 30 يوماً
+//        + كشف نوع الصورة الحقيقي (WebP داخل مفتاح .png)
+//  v2.5: عرض الصور Read-Through (لصور التطبيق فقط منذ 2.6)
+//  v2.4: استعادة كلمة المرور بمتغير سري RECOVERY_KEY
 //  v2.3: نظام صور R2 بصلاحيات JWT
 //  v2.2: جسر المالك يقبل JWT
 //  v2.1: endpoints المنيو والإعدادات من D1
@@ -22,7 +23,7 @@ const CORS_HEADERS = {
 
 const RAW_BASE = 'https://raw.githubusercontent.com/makaronjy/Makaronjy/main/';
 
-/* v2.6: النقل الذاتي مسموح لصور التطبيق الثابتة فقط */
+/* النقل الذاتي مسموح لصور التطبيق الثابتة فقط */
 const APP_IMG_FALLBACK = [
   'img/logo.png', 'img/bg.png', 'img/welcome.png', 'img/closed.png',
   'img/icon-192.png', 'img/icon-512.png', 'img/missing.png',
@@ -125,7 +126,7 @@ async function checkRateLimit(env, key, limit = 100, ttl = 60) {
     return { allowed: true, remaining: limit - current - 1 };
   } catch (e) { return { allowed: true, remaining: -1 }; }
 }
-/* v2.6: سرد R2 مع ترقيم الصفحات */
+/* سرد R2 مع ترقيم الصفحات */
 async function r2ListAll(bucket, prefix) {
   const out = [];
   let cursor;
@@ -1185,7 +1186,7 @@ async function handleReportsAccounting(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  20) صور R2 + سلة المهملات (v2.6)
+//  20) صور R2 + سلة المهملات
 // ═══════════════════════════════════════════
 function imgCt(key) {
   if (/\.png$/i.test(key)) return 'image/png';
@@ -1196,7 +1197,7 @@ function imgCt(key) {
   if (/\.ico$/i.test(key)) return 'image/x-icon';
   return 'application/octet-stream';
 }
-/* v2.6: كشف النوع الحقيقي — يسمح بتخزين WebP مضغوط داخل مفتاح .png */
+/* كشف النوع الحقيقي — يسمح بتخزين WebP مضغوط داخل مفتاح .png */
 function sniffImageType(b) {
   if (!b || b.length < 12) return null;
   if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47) return 'image/png';
@@ -1225,7 +1226,7 @@ async function handleImgServe(key, env) {
     }
   } catch (e) {}
 
-  /* v2.6: النقل الذاتي لصور التطبيق الثابتة فقط — حذف الأصناف/البانرات نهائي */
+  /* النقل الذاتي لصور التطبيق الثابتة فقط — حذف الأصناف/البانرات نهائي */
   if (APP_IMG_FALLBACK.indexOf(key) >= 0) {
     try {
       const safeUrl = RAW_BASE + key.split('/').map(encodeURIComponent).join('/');
@@ -1265,7 +1266,7 @@ async function handleImgPut(request, env, key) {
   return json({ success: true, key, url: '/api/img/' + key, bytes: bytes.length, contentType: ct });
 }
 
-/* v2.6: الحذف ينقل إلى سلة المهملات أولاً */
+/* الحذف ينقل إلى سلة المهملات أولاً */
 async function handleImgDelete(request, env, key) {
   const auth = await requireAuth(request, env, ['super_admin']);
   if (auth.error) return auth.error;
@@ -1368,7 +1369,7 @@ async function purgeOldTrash(env, days) {
 }
 
 // ═══════════════════════════════════════════
-//  21) النسخ الاحتياطي (v2.6: يشمل المنيو والإعدادات)
+//  21) النسخ الاحتياطي (يشمل المنيو والإعدادات)
 // ═══════════════════════════════════════════
 async function buildAndStoreBackup(env) {
   const [orders, users, branches, tracking, ledger, appRow] = await Promise.all([
@@ -1396,7 +1397,7 @@ async function buildAndStoreBackup(env) {
 
   const backup = {
     exported_at: new Date().toISOString(),
-    version: '2.6',
+    version: '2.7',
     app_data: appData,
     images_inventory: imageKeys,
     branches: branches.results,
@@ -1455,6 +1456,82 @@ async function handleBackupList(request, env) {
 }
 
 // ═══════════════════════════════════════════
+//  22) صور الأصناف اليتيمة (v2.7)
+// ═══════════════════════════════════════════
+async function scanItemOrphans(env) {
+  const row = await env.DB.prepare('SELECT menu_json FROM app_data WHERE id = 1').first();
+  let menu = [];
+  try { menu = row ? JSON.parse(row.menu_json) : []; } catch (e) { menu = []; }
+  const used = {};
+  let itemCount = 0;
+  (Array.isArray(menu) ? menu : []).forEach(s => {
+    (s.items || []).forEach(it => {
+      if (it && it.id) { used['img/items/' + it.id + '.png'] = true; itemCount++; }
+    });
+  });
+  const objects = await r2ListAll(env.IMAGES, 'img/items/');
+  const orphans = objects.filter(o => !used[o.key]).map(o => ({
+    key: o.key, name: o.key.split('/').pop(), size: o.size
+  }));
+  const totalBytes = orphans.reduce((a, b) => a + (b.size || 0), 0);
+  return {
+    ok: itemCount > 0,
+    menu_items: itemCount,
+    images_total: objects.length,
+    orphans,
+    orphan_count: orphans.length,
+    orphan_bytes: totalBytes,
+    ratio: objects.length ? orphans.length / objects.length : 0
+  };
+}
+async function handleItemOrphans(request, env) {
+  const auth = await requireAuth(request, env, ['super_admin']);
+  if (auth.error) return auth.error;
+  try {
+    const s = await scanItemOrphans(env);
+    if (!s.ok) return json({
+      success: false,
+      error: 'المنيو فارغ أو غير قابل للقراءة — أُلغي الفحص حمايةً للصور',
+      menu_items: 0, images_total: s.images_total, orphans: [], orphan_count: 0
+    });
+    return json({
+      success: true,
+      menu_items: s.menu_items,
+      images_total: s.images_total,
+      orphan_count: s.orphan_count,
+      orphan_bytes: s.orphan_bytes,
+      high_risk: s.ratio > 0.8,
+      orphans: s.orphans
+    });
+  } catch (e) { return error('فشل الفحص: ' + e.message, 500); }
+}
+async function handleItemOrphansClean(request, env) {
+  const auth = await requireAuth(request, env, ['super_admin']);
+  if (auth.error) return auth.error;
+  try {
+    const s = await scanItemOrphans(env);
+    if (!s.ok) return error('المنيو فارغ — أُلغي التنظيف حمايةً للصور', 409);
+    if (!s.orphans.length) return json({ success: true, moved: 0, failed: 0, message: 'لا توجد صور يتيمة' });
+    let moved = 0, failed = 0;
+    for (const o of s.orphans) {
+      try {
+        const obj = await env.IMAGES.get(o.key);
+        if (obj) {
+          const buf = await obj.arrayBuffer();
+          await env.IMAGES.put('trash/' + Date.now() + '/' + o.key, buf, {
+            httpMetadata: { contentType: obj.httpMetadata?.contentType || imgCt(o.key) },
+            customMetadata: { originalKey: o.key, deletedAt: new Date().toISOString(), reason: 'item-orphan' }
+          });
+        }
+        await env.IMAGES.delete(o.key);
+        moved++;
+      } catch (e) { failed++; }
+    }
+    return json({ success: true, moved, failed, retentionDays: TRASH_DAYS });
+  } catch (e) { return error('فشل التنظيف: ' + e.message, 500); }
+}
+
+// ═══════════════════════════════════════════
 //  Router
 // ═══════════════════════════════════════════
 export default {
@@ -1463,7 +1540,13 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
     try {
-      if (path === '/api/health' && request.method === 'GET') return json({ status: 'ok', version: '2.6', live_mode: env.LIVE_MODE || 'polling', trash_days: TRASH_DAYS });
+      if (path === '/api/health' && request.method === 'GET') return json({
+        status: 'ok',
+        version: '2.7',
+        features: ['r2-images','image-trash','trash-restore','backup-appdata','item-orphans','read-through-app-only'],
+        live_mode: env.LIVE_MODE || 'polling',
+        trash_days: TRASH_DAYS
+      });
       if (path === '/api/recover-owner' && request.method === 'GET') return await handleRecoverOwner(request, env);
 
       if (path === '/api/data/menu' && request.method === 'GET') return await handleGetMenu(env);
@@ -1504,6 +1587,10 @@ export default {
       /* ===== النسخ الاحتياطي ===== */
       if (path === '/api/admin/backup-now' && request.method === 'POST') return await handleBackupNow(request, env);
       if (path === '/api/admin/backups' && request.method === 'GET') return await handleBackupList(request, env);
+
+      /* ===== v2.7: صور الأصناف اليتيمة ===== */
+      if (path === '/api/admin/item-orphans' && request.method === 'GET') return await handleItemOrphans(request, env);
+      if (path === '/api/admin/item-orphans-clean' && request.method === 'POST') return await handleItemOrphansClean(request, env);
 
       /* ===== سلة مهملات الصور ===== */
       if (path === '/api/img/trash' && request.method === 'GET') return await handleTrashList(request, env);
@@ -1558,13 +1645,13 @@ export default {
             AND NOT EXISTS (SELECT 1 FROM order_ledger l WHERE l.order_number = o.order_number AND l.kind = 'cancelled')
         `).run();
 
-        /* v2.6: نسخة احتياطية تشمل المنيو والإعدادات + جرد الصور */
+        /* نسخة احتياطية تشمل المنيو والإعدادات + جرد الصور */
         try {
           const info = await buildAndStoreBackup(env);
           console.log('backup ok:', JSON.stringify(info));
         } catch (e) { console.error('backup error:', e); }
 
-        /* v2.6: تفريغ سلة المهملات الأقدم من 30 يوماً */
+        /* تفريغ سلة المهملات الأقدم من 30 يوماً */
         try {
           const removed = await purgeOldTrash(env, TRASH_DAYS);
           console.log('trash purged:', removed);
@@ -1577,5 +1664,5 @@ export default {
 };
 
 // ═══════════════════════════════════════════
-//  نهاية worker/index.js (v2.6)
+//  نهاية worker/index.js (v2.7)
 // ═══════════════════════════════════════════
