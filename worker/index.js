@@ -1,10 +1,10 @@
 // ═══════════════════════════════════════════
 //  مكرونجي - Cloudflare Worker API (كامل)
 //  الإصدار: 2.3
-//  v2.3: صور R2 (رفع/حذف/عرض/سرد) بصلاحيات JWT — بدون GitHub
-//        + إزالة مساري الإعداد bootstrap / fix-password (ثغرة)
+//  v2.3: نظام صور R2 (رفع/حذف/عرض/سرد) بصلاحيات JWT — بدون GitHub
+//        + إزالة مساري /api/bootstrap و /api/fix-password (أمان)
 //  v2.2: جسر المالك يقبل التوكن السحابي JWT مباشرة
-//  v2.1: endpoints المنيو/الإعدادات من D1 + نقل البيانات
+//  v2.1: endpoints المنيو والإعدادات من D1 + نقل البيانات
 // ═══════════════════════════════════════════
 
 const CORS_HEADERS = {
@@ -243,12 +243,85 @@ async function requireAuth(request, env, allowedRoles) {
 }
 
 // ═══════════════════════════════════════════
+//  0) Bootstrap - إنشاء حساب المالك الأول
+//     (الدالة محفوظة للمرجع — المسار مُزال في v2.3)
+// ═══════════════════════════════════════════
+async function handleBootstrap(env) {
+  try {
+    const existing = await env.DB.prepare("SELECT id, username FROM users WHERE role = 'super_admin' LIMIT 1").first();
+    if (existing) {
+      return json({ 
+        success: false, 
+        error: 'حساب المالك موجود بالفعل',
+        existing_username: existing.username
+      }, 409);
+    }
+    
+    const username = 'owner';
+    const password = '123456';
+    const salt = generateSalt();
+    const hash = await hashPassword(password, salt);
+    
+    await env.DB.prepare(`
+      INSERT INTO users (name, phone, username, password_hash, password_salt, role, is_active, must_change_password)
+      VALUES (?, ?, ?, ?, ?, ?, 1, 0)
+    `).bind('مالك النظام', '966500000000', username, hash, salt, 'super_admin').run();
+    
+    return json({
+      success: true,
+      message: 'تم إنشاء حساب المالك بنجاح',
+      username: username,
+      password: password,
+      note: 'يمكنك الآن تسجيل الدخول باستخدام هذه البيانات'
+    }, 201);
+  } catch (e) {
+    console.error('Bootstrap error:', e);
+    return json({ success: false, error: e.message }, 500);
+  }
+}
+
+// ═══════════════════════════════════════════
+//  0.5) إصلاح كلمة مرور المالك
+//       (الدالة محفوظة للمرجع — المسار مُزال في v2.3)
+// ═══════════════════════════════════════════
+async function handleFixOwnerPassword(env) {
+  try {
+    const user = await env.DB.prepare("SELECT id FROM users WHERE username = 'owner' AND role = 'super_admin'").first();
+    if (!user) {
+      return json({ success: false, error: 'حساب المالك غير موجود' }, 404);
+    }
+    
+    const password = '123456';
+    const salt = generateSalt();
+    const hash = await hashPassword(password, salt);
+    
+    await env.DB.prepare(`
+      UPDATE users SET password_hash = ?, password_salt = ?, must_change_password = 0
+      WHERE id = ?
+    `).bind(hash, salt, user.id).run();
+    
+    return json({
+      success: true,
+      message: 'تم تحديث كلمة المرور بنجاح',
+      username: 'owner',
+      password: '123456',
+      note: 'يمكنك الآن تسجيل الدخول'
+    });
+  } catch (e) {
+    console.error('Fix password error:', e);
+    return json({ success: false, error: e.message }, 500);
+  }
+}
+
+// ═══════════════════════════════════════════
 //  0.6) قراءة المنيو من D1
 // ═══════════════════════════════════════════
 async function handleGetMenu(env) {
   try {
     const data = await env.DB.prepare('SELECT menu_json FROM app_data WHERE id = 1').first();
-    if (!data) return json({ menu: [] });
+    if (!data) {
+      return json({ menu: [] });
+    }
     return json({ menu: JSON.parse(data.menu_json) });
   } catch (e) {
     console.error('Get menu error:', e);
@@ -262,12 +335,17 @@ async function handleGetMenu(env) {
 async function handleSaveMenu(request, env) {
   const auth = await requireAuth(request, env, ['super_admin']);
   if (auth.error) return auth.error;
+  
   try {
     const body = await request.json();
-    if (!body.menu || !Array.isArray(body.menu)) return error('بيانات المنيو غير صالحة', 400);
+    if (!body.menu || !Array.isArray(body.menu)) {
+      return error('بيانات المنيو غير صالحة', 400);
+    }
+    
     await env.DB.prepare(`
       UPDATE app_data SET menu_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1
     `).bind(JSON.stringify(body.menu)).run();
+    
     return json({ success: true, message: 'تم حفظ المنيو بنجاح' });
   } catch (e) {
     console.error('Save menu error:', e);
@@ -281,7 +359,9 @@ async function handleSaveMenu(request, env) {
 async function handleGetSettings(env) {
   try {
     const data = await env.DB.prepare('SELECT settings_json FROM app_data WHERE id = 1').first();
-    if (!data) return json({ settings: {} });
+    if (!data) {
+      return json({ settings: {} });
+    }
     return json({ settings: JSON.parse(data.settings_json) });
   } catch (e) {
     console.error('Get settings error:', e);
@@ -295,12 +375,17 @@ async function handleGetSettings(env) {
 async function handleSaveSettings(request, env) {
   const auth = await requireAuth(request, env, ['super_admin']);
   if (auth.error) return auth.error;
+  
   try {
     const body = await request.json();
-    if (!body.settings || typeof body.settings !== 'object') return error('بيانات الإعدادات غير صالحة', 400);
+    if (!body.settings || typeof body.settings !== 'object') {
+      return error('بيانات الإعدادات غير صالحة', 400);
+    }
+    
     await env.DB.prepare(`
       UPDATE app_data SET settings_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1
     `).bind(JSON.stringify(body.settings)).run();
+    
     return json({ success: true, message: 'تم حفظ الإعدادات بنجاح' });
   } catch (e) {
     console.error('Save settings error:', e);
@@ -314,14 +399,19 @@ async function handleSaveSettings(request, env) {
 async function handleMigrateFromGithub(request, env) {
   const auth = await requireAuth(request, env, ['super_admin']);
   if (auth.error) return auth.error;
+  
   try {
     const body = await request.json();
-    if (!body.menu || !body.settings) return error('بيانات النقل غير صالحة', 400);
+    if (!body.menu || !body.settings) {
+      return error('بيانات النقل غير صالحة', 400);
+    }
+    
     await env.DB.prepare(`
       UPDATE app_data SET menu_json = ?, settings_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1
     `).bind(JSON.stringify(body.menu), JSON.stringify(body.settings)).run();
-    return json({
-      success: true,
+    
+    return json({ 
+      success: true, 
       message: 'تم نقل البيانات من GitHub إلى D1 بنجاح',
       menu_items: body.menu.length || 0,
       settings_keys: Object.keys(body.settings).length || 0
@@ -330,51 +420,6 @@ async function handleMigrateFromGithub(request, env) {
     console.error('Migration error:', e);
     return error('فشل نقل البيانات: ' + e.message, 500);
   }
-}
-
-// ═══════════════════════════════════════════
-//  0.11) صور R2 (بدون GitHub) — v2.3
-// ═══════════════════════════════════════════
-function imgCt(key) {
-  if (/\.png$/i.test(key)) return 'image/png';
-  if (/\.(jpg|jpeg)$/i.test(key)) return 'image/jpeg';
-  if (/\.webp$/i.test(key)) return 'image/webp';
-  if (/\.svg$/i.test(key)) return 'image/svg+xml';
-  if (/\.gif$/i.test(key)) return 'image/gif';
-  return 'application/octet-stream';
-}
-async function handleImgServe(key, env) {
-  const obj = await env.IMAGES.get(key);
-  if (!obj) return error('الصورة غير موجودة', 404);
-  return new Response(obj.body, {
-    headers: { 'Content-Type': imgCt(key), 'Cache-Control': 'public, max-age=31536000, immutable', ...CORS_HEADERS }
-  });
-}
-async function handleImgPut(request, env, key) {
-  const auth = await requireAuth(request, env, ['super_admin']);
-  if (auth.error) return auth.error;
-  const body = await request.json().catch(() => null);
-  if (!body || !body.data) return error('لا توجد بيانات صورة', 400);
-  const b64 = String(body.data).replace(/^data:[^;]+;base64,/, '');
-  const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  if (bytes.length > 6 * 1024 * 1024) return error('الصورة أكبر من 6MB', 413);
-  await env.IMAGES.put(key, bytes, { httpMetadata: { contentType: imgCt(key) } });
-  return json({ success: true, key, url: '/api/img/' + key });
-}
-async function handleImgDelete(request, env, key) {
-  const auth = await requireAuth(request, env, ['super_admin']);
-  if (auth.error) return auth.error;
-  await env.IMAGES.delete(key);
-  return json({ success: true, deleted: key });
-}
-async function handleImgList(request, env) {
-  const auth = await requireAuth(request, env, ['super_admin']);
-  if (auth.error) return auth.error;
-  const prefix = new URL(request.url).searchParams.get('prefix') || '';
-  const list = await env.IMAGES.list({ prefix });
-  return json({ files: list.objects.map(o => ({ name: o.key.split('/').pop(), path: o.key, sha: null })) });
 }
 
 // ═══════════════════════════════════════════
@@ -419,7 +464,7 @@ async function handleLogin(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  2) جسر المالك (v2.2: يقبل JWT مباشرة)
+//  2) جسر المالك (v2.2: يقبل التوكن السحابي JWT مباشرة)
 // ═══════════════════════════════════════════
 async function handleAdminBridge(request, env) {
   const ip = getIP(request);
@@ -428,6 +473,7 @@ async function handleAdminBridge(request, env) {
   const body = await request.json().catch(() => null);
   if (!body || !body.github_token) return error('التوكن مطلوب');
 
+  /* v2.2: توكن سحابي صالح (JWT) لمالك النظام → قبول مباشر بدون GitHub */
   const jwtPayload = await verifyJWT(body.github_token, env.JWT_SECRET);
   if (jwtPayload && jwtPayload.role === 'super_admin') {
     const ownerUser = await env.DB.prepare(
@@ -437,11 +483,17 @@ async function handleAdminBridge(request, env) {
       return json({
         success: true,
         token: body.github_token,
-        user: { id: ownerUser.id, name: ownerUser.name, username: ownerUser.username, role: 'super_admin' }
+        user: {
+          id: ownerUser.id,
+          name: ownerUser.name,
+          username: ownerUser.username,
+          role: 'super_admin'
+        }
       });
     }
   }
 
+  /* الاحتياط الأصلي: التحقق عبر GitHub */
   const ghHeaders = {
     'Authorization': `Bearer ${body.github_token}`,
     'Accept': 'application/vnd.github+json',
@@ -1125,6 +1177,64 @@ async function handleReportsAccounting(request, env) {
 }
 
 // ═══════════════════════════════════════════
+//  20) صور R2 (v2.3) — بدون GitHub
+//      GET  /api/img/<key>        عام (عرض الصورة)
+//      PUT  /api/img/<key>        مالك فقط (رفع/استبدال)
+//      DELETE /api/img/<key>      مالك فقط (حذف)
+//      GET  /api/img?prefix=...   مالك فقط (سرد)
+// ═══════════════════════════════════════════
+function imgCt(key) {
+  if (/\.png$/i.test(key)) return 'image/png';
+  if (/\.(jpg|jpeg)$/i.test(key)) return 'image/jpeg';
+  if (/\.webp$/i.test(key)) return 'image/webp';
+  if (/\.svg$/i.test(key)) return 'image/svg+xml';
+  if (/\.gif$/i.test(key)) return 'image/gif';
+  return 'application/octet-stream';
+}
+async function handleImgServe(key, env) {
+  const obj = await env.IMAGES.get(key);
+  if (!obj) return error('الصورة غير موجودة', 404);
+  return new Response(obj.body, {
+    headers: {
+      'Content-Type': imgCt(key),
+      'Cache-Control': 'public, max-age=31536000, immutable',
+      ...CORS_HEADERS
+    }
+  });
+}
+async function handleImgPut(request, env, key) {
+  const auth = await requireAuth(request, env, ['super_admin']);
+  if (auth.error) return auth.error;
+  const body = await request.json().catch(() => null);
+  if (!body || !body.data) return error('لا توجد بيانات صورة', 400);
+  let bin, bytes;
+  try {
+    const b64 = String(body.data).replace(/^data:[^;]+;base64,/, '');
+    bin = atob(b64);
+    bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  } catch (e) { return error('بيانات الصورة غير صالحة', 400); }
+  if (bytes.length > 6 * 1024 * 1024) return error('الصورة أكبر من 6MB', 413);
+  await env.IMAGES.put(key, bytes, { httpMetadata: { contentType: imgCt(key) } });
+  return json({ success: true, key, url: '/api/img/' + key });
+}
+async function handleImgDelete(request, env, key) {
+  const auth = await requireAuth(request, env, ['super_admin']);
+  if (auth.error) return auth.error;
+  await env.IMAGES.delete(key);
+  return json({ success: true, deleted: key });
+}
+async function handleImgList(request, env) {
+  const auth = await requireAuth(request, env, ['super_admin']);
+  if (auth.error) return auth.error;
+  const prefix = new URL(request.url).searchParams.get('prefix') || '';
+  const list = await env.IMAGES.list({ prefix });
+  return json({
+    files: list.objects.map(o => ({ name: o.key.split('/').pop(), path: o.key, sha: null }))
+  });
+}
+
+// ═══════════════════════════════════════════
 //  Router
 // ═══════════════════════════════════════════
 export default {
@@ -1139,13 +1249,6 @@ export default {
       if (path === '/api/data/settings' && request.method === 'GET') return await handleGetSettings(env);
       if (path === '/api/data/settings' && request.method === 'PUT') return await handleSaveSettings(request, env);
       if (path === '/api/migrate/github' && request.method === 'POST') return await handleMigrateFromGithub(request, env);
-      if (path === '/api/img' && request.method === 'GET') return await handleImgList(request, env);
-      if (path.startsWith('/api/img/')) {
-        const key = decodeURIComponent(path.slice('/api/img/'.length));
-        if (request.method === 'GET') return await handleImgServe(key, env);
-        if (request.method === 'PUT') return await handleImgPut(request, env, key);
-        if (request.method === 'DELETE') return await handleImgDelete(request, env, key);
-      }
       if (path === '/api/auth/login' && request.method === 'POST') return await handleLogin(request, env);
       if (path === '/api/auth/admin-bridge' && request.method === 'POST') return await handleAdminBridge(request, env);
       if (path === '/api/auth/change-password' && request.method === 'POST') return await handleChangePassword(request, env);
@@ -1175,6 +1278,15 @@ export default {
       if (m && request.method === 'PUT') return await handleAdminUsersUpdate(parseInt(m[1]), request, env);
       if (path === '/api/reports/summary' && request.method === 'GET') return await handleReportsSummary(request, env);
       if (path === '/api/reports/accounting' && request.method === 'GET') return await handleReportsAccounting(request, env);
+      /* ===== v2.3: صور R2 ===== */
+      if (path === '/api/img' && request.method === 'GET') return await handleImgList(request, env);
+      if (path.startsWith('/api/img/')) {
+        const key = decodeURIComponent(path.slice('/api/img/'.length));
+        if (!key) return error('مفتاح الصورة مطلوب', 400);
+        if (request.method === 'GET') return await handleImgServe(key, env);
+        if (request.method === 'PUT') return await handleImgPut(request, env, key);
+        if (request.method === 'DELETE') return await handleImgDelete(request, env, key);
+      }
       return error('Not found', 404);
     } catch (e) {
       console.error('Worker error:', e);
