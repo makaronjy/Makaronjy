@@ -1,13 +1,16 @@
 // ═══════════════════════════════════════════
 //  مكرونجي - Cloudflare Worker API (كامل)
-//  الإصدار: 2.5
-//  v2.5: عرض الصور بخاصية Read-Through — إن لم توجد في R2
-//        تُجلب من المستودع العام وتُخزَّن في R2 تلقائياً (نقل ذاتي)
-//        + استعادة كلمة المرور محمية بمتغير سري RECOVERY_KEY (لا مفتاح مكشوف)
-//  v2.4: مسار استعادة كلمة مرور المالك
-//  v2.3: نظام صور R2 (رفع/حذف/عرض/سرد) بصلاحيات JWT
-//  v2.2: جسر المالك يقبل التوكن السحابي JWT مباشرة
-//  v2.1: endpoints المنيو والإعدادات من D1 + نقل البيانات
+//  الإصدار: 2.6
+//  v2.6: • المنيو والإعدادات (app_data) داخل النسخة الاحتياطية الليلية
+//        • حذف الصور صار نهائياً للأصناف/البانرات (النقل الذاتي للتطبيق فقط)
+//        • سلة مهملات 30 يوماً للصور المحذوفة + استرجاع + حذف نهائي
+//        • كشف نوع الصورة الحقيقي (WebP/JPEG داخل مفتاح .png)
+//        • نسخة احتياطية فورية عند الطلب + جرد مفاتيح الصور
+//  v2.5: عرض الصور Read-Through من المستودع
+//  v2.4: استعادة كلمة المرور بمتغير سري
+//  v2.3: نظام صور R2 بصلاحيات JWT
+//  v2.2: جسر المالك يقبل JWT
+//  v2.1: endpoints المنيو والإعدادات من D1
 // ═══════════════════════════════════════════
 
 const CORS_HEADERS = {
@@ -17,8 +20,15 @@ const CORS_HEADERS = {
   'Access-Control-Max-Age': '86400',
 };
 
-/* v2.5: مصدر الصور الاحتياطي (المستودع عام) */
 const RAW_BASE = 'https://raw.githubusercontent.com/makaronjy/Makaronjy/main/';
+
+/* v2.6: النقل الذاتي مسموح لصور التطبيق الثابتة فقط */
+const APP_IMG_FALLBACK = [
+  'img/logo.png', 'img/bg.png', 'img/welcome.png', 'img/closed.png',
+  'img/icon-192.png', 'img/icon-512.png', 'img/missing.png',
+  'img/d-jahez.png', 'img/d-hungerstation.png', 'img/d-keeta.png'
+];
+const TRASH_DAYS = 30;
 
 const STATUS_TEXT = {
   pending: 'بانتظار القبول',
@@ -103,9 +113,7 @@ function sanitize(str) {
   if (!str || typeof str !== 'string') return '';
   return str.replace(/[<>]/g, '').replace(/javascript:/gi, '').replace(/on\w+=/gi, '').trim().slice(0, 1000);
 }
-function normLang(v) {
-  return (v === 'en') ? 'en' : 'ar';
-}
+function normLang(v) { return (v === 'en') ? 'en' : 'ar'; }
 function getIP(request) {
   return request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown';
 }
@@ -115,9 +123,19 @@ async function checkRateLimit(env, key, limit = 100, ttl = 60) {
     if (current >= limit) return { allowed: false, remaining: 0 };
     await env.KV.put(key, String(current + 1), { expirationTtl: ttl });
     return { allowed: true, remaining: limit - current - 1 };
-  } catch (e) {
-    return { allowed: true, remaining: -1 };
+  } catch (e) { return { allowed: true, remaining: -1 }; }
+}
+/* v2.6: سرد R2 مع ترقيم الصفحات */
+async function r2ListAll(bucket, prefix) {
+  const out = [];
+  let cursor;
+  for (let i = 0; i < 50; i++) {
+    const res = await bucket.list({ prefix, cursor, limit: 1000 });
+    (res.objects || []).forEach(o => out.push(o));
+    if (!res.truncated || !res.cursor) break;
+    cursor = res.cursor;
   }
+  return out;
 }
 
 // ═══════════════════════════════════════════
@@ -293,27 +311,21 @@ async function handleFixOwnerPassword(env) {
 }
 
 // ═══════════════════════════════════════════
-//  0.55) استعادة كلمة مرور المالك (v2.5 — محمية بمتغير سري)
-//  GET /api/recover-owner?key=<RECOVERY_KEY>&new=<كلمة جديدة>
-//  المفتاح يُضبط في Cloudflare → Settings → Variables and Secrets
-//  باسم RECOVERY_KEY (غير موجود في الكود ولا في المستودع)
+//  0.55) استعادة كلمة مرور المالك (محمية بمتغير سري)
 // ═══════════════════════════════════════════
 async function handleRecoverOwner(request, env) {
   if (!env.RECOVERY_KEY) return error('الاستعادة غير مفعّلة — أضف متغير RECOVERY_KEY في إعدادات الووركر', 403);
   const url = new URL(request.url);
   const key = url.searchParams.get('key') || '';
   if (key !== env.RECOVERY_KEY) return error('مفتاح غير صحيح', 403);
-
   const ip = getIP(request);
   const rate = await checkRateLimit(env, `recover:${ip}`, 5, 900);
   if (!rate.allowed) return error('محاولات كثيرة، حاول بعد 15 دقيقة', 429);
-
   try {
     const user = await env.DB.prepare(
       "SELECT id, username FROM users WHERE role = 'super_admin' ORDER BY id LIMIT 1"
     ).first();
     if (!user) return error('حساب المالك غير موجود في قاعدة البيانات', 404);
-
     let newPass = url.searchParams.get('new') || '123456';
     const usingCustom = !!url.searchParams.get('new');
     if (usingCustom) {
@@ -322,20 +334,13 @@ async function handleRecoverOwner(request, env) {
         return error('يجب أن تحتوي حرف كبير وصغير ورقم', 400);
       }
     }
-
     const salt = generateSalt();
     const hash = await hashPassword(newPass, salt);
     await env.DB.prepare(`
       UPDATE users SET password_hash = ?, password_salt = ?, must_change_password = 0,
       is_active = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?
     `).bind(hash, salt, user.id).run();
-
-    return json({
-      success: true,
-      message: 'تم تعيين كلمة المرور بنجاح',
-      username: user.username,
-      password: newPass
-    });
+    return json({ success: true, message: 'تم تعيين كلمة المرور بنجاح', username: user.username, password: newPass });
   } catch (e) {
     console.error('Recover error:', e);
     return error('فشل الاستعادة: ' + e.message, 500);
@@ -881,7 +886,7 @@ async function handleUploadPhoto(orderId, request, env) {
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     if (bytes.length > 5 * 1024 * 1024) return error('حجم الصورة كبير جداً (الحد 5MB)', 413);
     photoKey = `deliveries/${order.order_number}/${Date.now()}.jpg`;
-    await env.IMAGES.put(photoKey, bytes, { httpMetadata: { contentType: 'image/jpeg' } });
+    await env.IMAGES.put(photoKey, bytes, { httpMetadata: { contentType: sniffImageType(bytes) || 'image/jpeg' } });
   }
   await env.DB.prepare('UPDATE orders SET delivery_photo = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(photoKey, orderId).run();
   return json({ success: true, photo_key: photoKey });
@@ -901,7 +906,7 @@ async function handleGetPhoto(orderId, request, env) {
   const obj = await env.IMAGES.get(order.delivery_photo);
   if (!obj) return error('الصورة غير موجودة في التخزين', 404);
   return new Response(obj.body, {
-    headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, max-age=3600', ...CORS_HEADERS },
+    headers: { 'Content-Type': obj.httpMetadata?.contentType || 'image/jpeg', 'Cache-Control': 'private, max-age=3600', ...CORS_HEADERS },
   });
 }
 
@@ -1180,7 +1185,7 @@ async function handleReportsAccounting(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  20) صور R2 + Read-Through من المستودع (v2.5)
+//  20) صور R2 + سلة المهملات (v2.6)
 // ═══════════════════════════════════════════
 function imgCt(key) {
   if (/\.png$/i.test(key)) return 'image/png';
@@ -1191,82 +1196,262 @@ function imgCt(key) {
   if (/\.ico$/i.test(key)) return 'image/x-icon';
   return 'application/octet-stream';
 }
+/* v2.6: كشف النوع الحقيقي — يسمح بتخزين WebP مضغوط داخل مفتاح .png */
+function sniffImageType(b) {
+  if (!b || b.length < 12) return null;
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47) return 'image/png';
+  if (b[0] === 0xFF && b[1] === 0xD8 && b[2] === 0xFF) return 'image/jpeg';
+  if (b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 &&
+      b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return 'image/webp';
+  if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) return 'image/gif';
+  return null;
+}
+function validImgKey(key) {
+  return !!key && key.indexOf('..') < 0 && key.indexOf('trash/') !== 0 && key.length < 300;
+}
 
-/* v2.5: إن لم توجد الصورة في R2 → تُجلب من المستودع وتُخزَّن تلقائياً */
 async function handleImgServe(key, env) {
-  if (!key || key.indexOf('..') >= 0) return error('مفتاح صورة غير صالح', 400);
-
-  /* 1) من R2 (السريع) */
+  if (!validImgKey(key)) return error('مفتاح صورة غير صالح', 400);
   try {
     const obj = await env.IMAGES.get(key);
     if (obj) {
       return new Response(obj.body, {
         headers: {
-          'Content-Type': imgCt(key),
+          'Content-Type': obj.httpMetadata?.contentType || imgCt(key),
           'Cache-Control': 'public, max-age=31536000, immutable',
           ...CORS_HEADERS
         }
       });
     }
-  } catch (e) { /* نتابع للاحتياطي */ }
+  } catch (e) {}
 
-  /* 2) احتياطي: من المستودع العام + تخزينه في R2 للمرة القادمة */
-  if (key.indexOf('img/') === 0) {
+  /* v2.6: النقل الذاتي لصور التطبيق الثابتة فقط — حذف الأصناف/البانرات نهائي */
+  if (APP_IMG_FALLBACK.indexOf(key) >= 0) {
     try {
       const safeUrl = RAW_BASE + key.split('/').map(encodeURIComponent).join('/');
       const r = await fetch(safeUrl, { headers: { 'User-Agent': 'makaronjy-worker' } });
       if (r.ok) {
         const buf = await r.arrayBuffer();
         if (buf && buf.byteLength > 0) {
-          try {
-            await env.IMAGES.put(key, buf, { httpMetadata: { contentType: imgCt(key) } });
-          } catch (e) { /* التخزين اختياري */ }
+          const bytes = new Uint8Array(buf);
+          const ct = sniffImageType(bytes) || imgCt(key);
+          try { await env.IMAGES.put(key, buf, { httpMetadata: { contentType: ct } }); } catch (e) {}
           return new Response(buf, {
-            headers: {
-              'Content-Type': imgCt(key),
-              'Cache-Control': 'public, max-age=86400',
-              ...CORS_HEADERS
-            }
+            headers: { 'Content-Type': ct, 'Cache-Control': 'public, max-age=86400', ...CORS_HEADERS }
           });
         }
       }
-    } catch (e) { /* نتابع للـ404 */ }
+    } catch (e) {}
   }
-
   return error('الصورة غير موجودة', 404);
 }
 
 async function handleImgPut(request, env, key) {
   const auth = await requireAuth(request, env, ['super_admin']);
   if (auth.error) return auth.error;
-  if (!key || key.indexOf('..') >= 0) return error('مفتاح صورة غير صالح', 400);
+  if (!validImgKey(key)) return error('مفتاح صورة غير صالح', 400);
   const body = await request.json().catch(() => null);
   if (!body || !body.data) return error('لا توجد بيانات صورة', 400);
-  let bin, bytes;
+  let bytes;
   try {
     const b64 = String(body.data).replace(/^data:[^;]+;base64,/, '');
-    bin = atob(b64);
+    const bin = atob(b64);
     bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   } catch (e) { return error('بيانات الصورة غير صالحة', 400); }
-  if (bytes.length > 6 * 1024 * 1024) return error('الصورة أكبر من 6MB', 413);
-  await env.IMAGES.put(key, bytes, { httpMetadata: { contentType: imgCt(key) } });
-  return json({ success: true, key, url: '/api/img/' + key });
+  if (bytes.length > 6 * 1024 * 1024) return error('الصورة أكبر من 6MB — قلّل الجودة من إعدادات الضغط', 413);
+  const ct = sniffImageType(bytes) || imgCt(key);
+  await env.IMAGES.put(key, bytes, { httpMetadata: { contentType: ct } });
+  return json({ success: true, key, url: '/api/img/' + key, bytes: bytes.length, contentType: ct });
 }
+
+/* v2.6: الحذف ينقل إلى سلة المهملات أولاً */
 async function handleImgDelete(request, env, key) {
   const auth = await requireAuth(request, env, ['super_admin']);
   if (auth.error) return auth.error;
+  if (!validImgKey(key)) return error('مفتاح صورة غير صالح', 400);
+  let trashed = false, trashKey = null;
+  try {
+    const obj = await env.IMAGES.get(key);
+    if (obj) {
+      const buf = await obj.arrayBuffer();
+      trashKey = 'trash/' + Date.now() + '/' + key;
+      await env.IMAGES.put(trashKey, buf, {
+        httpMetadata: { contentType: obj.httpMetadata?.contentType || imgCt(key) },
+        customMetadata: { originalKey: key, deletedAt: new Date().toISOString() }
+      });
+      trashed = true;
+    }
+  } catch (e) { console.error('trash copy failed:', e); }
   await env.IMAGES.delete(key);
-  return json({ success: true, deleted: key });
+  return json({ success: true, deleted: key, trashed, trashKey, retentionDays: TRASH_DAYS });
 }
+
 async function handleImgList(request, env) {
   const auth = await requireAuth(request, env, ['super_admin']);
   if (auth.error) return auth.error;
   const prefix = new URL(request.url).searchParams.get('prefix') || '';
-  const list = await env.IMAGES.list({ prefix });
+  const objects = await r2ListAll(env.IMAGES, prefix);
   return json({
-    files: list.objects.map(o => ({ name: o.key.split('/').pop(), path: o.key, sha: null }))
+    files: objects.filter(o => o.key.indexOf('trash/') !== 0)
+      .map(o => ({ name: o.key.split('/').pop(), path: o.key, size: o.size, sha: null }))
   });
+}
+
+/* ===== سلة المهملات ===== */
+function parseTrashKey(k) {
+  const rest = k.slice('trash/'.length);
+  const i = rest.indexOf('/');
+  if (i < 0) return null;
+  const ts = parseInt(rest.slice(0, i), 10);
+  const originalKey = rest.slice(i + 1);
+  if (!isFinite(ts) || !originalKey) return null;
+  return { ts, originalKey };
+}
+async function handleTrashList(request, env) {
+  const auth = await requireAuth(request, env, ['super_admin']);
+  if (auth.error) return auth.error;
+  const objects = await r2ListAll(env.IMAGES, 'trash/');
+  const items = [];
+  for (const o of objects) {
+    const p = parseTrashKey(o.key);
+    if (!p) continue;
+    items.push({
+      trashKey: o.key, originalKey: p.originalKey,
+      name: p.originalKey.split('/').pop(),
+      deletedAt: new Date(p.ts).toISOString(),
+      size: o.size,
+      daysLeft: Math.max(0, TRASH_DAYS - Math.floor((Date.now() - p.ts) / 86400000))
+    });
+  }
+  items.sort((a, b) => b.deletedAt.localeCompare(a.deletedAt));
+  return json({ items, count: items.length, retentionDays: TRASH_DAYS });
+}
+async function handleTrashRestore(request, env) {
+  const auth = await requireAuth(request, env, ['super_admin']);
+  if (auth.error) return auth.error;
+  const body = await request.json().catch(() => null);
+  const trashKey = body && body.trashKey;
+  if (!trashKey || trashKey.indexOf('trash/') !== 0) return error('مفتاح سلة مهملات غير صالح', 400);
+  const p = parseTrashKey(trashKey);
+  if (!p) return error('مفتاح سلة مهملات غير صالح', 400);
+  const obj = await env.IMAGES.get(trashKey);
+  if (!obj) return error('العنصر غير موجود في سلة المهملات', 404);
+  const buf = await obj.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  await env.IMAGES.put(p.originalKey, buf, {
+    httpMetadata: { contentType: obj.httpMetadata?.contentType || sniffImageType(bytes) || imgCt(p.originalKey) }
+  });
+  await env.IMAGES.delete(trashKey);
+  return json({ success: true, restored: p.originalKey });
+}
+async function handleTrashPurgeOne(request, env) {
+  const auth = await requireAuth(request, env, ['super_admin']);
+  if (auth.error) return auth.error;
+  const body = await request.json().catch(() => null);
+  const trashKey = body && body.trashKey;
+  if (!trashKey || trashKey.indexOf('trash/') !== 0) return error('مفتاح سلة مهملات غير صالح', 400);
+  await env.IMAGES.delete(trashKey);
+  return json({ success: true, purged: trashKey });
+}
+async function purgeOldTrash(env, days) {
+  const cutoff = Date.now() - (days || TRASH_DAYS) * 86400000;
+  const objects = await r2ListAll(env.IMAGES, 'trash/');
+  let removed = 0;
+  for (const o of objects) {
+    const p = parseTrashKey(o.key);
+    if (p && p.ts < cutoff) {
+      try { await env.IMAGES.delete(o.key); removed++; } catch (e) {}
+    }
+  }
+  return removed;
+}
+
+// ═══════════════════════════════════════════
+//  21) النسخ الاحتياطي (v2.6: يشمل المنيو والإعدادات)
+// ═══════════════════════════════════════════
+async function buildAndStoreBackup(env) {
+  const [orders, users, branches, tracking, ledger, appRow] = await Promise.all([
+    env.DB.prepare('SELECT * FROM orders').all(),
+    env.DB.prepare('SELECT id, name, phone, username, role, branch_id, is_active FROM users').all(),
+    env.DB.prepare('SELECT * FROM branches').all(),
+    env.DB.prepare("SELECT * FROM order_tracking WHERE created_at >= datetime('now', '-30 days')").all(),
+    env.DB.prepare('SELECT * FROM order_ledger').all(),
+    env.DB.prepare('SELECT * FROM app_data WHERE id = 1').first(),
+  ]);
+
+  let appData = null;
+  if (appRow) {
+    let menu = null, settings = null;
+    try { menu = JSON.parse(appRow.menu_json); } catch (e) {}
+    try { settings = JSON.parse(appRow.settings_json); } catch (e) {}
+    appData = { menu, settings, updated_at: appRow.updated_at || null };
+  }
+
+  let imageKeys = [];
+  try {
+    const objs = await r2ListAll(env.IMAGES, 'img/');
+    imageKeys = objs.map(o => ({ key: o.key, size: o.size }));
+  } catch (e) {}
+
+  const backup = {
+    exported_at: new Date().toISOString(),
+    version: '2.6',
+    app_data: appData,
+    images_inventory: imageKeys,
+    branches: branches.results,
+    users: users.results,
+    orders: orders.results,
+    order_tracking: tracking.results,
+    order_ledger: ledger.results,
+  };
+
+  const key = `backups/backup-${new Date().toISOString().slice(0, 10)}.json`;
+  await env.BACKUPS.put(key, JSON.stringify(backup), {
+    httpMetadata: { contentType: 'application/json' }
+  });
+
+  const list = await env.BACKUPS.list({ prefix: 'backups/' });
+  if (list.objects.length > 30) {
+    const sorted = list.objects.sort((a, b) => a.key.localeCompare(b.key));
+    await env.BACKUPS.delete(sorted.slice(0, list.objects.length - 30).map(o => o.key));
+  }
+
+  let sections = 0, items = 0;
+  if (appData && Array.isArray(appData.menu)) {
+    sections = appData.menu.length;
+    appData.menu.forEach(s => { items += (s.items || []).length; });
+  }
+  return {
+    key,
+    has_app_data: !!appData,
+    menu_sections: sections,
+    menu_items: items,
+    settings_keys: appData && appData.settings ? Object.keys(appData.settings).length : 0,
+    images_count: imageKeys.length,
+    orders: orders.results.length,
+    users: users.results.length
+  };
+}
+async function handleBackupNow(request, env) {
+  const auth = await requireAuth(request, env, ['super_admin']);
+  if (auth.error) return auth.error;
+  try {
+    const info = await buildAndStoreBackup(env);
+    return json({ success: true, message: 'تم إنشاء النسخة الاحتياطية (تشمل المنيو والإعدادات)', ...info });
+  } catch (e) {
+    console.error('Backup now error:', e);
+    return error('فشل النسخ الاحتياطي: ' + e.message, 500);
+  }
+}
+async function handleBackupList(request, env) {
+  const auth = await requireAuth(request, env, ['super_admin']);
+  if (auth.error) return auth.error;
+  const list = await env.BACKUPS.list({ prefix: 'backups/' });
+  const items = list.objects
+    .map(o => ({ key: o.key, name: o.key.split('/').pop(), size: o.size, uploaded: o.uploaded }))
+    .sort((a, b) => b.key.localeCompare(a.key));
+  return json({ items, count: items.length });
 }
 
 // ═══════════════════════════════════════════
@@ -1278,9 +1463,7 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
     try {
-      if (path === '/api/health' && request.method === 'GET') return json({ status: 'ok', version: '2.5', live_mode: env.LIVE_MODE || 'polling' });
-
-      /* استعادة كلمة المرور — محمية بمتغير RECOVERY_KEY السري */
+      if (path === '/api/health' && request.method === 'GET') return json({ status: 'ok', version: '2.6', live_mode: env.LIVE_MODE || 'polling', trash_days: TRASH_DAYS });
       if (path === '/api/recover-owner' && request.method === 'GET') return await handleRecoverOwner(request, env);
 
       if (path === '/api/data/menu' && request.method === 'GET') return await handleGetMenu(env);
@@ -1317,6 +1500,16 @@ export default {
       if (m && request.method === 'PUT') return await handleAdminUsersUpdate(parseInt(m[1]), request, env);
       if (path === '/api/reports/summary' && request.method === 'GET') return await handleReportsSummary(request, env);
       if (path === '/api/reports/accounting' && request.method === 'GET') return await handleReportsAccounting(request, env);
+
+      /* ===== النسخ الاحتياطي ===== */
+      if (path === '/api/admin/backup-now' && request.method === 'POST') return await handleBackupNow(request, env);
+      if (path === '/api/admin/backups' && request.method === 'GET') return await handleBackupList(request, env);
+
+      /* ===== سلة مهملات الصور ===== */
+      if (path === '/api/img/trash' && request.method === 'GET') return await handleTrashList(request, env);
+      if (path === '/api/img/restore' && request.method === 'POST') return await handleTrashRestore(request, env);
+      if (path === '/api/img/purge' && request.method === 'POST') return await handleTrashPurgeOne(request, env);
+
       if (path === '/api/img' && request.method === 'GET') return await handleImgList(request, env);
       if (path.startsWith('/api/img/')) {
         const key = decodeURIComponent(path.slice('/api/img/'.length));
@@ -1364,26 +1557,18 @@ export default {
           FROM orders o WHERE o.status = 'cancelled'
             AND NOT EXISTS (SELECT 1 FROM order_ledger l WHERE l.order_number = o.order_number AND l.kind = 'cancelled')
         `).run();
-        const [orders, users, branches, tracking, ledger] = await Promise.all([
-          env.DB.prepare('SELECT * FROM orders').all(),
-          env.DB.prepare('SELECT id, name, phone, username, role, branch_id, is_active FROM users').all(),
-          env.DB.prepare('SELECT * FROM branches').all(),
-          env.DB.prepare("SELECT * FROM order_tracking WHERE created_at >= datetime('now', '-30 days')").all(),
-          env.DB.prepare('SELECT * FROM order_ledger').all(),
-        ]);
-        const backup = {
-          exported_at: new Date().toISOString(),
-          branches: branches.results, users: users.results,
-          orders: orders.results, order_tracking: tracking.results,
-          order_ledger: ledger.results,
-        };
-        const key = `backups/backup-${new Date().toISOString().slice(0, 10)}.json`;
-        await env.BACKUPS.put(key, JSON.stringify(backup));
-        const list = await env.BACKUPS.list({ prefix: 'backups/' });
-        if (list.objects.length > 30) {
-          const sorted = list.objects.sort((a, b) => a.key.localeCompare(b.key));
-          await env.BACKUPS.delete(sorted.slice(0, list.objects.length - 30).map(o => o.key));
-        }
+
+        /* v2.6: نسخة احتياطية تشمل المنيو والإعدادات + جرد الصور */
+        try {
+          const info = await buildAndStoreBackup(env);
+          console.log('backup ok:', JSON.stringify(info));
+        } catch (e) { console.error('backup error:', e); }
+
+        /* v2.6: تفريغ سلة المهملات الأقدم من 30 يوماً */
+        try {
+          const removed = await purgeOldTrash(env, TRASH_DAYS);
+          console.log('trash purged:', removed);
+        } catch (e) { console.error('trash purge error:', e); }
       } else {
         await purgeStaleOrders(env);
       }
@@ -1392,5 +1577,5 @@ export default {
 };
 
 // ═══════════════════════════════════════════
-//  نهاية worker/index.js (v2.5)
+//  نهاية worker/index.js (v2.6)
 // ═══════════════════════════════════════════
