@@ -34,83 +34,13 @@ window.APP_SETTINGS = {
       "lng": 46.647204,
       "map": "https://maps.app.goo.gl/qwS3kpF2JUeHBCrH6",
       "hours": [
-        {
-          "o": {
-            "h": 10,
-            "m": 0
-          },
-          "c": {
-            "h": 3,
-            "m": 0
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 11,
-            "m": 0
-          },
-          "c": {
-            "h": 3,
-            "m": 0
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 3,
-            "m": 0
-          },
-          "c": {
-            "h": 8,
-            "m": 0
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 7,
-            "m": 0
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 15,
-            "m": 0
-          },
-          "c": {
-            "h": 3,
-            "m": 0
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 2,
-            "m": 0
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 3,
-            "m": 0
-          },
-          "closed": false
-        }
+        { "o": { "h": 10, "m": 0 }, "c": { "h": 3, "m": 0 }, "closed": false },
+        { "o": { "h": 11, "m": 0 }, "c": { "h": 3, "m": 0 }, "closed": false },
+        { "o": { "h": 3, "m": 0 }, "c": { "h": 8, "m": 0 }, "closed": false },
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 7, "m": 0 }, "closed": false },
+        { "o": { "h": 15, "m": 0 }, "c": { "h": 3, "m": 0 }, "closed": false },
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 2, "m": 0 }, "closed": false },
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 3, "m": 0 }, "closed": false }
       ],
       "deliveryFee": 10
     },
@@ -126,83 +56,13 @@ window.APP_SETTINGS = {
       "lng": 46.597488,
       "map": "https://maps.app.goo.gl/VjqWsGHn3xZgWoGu9",
       "hours": [
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 2,
-            "m": 0
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 2,
-            "m": 0
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 2,
-            "m": 0
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 2,
-            "m": 0
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 2,
-            "m": 0
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 2,
-            "m": 0
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 2,
-            "m": 0
-          },
-          "closed": false
-        }
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 2, "m": 0 }, "closed": false },
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 2, "m": 0 }, "closed": false },
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 2, "m": 0 }, "closed": false },
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 2, "m": 0 }, "closed": false },
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 2, "m": 0 }, "closed": false },
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 2, "m": 0 }, "closed": false },
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 2, "m": 0 }, "closed": false }
       ],
       "deliveryFee": 10
     },
@@ -218,83 +78,13 @@ window.APP_SETTINGS = {
       "lng": 46.656308,
       "map": "https://maps.app.goo.gl/59Rpm3zbqfFzstev8?g_st=ac",
       "hours": [
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 2,
-            "m": 0
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 2,
-            "m": 0
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 2,
-            "m": 0
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 2,
-            "m": 0
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 2,
-            "m": 0
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 2,
-            "m": 0
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 2,
-            "m": 0
-          },
-          "closed": false
-        }
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 2, "m": 0 }, "closed": false },
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 2, "m": 0 }, "closed": false },
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 2, "m": 0 }, "closed": false },
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 2, "m": 0 }, "closed": false },
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 2, "m": 0 }, "closed": false },
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 2, "m": 0 }, "closed": false },
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 2, "m": 0 }, "closed": false }
       ],
       "deliveryFee": 10
     },
@@ -310,87 +100,19 @@ window.APP_SETTINGS = {
       "lng": 46.621672,
       "map": "https://maps.app.goo.gl/tCieuNxohr4kyVrK7",
       "hours": [
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 2,
-            "m": 30
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 2,
-            "m": 30
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 2,
-            "m": 30
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 2,
-            "m": 30
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 2,
-            "m": 30
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 12,
-            "m": 30
-          },
-          "c": {
-            "h": 2,
-            "m": 30
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 2,
-            "m": 30
-          },
-          "closed": false
-        }
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 2, "m": 30 }, "closed": false },
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 2, "m": 30 }, "closed": false },
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 2, "m": 30 }, "closed": false },
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 2, "m": 30 }, "closed": false },
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 2, "m": 30 }, "closed": false },
+        { "o": { "h": 12, "m": 30 }, "c": { "h": 2, "m": 30 }, "closed": false },
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 2, "m": 30 }, "closed": false }
       ],
       "deliveryFee": 10
     },
     {
+      "id": "b-rawabi",
+      "num": 5,
       "nameAr": "فرع الروابي",
       "nameEn": "Al-Rawabi Branch",
       "addrAr": "الزبير بن العوام , الروابي , الرياض 11461",
@@ -400,86 +122,14 @@ window.APP_SETTINGS = {
       "lng": 46.790105,
       "map": "https://maps.app.goo.gl/AxGgzM4JUFSfciyu7?g_st=ac",
       "hours": [
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 2,
-            "m": 0
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 2,
-            "m": 0
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 2,
-            "m": 0
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 2,
-            "m": 0
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 2,
-            "m": 0
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 2,
-            "m": 0
-          },
-          "closed": false
-        },
-        {
-          "o": {
-            "h": 13,
-            "m": 0
-          },
-          "c": {
-            "h": 2,
-            "m": 0
-          },
-          "closed": false
-        }
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 2, "m": 0 }, "closed": false },
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 2, "m": 0 }, "closed": false },
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 2, "m": 0 }, "closed": false },
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 2, "m": 0 }, "closed": false },
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 2, "m": 0 }, "closed": false },
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 2, "m": 0 }, "closed": false },
+        { "o": { "h": 13, "m": 0 }, "c": { "h": 2, "m": 0 }, "closed": false }
       ],
-      "id": "b-1791819751585",
-      "num": 5,
       "deliveryFee": 10
     }
   ],
@@ -530,7 +180,7 @@ window.APP_SETTINGS = {
     "oncePerDay": true,
     "icon": "🍝",
     "titleAr": "افتتاح قريب",
-    "titleEn": "Coming Soon</label></div><div class=</label></div><div class=</label></div><div class=",
+    "titleEn": "Coming Soon",
     "textAr": "تابعونا على حساباتنا لمعرفة آخر العروض",
     "textEn": "Follow us on our accounts to stay updated on the latest offers",
     "btnAr": "حسناً 🍝",
