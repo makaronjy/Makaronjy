@@ -306,14 +306,8 @@ body{
 
 <script>
 /* ═══════════════════════════════════════════
-   مكرونجي — لوحة مشرف الفرع (v3.0)
-   v3.0: رسائل الواتساب بلغة الطلب (ttLang)
-         + حذف "عزيزنا" من الرسائل
-         + ذاكرة لغة معزولة (mk_lang_sup)
-   الثوابت الصحيحة:
-   • REFRESH_MS = 10000  ← بيانات كل 10 ثوانٍ (توفير حصة Worker)
-   • TIME_REFRESH_MS = 5000 ← وقت نسبي كل 5 ثوانٍ (محلي مجاني)
-   الألوان الذكية: 🟢 <5د | ⚪ 5-30د | 🔴 >30د + نبض
+   مكرونجي — لوحة مشرف الفرع (v3.0-P0-Fixed)
+   v3.0-P0-Fixed: تطبيق esc() على جميع مدخلات المستخدم لمنع XSS.
    ═══════════════════════════════════════════ */
 const API_BASE = 'https://makaronjy-api.makaronjy.workers.dev';
 const REFRESH_MS = 10000;      // 10 ثوانٍ للتحديث الدوري (بيانات من Worker)
@@ -709,17 +703,17 @@ function cardNew(o) {
   return `
   <div class="order-card new">
     <div class="oc-head">
-      <span class="oc-num">${o.number}</span>
+      <span class="oc-num">${esc(o.number)}</span>
       ${typeBadge(o)}
-      <span class="oc-cust">👤 ${o.customer_name}</span>
-      <a class="oc-phone" href="tel:${o.customer_phone}">${o.customer_phone}</a>
-      <span class="oc-total">${o.total} ${cur()}</span>
+      <span class="oc-cust">👤 ${esc(o.customer_name)}</span>
+      <a class="oc-phone" href="tel:${esc(o.customer_phone)}">${esc(o.customer_phone)}</a>
+      <span class="oc-total">${esc(o.total)} ${cur()}</span>
     </div>
     <div class="oc-line">${timeBadge(o.created_at)}</div>
-    ${o.customer_address ? `<div class="oc-line"><span class="lbl">📍 ${tt('supervisor.labels.address')}:</span> ${o.customer_address}
-      ${o.customer_lat ? `— <a class="map-link" target="_blank" href="https://www.google.com/maps?q=${o.customer_lat},${o.customer_lng}">${tt('supervisor.actions.viewMap')} 🗺️</a>` : ''}</div>` : ''}
-    <div class="oc-items">${o.items.map(i => `▪️ ${i.qty}× ${itemNameL(i)}${i.size ? ' (' + i.size + ')' : ''} — ${i.qty * i.price} ${cur()}`).join('<br>')}</div>
-    ${o.notes ? `<div class="oc-note">📝 ${o.notes}</div>` : ''}
+    ${o.customer_address ? `<div class="oc-line"><span class="lbl">📍 ${tt('supervisor.labels.address')}:</span> ${esc(o.customer_address)}
+      ${o.customer_lat ? `— <a class="map-link" target="_blank" href="https://www.google.com/maps?q=${esc(o.customer_lat)},${esc(o.customer_lng)}">${tt('supervisor.actions.viewMap')} 🗺️</a>` : ''}</div>` : ''}
+    <div class="oc-items">${o.items.map(i => `▪️ ${esc(i.qty)}× ${esc(itemNameL(i))}${i.size ? ' (' + esc(i.size) + ')' : ''} — ${i.qty * i.price} ${cur()}`).join('<br>')}</div>
+    ${o.notes ? `<div class="oc-note">📝 ${esc(o.notes)}</div>` : ''}
     <div class="oc-line"><span class="lbl">💵 ${tt('supervisor.labels.payment')}:</span> ${isPickup(o) ? tt('supervisor.badges.payment.atCashier') : (o.payment_method === 'cod' ? tt('supervisor.badges.payment.cod') : tt('supervisor.badges.payment.card'))}</div>
     <div class="oc-actions">
       <button class="btn btn-ok" onclick="act(${o.id},'accepted')">${tt('supervisor.actions.confirm')}</button>
@@ -744,7 +738,7 @@ function cardProgress(o) {
     if (isPickup(o)) {
       actions = `
         <button class="btn btn-ok" onclick="act(${o.id},'delivered')">${tt('supervisor.actions.pickupFromBranch')}</button>
-        <span class="oc-type pickup" style="align-self:center">${tt('supervisor.actions.pickupHint')} ${o.total} ${tt('supervisor.actions.atCashier')}</span>`;
+        <span class="oc-type pickup" style="align-self:center">${tt('supervisor.actions.pickupHint')} ${esc(o.total)} ${tt('supervisor.actions.atCashier')}</span>`;
     } else {
       poolInfo = `
         <div class="pool-info">
@@ -760,7 +754,7 @@ function cardProgress(o) {
           <div class="oc-actions">
             <select class="sel" id="drv-${o.id}">
               <option value="">${tt('supervisor.actions.chooseDriver')}</option>
-              ${DRIVERS.map(d => `<option value="${d.id}">${d.name}</option>`).join('')}
+              ${DRIVERS.map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('')}
             </select>
             <button class="btn btn-blue" onclick="assign(${o.id})">${tt('supervisor.actions.assignDriver')}</button>
           </div>
@@ -770,10 +764,10 @@ function cardProgress(o) {
   return `
   <div class="order-card${o.status === 'ready' && !isPickup(o) ? ' pool' : ''}">
     <div class="oc-head">
-      <span class="oc-num">${o.number}</span>
+      <span class="oc-num">${esc(o.number)}</span>
       ${typeBadge(o)}
-      <span class="oc-cust">👤 ${o.customer_name}</span>
-      <span class="oc-total">${o.total} ${cur()}</span>
+      <span class="oc-cust">👤 ${esc(o.customer_name)}</span>
+      <span class="oc-total">${esc(o.total)} ${cur()}</span>
     </div>
     <div class="oc-line"><span class="lbl">${tt('supervisor.labels.status')}:</span> ${statusLbl(o)} — ${timeBadge(o.created_at)}</div>
     ${poolInfo}
@@ -789,17 +783,17 @@ function togglePoolAssign(id) {
 /* ─── بطاقة توصيل نشط ─── */
 function cardActive(o) {
   const mapLink = (o.driver_lat && o.driver_lng)
-    ? `<a class="map-link" target="_blank" href="https://www.google.com/maps?q=${o.driver_lat},${o.driver_lng}">${tt('supervisor.actions.driverLocation')}</a>`
+    ? `<a class="map-link" target="_blank" href="https://www.google.com/maps?q=${esc(o.driver_lat)},${esc(o.driver_lng)}">${tt('supervisor.actions.driverLocation')}</a>`
     : '';
   return `
   <div class="order-card">
     <div class="oc-head">
-      <span class="oc-num">${o.number}</span>
+      <span class="oc-num">${esc(o.number)}</span>
       ${typeBadge(o)}
-      <span class="oc-cust">🚗 ${o.driver_name || tt('supervisor.actions.unknownDriver')}</span>
-      ${o.driver_phone ? `<a class="oc-phone" href="tel:${o.driver_phone}">${o.driver_phone}</a>` : ''}
+      <span class="oc-cust">🚗 ${esc(o.driver_name || tt('supervisor.actions.unknownDriver'))}</span>
+      ${o.driver_phone ? `<a class="oc-phone" href="tel:${esc(o.driver_phone)}">${esc(o.driver_phone)}</a>` : ''}
     </div>
-    <div class="oc-line"><span class="lbl">👤 ${tt('supervisor.labels.customer')}:</span> ${o.customer_name} — <a class="oc-phone" href="tel:${o.customer_phone}">${o.customer_phone}</a></div>
+    <div class="oc-line"><span class="lbl">👤 ${tt('supervisor.labels.customer')}:</span> ${esc(o.customer_name)} — <a class="oc-phone" href="tel:${esc(o.customer_phone)}">${esc(o.customer_phone)}</a></div>
     <div class="oc-line"><span class="lbl">${tt('supervisor.labels.status')}:</span> ${statusLbl(o)} ${mapLink} — ${timeBadge(o.created_at)}</div>
     <div class="oc-line"><a class="map-link" target="_blank" href="track.html?order=${encodeURIComponent(o.number)}">${tt('supervisor.actions.openTracking')}</a></div>
   </div>`;
@@ -812,12 +806,12 @@ function cardDone(o) {
   return `
   <div class="order-card">
     <div class="oc-head">
-      <span class="oc-num">${o.number}</span>
+      <span class="oc-num">${esc(o.number)}</span>
       ${typeBadge(o)}
-      <span class="oc-cust">👤 ${o.customer_name}</span>
-      <span class="oc-total">${o.total} ${cur()}</span>
+      <span class="oc-cust">👤 ${esc(o.customer_name)}</span>
+      <span class="oc-total">${esc(o.total)} ${cur()}</span>
     </div>
-    <div class="oc-line"><span class="lbl">🚗 ${tt('supervisor.labels.driver')}:</span> ${isPickup(o) ? tt('supervisor.badges.pickup') : (o.driver_name || '—')} — ${timeBadge(o.created_at)}</div>
+    <div class="oc-line"><span class="lbl">🚗 ${tt('supervisor.labels.driver')}:</span> ${isPickup(o) ? tt('supervisor.badges.pickup') : esc(o.driver_name || '—')} — ${timeBadge(o.created_at)}</div>
     ${photoBtn ? `<div class="oc-actions">${photoBtn}</div>` : ''}
   </div>`;
 }
@@ -831,7 +825,7 @@ async function act(id, status) {
       title: tt('supervisor.actions.reject'),
       yes: tt('supervisor.actions.reject'),
       danger: true,
-      meta: o ? (o.number + ' • ' + o.customer_name + ' • ' + o.total + ' ' + cur()) : ''
+      meta: o ? (esc(o.number) + ' • ' + esc(o.customer_name) + ' • ' + esc(o.total) + ' ' + cur()) : ''
     });
     if (!ok) return;
   }
@@ -840,7 +834,7 @@ async function act(id, status) {
       icon: '✅',
       title: tt('supervisor.actions.pickupFromBranch'),
       yes: isEn() ? 'Yes, picked up' : 'نعم، استلمه العميل',
-      meta: o ? (o.number + ' • ' + o.customer_name + ' • ' + o.total + ' ' + cur()) : ''
+      meta: o ? (esc(o.number) + ' • ' + esc(o.customer_name) + ' • ' + esc(o.total) + ' ' + cur()) : ''
     });
     if (!ok) return;
   }
@@ -866,7 +860,7 @@ async function assign(id) {
       method: 'PUT',
       body: JSON.stringify({ driver_id: parseInt(driverId) }),
     });
-    toast(tt('supervisor.toast.driverAssigned') + ': ' + r.driver_name, 'ok');
+    toast(tt('supervisor.toast.driverAssigned') + ': ' + esc(r.driver_name), 'ok');
     loadAll(false);
   } catch (e) {
     toast('⚠️ ' + e.message, 'err');
@@ -888,31 +882,31 @@ function printReport() {
   const fees = done.reduce((s, o) => s + o.delivery_fee, 0);
 
   document.getElementById('reportArea').innerHTML = `
-    <h2>🍝 ${tt('supervisor.report.title')} ${brDisplayName(orders[0] || {}) || USER.branchName || ''}</h2>
-    <p>${tt('supervisor.report.date')}: ${new Date().toLocaleString(isEn() ? 'en-GB' : 'ar-SA', {timeZone:'Asia/Riyadh'})}</p>
-    <p>${tt('supervisor.report.totalOrders')}: ${orders.length} | ${tt('supervisor.report.delivered')}: ${done.length} | ${tt('supervisor.report.revenue')}: ${revenue} ${cur()} | ${tt('supervisor.report.fees')}: ${fees} ${cur()}</p>
+    <h2>🍝 ${esc(tt('supervisor.report.title'))} ${esc(brDisplayName(orders[0] || {}) || USER.branchName || '')}</h2>
+    <p>${esc(tt('supervisor.report.date'))}: ${new Date().toLocaleString(isEn() ? 'en-GB' : 'ar-SA', {timeZone:'Asia/Riyadh'})}</p>
+    <p>${esc(tt('supervisor.report.totalOrders'))}: ${orders.length} | ${esc(tt('supervisor.report.delivered'))}: ${done.length} | ${esc(tt('supervisor.report.revenue'))}: ${revenue} ${cur()} | ${esc(tt('supervisor.report.fees'))}: ${fees} ${cur()}</p>
     <table>
       <tr>
-        <th>${tt('supervisor.report.columns.orderNum')}</th>
-        <th>${tt('supervisor.report.columns.type')}</th>
-        <th>${tt('supervisor.report.columns.customer')}</th>
-        <th>${tt('supervisor.report.columns.phone')}</th>
-        <th>${tt('supervisor.report.columns.total')}</th>
-        <th>${tt('supervisor.report.columns.status')}</th>
-        <th>${tt('supervisor.report.columns.driver')}</th>
+        <th>${esc(tt('supervisor.report.columns.orderNum'))}</th>
+        <th>${esc(tt('supervisor.report.columns.type'))}</th>
+        <th>${esc(tt('supervisor.report.columns.customer'))}</th>
+        <th>${esc(tt('supervisor.report.columns.phone'))}</th>
+        <th>${esc(tt('supervisor.report.columns.total'))}</th>
+        <th>${esc(tt('supervisor.report.columns.status'))}</th>
+        <th>${esc(tt('supervisor.report.columns.driver'))}</th>
       </tr>
       ${orders.map(o => `
         <tr>
-          <td>${o.number}</td>
+          <td>${esc(o.number)}</td>
           <td>${isPickup(o) ? (isEn()?'Pickup':'استلام') : (isEn()?'Delivery':'توصيل')}</td>
-          <td>${o.customer_name}</td>
-          <td>${o.customer_phone}</td>
-          <td>${o.total}</td>
-          <td>${statusLbl(o)}</td>
-          <td>${isPickup(o) ? '🏪' : (o.driver_name || '—')}</td>
+          <td>${esc(o.customer_name)}</td>
+          <td>${esc(o.customer_phone)}</td>
+          <td>${esc(o.total)}</td>
+          <td>${esc(statusLbl(o))}</td>
+          <td>${isPickup(o) ? '🏪' : esc(o.driver_name || '—')}</td>
         </tr>`).join('')}
     </table>
-    <p style="margin-top:1rem">${tt('supervisor.report.savePdfHint')}</p>
+    <p style="margin-top:1rem">${esc(tt('supervisor.report.savePdfHint'))}</p>
   `;
   window.print();
 }
@@ -950,4 +944,4 @@ document.addEventListener('visibilitychange', () => {
 
 </body>
 </html>
-<!-- ===== END supervisor.html (v3.0) ===== -->
+<!-- ===== END supervisor.html (v3.0-P0-Fixed) ===== -->
