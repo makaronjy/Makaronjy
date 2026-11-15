@@ -1,17 +1,7 @@
 // ═══════════════════════════════════════════
 //  مكرونجي - Cloudflare Worker API (كامل)
-//  الإصدار: 2.7
-//  v2.7: • /api/health يُبلغ عن القدرات (features) لا الرقم فقط
-//        • فحص وتنظيف صور الأصناف اليتيمة (إلى سلة المهملات)
-//        • حمايات: رفض العمل عند منيو فارغ + تحذير النسبة العالية
-//  v2.6: المنيو والإعدادات داخل النسخة الاحتياطية الليلية
-//        + حذف نهائي للأصناف/البانرات + سلة مهملات 30 يوماً
-//        + كشف نوع الصورة الحقيقي (WebP داخل مفتاح .png)
-//  v2.5: عرض الصور Read-Through (لصور التطبيق فقط منذ 2.6)
-//  v2.4: استعادة كلمة المرور بمتغير سري RECOVERY_KEY
-//  v2.3: نظام صور R2 بصلاحيات JWT
-//  v2.2: جسر المالك يقبل JWT
-//  v2.1: endpoints المنيو والإعدادات من D1
+//  الإصدار: 2.7-P0-Fixed
+//  إصلاحات P0: التحقق من الأسعار/الرسوم من D1، منع حذف الطلبات النشطة، حماية صور التسليم.
 // ═══════════════════════════════════════════
 
 const CORS_HEADERS = {
@@ -157,25 +147,20 @@ async function ledgerInsert(env, order, kind) {
 }
 
 // ═══════════════════════════════════════════
-//  الحذف الكسول
+//  الحذف الكسول (P0 Fixed: حذف pending فقط > 24 ساعة)
 // ═══════════════════════════════════════════
 async function purgeStaleOrders(env) {
   try {
     const stale = await env.DB.prepare(`
       SELECT * FROM orders
-      WHERE status NOT IN ('delivered','archived')
-        AND updated_at < datetime('now', '-1 hour')
+      WHERE status = 'pending'
+        AND created_at < datetime('now', '-24 hours')
     `).all();
     if (!stale.results.length) return 0;
     for (const o of stale.results) {
-      const already = await env.DB.prepare(
-        'SELECT 1 FROM order_ledger WHERE order_number = ?'
-      ).bind(o.order_number).first();
-      if (!already) await ledgerInsert(env, o, 'abandoned');
+      await ledgerInsert(env, o, 'abandoned');
       await env.DB.prepare('DELETE FROM orders WHERE id = ?').bind(o.id).run();
     }
-    await env.DB.prepare('DELETE FROM order_tracking WHERE order_id NOT IN (SELECT id FROM orders)').run();
-    await env.DB.prepare('DELETE FROM driver_locations WHERE order_id NOT IN (SELECT id FROM orders)').run();
     return stale.results.length;
   } catch (e) {
     console.error('purge error:', e);
@@ -553,14 +538,16 @@ async function handleChangePassword(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  4) إنشاء طلب
+//  4) إنشاء طلب (P0 Fixed: التحقق من الأسعار والرسوم من D1)
 // ═══════════════════════════════════════════
 async function handleCreateOrder(request, env) {
   const ip = getIP(request);
   const rateCheck = await checkRateLimit(env, `create_order:${ip}`, 10, 60);
   if (!rateCheck.allowed) return error('محاولات كثيرة، حاول بعد دقيقة', 429);
+  
   const body = await request.json().catch(() => null);
   if (!body) return error('بيانات ناقصة');
+  
   const customerName = sanitize(body.customer_name);
   const customerPhone = sanitize(body.customer_phone);
   const branchId = sanitize(body.branch_id);
@@ -568,30 +555,68 @@ async function handleCreateOrder(request, env) {
   const notes = sanitize(body.notes || '');
   const orderType = body.order_type === 'pickup' ? 'pickup' : 'delivery';
   const orderLang = normLang(body.lang);
+  
   if (!customerName || customerName.length < 2) return error('الاسم مطلوب (حرفان على الأقل)');
   if (!customerPhone || !/^\d{9,15}$/.test(customerPhone.replace(/[^0-9]/g, ''))) return error('رقم الجوال غير صحيح');
   if (!branchId) return error('الفرع مطلوب');
   if (items.length === 0) return error('السلة فارغة');
-  const branch = await env.DB.prepare('SELECT * FROM branches WHERE id = ? AND is_active = 1').bind(branchId).first();
-  if (!branch) return error('الفرع غير موجود');
-  let subtotal = 0;
-  const cleanItems = items.map(item => {
-    const qty = Math.max(1, parseInt(item.qty) || 1);
-    const price = Math.max(0, parseFloat(item.price) || 0);
-    subtotal += qty * price;
-    return { id: sanitize(item.id || ''), name: sanitize(item.name || ''), name_ar: sanitize(item.name_ar || item.name || ''), name_en: sanitize(item.name_en || item.name || ''), qty, price, size: sanitize(item.size || '') };
+
+  // 🔒 جلب بيانات الفرع والمنيوم من قاعدة البيانات للتحقق
+  const branch = await env.DB.prepare('SELECT id, name_ar, phone, delivery_fee FROM branches WHERE id = ? AND is_active = 1').bind(branchId).first();
+  if (!branch) return error('الفرع غير موجود أو غير نشط');
+
+  const menuRow = await env.DB.prepare('SELECT menu_json FROM app_data WHERE id = 1').first();
+  let menuData = [];
+  try { menuData = menuRow ? JSON.parse(menuRow.menu_json) : []; } catch(e) {}
+  
+  const menuMap = new Map();
+  menuData.forEach(sec => {
+    (sec.items || []).forEach(it => {
+      menuMap.set(it.id, { 
+        price: it.prices && it.prices[0] ? it.prices[0] : 0, 
+        hidden: it.hidden || false,
+        name: it.name || it.ar,
+        name_ar: it.name_ar || it.ar,
+        name_en: it.name_en || it.en
+      });
+    });
   });
+
+  let subtotal = 0;
+  const cleanItems = [];
+  
+  for (const item of items) {
+    const dbItem = menuMap.get(item.id);
+    if (!dbItem) return error(`الصنف غير موجود: ${item.id}`);
+    if (dbItem.hidden) return error(`الصنف غير متاح حالياً: ${item.id}`);
+    
+    const qty = Math.max(1, parseInt(item.qty) || 1);
+    const price = dbItem.price; // 🔒 استخدام السعر من قاعدة البيانات
+    subtotal += qty * price;
+    
+    cleanItems.push({ 
+      id: sanitize(item.id), 
+      name: sanitize(dbItem.name), 
+      name_ar: sanitize(dbItem.name_ar), 
+      name_en: sanitize(dbItem.name_en), 
+      qty, 
+      price, 
+      size: sanitize(item.size || '') 
+    });
+  }
+
   let deliveryFee = 0;
   if (orderType === 'delivery') {
-    const feeMode = body.delivery_fee_mode || 'free';
-    if (feeMode === 'fixed') deliveryFee = parseFloat(body.delivery_fee) || 5;
-    else if (feeMode === 'per_branch') deliveryFee = branch.delivery_fee || 10;
+    // 🔒 استخدام رسوم التوصيل من قاعدة البيانات، وتجاهل مدخلات العميل
+    deliveryFee = parseFloat(branch.delivery_fee) || 0;
   }
+  
   const total = subtotal + deliveryFee;
   const orderNumber = await generateOrderNumber(env.DB);
   const customerLat = parseFloat(body.customer_lat) || null;
   const customerLng = parseFloat(body.customer_lng) || null;
   const customerAddress = orderType === 'delivery' ? sanitize(body.customer_address || '') : '';
+
   const result = await env.DB.prepare(`
     INSERT INTO orders (
       order_number, branch_id, order_type, lang, customer_name, customer_phone, customer_address,
@@ -599,8 +624,10 @@ async function handleCreateOrder(request, env) {
       delivery_fee, total, payment_method, status, notes
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'cod', 'pending', ?)
   `).bind(orderNumber, branchId, orderType, orderLang, customerName, customerPhone, customerAddress, customerLat, customerLng, JSON.stringify(cleanItems), subtotal, deliveryFee, total, notes).run();
+  
   const orderId = result.meta.last_row_id;
   await env.DB.prepare(`INSERT INTO order_tracking (order_id, status, notes) VALUES (?, 'pending', ?)`).bind(orderId, orderType === 'pickup' ? 'تم استلام الطلب — استلام من الفرع' : 'تم استلام الطلب').run();
+  
   return json({
     success: true, order_number: orderNumber, order_id: orderId, order_type: orderType, lang: orderLang,
     total, delivery_fee: deliveryFee, branch_name: branch.name_ar, branch_phone: branch.phone,
@@ -1213,6 +1240,9 @@ function validImgKey(key) {
 
 async function handleImgServe(key, env) {
   if (!validImgKey(key)) return error('مفتاح صورة غير صالح', 400);
+  // 🔒 حماية صور التسليم من الوصول العام (P0 Fixed)
+  if (!key.startsWith('img/')) return error('غير مصرح بالوصول', 403);
+  
   try {
     const obj = await env.IMAGES.get(key);
     if (obj) {
@@ -1226,7 +1256,7 @@ async function handleImgServe(key, env) {
     }
   } catch (e) {}
 
-  /* النقل الذاتي لصور التطبيق الثابتة فقط — حذف الأصناف/البانرات نهائي */
+  /* النقل الذاتي لصور التطبيق الثابتة فقط */
   if (APP_IMG_FALLBACK.indexOf(key) >= 0) {
     try {
       const safeUrl = RAW_BASE + key.split('/').map(encodeURIComponent).join('/');
@@ -1588,7 +1618,7 @@ export default {
       if (path === '/api/admin/backup-now' && request.method === 'POST') return await handleBackupNow(request, env);
       if (path === '/api/admin/backups' && request.method === 'GET') return await handleBackupList(request, env);
 
-      /* ===== v2.7: صور الأصناف اليتيمة ===== */
+      /* ===== صور الأصناف اليتيمة ===== */
       if (path === '/api/admin/item-orphans' && request.method === 'GET') return await handleItemOrphans(request, env);
       if (path === '/api/admin/item-orphans-clean' && request.method === 'POST') return await handleItemOrphansClean(request, env);
 
@@ -1622,12 +1652,14 @@ export default {
         await env.DB.prepare("DELETE FROM sessions WHERE expires_at < datetime('now')").run();
         await env.DB.prepare("DELETE FROM driver_locations WHERE created_at < datetime('now', '-7 days')").run();
         await env.DB.prepare(`DELETE FROM order_tracking WHERE order_id IN (SELECT id FROM orders WHERE status = 'archived' AND updated_at < datetime('now', '-90 days'))`).run();
-        const old = await env.DB.prepare(`SELECT * FROM orders WHERE status NOT IN ('delivered','archived') AND created_at < datetime('now', '-30 days')`).all();
+        
+        // P0 Fixed: حذف الطلبات المعلقة فقط الأقدم من 24 ساعة
+        const old = await env.DB.prepare(`SELECT * FROM orders WHERE status = 'pending' AND created_at < datetime('now', '-24 hours')`).all();
         for (const o of old.results) {
-          const already = await env.DB.prepare('SELECT 1 FROM order_ledger WHERE order_number = ?').bind(o.order_number).first();
-          if (!already) await ledgerInsert(env, o, 'abandoned');
+          await ledgerInsert(env, o, 'abandoned');
           await env.DB.prepare('DELETE FROM orders WHERE id = ?').bind(o.id).run();
         }
+        
         await env.DB.prepare('DELETE FROM order_tracking WHERE order_id NOT IN (SELECT id FROM orders)').run();
         await env.DB.prepare('DELETE FROM driver_locations WHERE order_id NOT IN (SELECT id FROM orders)').run();
         await env.DB.prepare(`
@@ -1664,5 +1696,5 @@ export default {
 };
 
 // ═══════════════════════════════════════════
-//  نهاية worker/index.js (v2.7)
+//  نهاية worker/index.js (v2.7-P0-Fixed)
 // ═══════════════════════════════════════════
