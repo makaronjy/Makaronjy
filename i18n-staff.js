@@ -1,8 +1,12 @@
 /* ═══════════════════════════════════════════
    مكرونجي — نظام الترجمة المركزي للصفحات الإدارية
-   i18n-staff.js  v2.1
+   i18n-staff.js  v2.2
    يُستخدم في: login / supervisor / driver / track / admin
    (تطبيق العميل index.html يحتفظ بقاموسه الخاص في app.js)
+   v2.2: • track.autoUpdate: 15 → 8 ثوانٍ (مطابق لـ POLL_MS في track.html)
+         • إصلاح إيموجي مكسور في en.supervisor.actions.preparing
+           كان «👨‍ Preparing» بتسلسل ZWJ ناقص → «👨‍🍳 Preparing»
+         • لا حذف ولا تغيير في أي مفتاح آخر
    v2.1: قاموس v1.0 كامل بدون أي حذف +
          عزل ذاكرة اللغة لكل صفحة + ttLang() بلغة الطلب +
          حذف "عزيزنا" (رسائل محايدة للجنسين)
@@ -241,7 +245,7 @@ window.STAFF_I18N = {
       pageTitle: 'تتبع الطلب',
       subtitle: 'تتبع طلبك لحظة بلحظة',
       loading: 'جارٍ تحميل طلبك...',
-      autoUpdate: '🔄 تحديث تلقائي كل 15 ثانية — لا تحتاج إعادة تحميل الصفحة',
+      autoUpdate: '🔄 تحديث تلقائي كل 8 ثوانٍ — لا تحتاج إعادة تحميل الصفحة',
       orderTypeLabel: {
         pickup: '🏪 طلب استلام من الفرع',
         delivery: '🛵 طلب توصيل'
@@ -566,7 +570,7 @@ window.STAFF_I18N = {
       actions: {
         confirm: '✅ Confirm',
         reject: '❌ Reject',
-        preparing: '👨‍ Preparing',
+        preparing: '👨‍🍳 Preparing',
         ready: '📦 Order Ready',
         readyForPickup: '📦 Ready for Pickup',
         sendToPool: '📦 Send to Drivers',
@@ -706,7 +710,7 @@ window.STAFF_I18N = {
       pageTitle: 'Order Tracking',
       subtitle: 'Track your order in real-time',
       loading: 'Loading your order...',
-      autoUpdate: '🔄 Auto-refresh every 15 seconds — no need to reload',
+      autoUpdate: '🔄 Auto-refresh every 8 seconds — no need to reload',
       orderTypeLabel: {
         pickup: '🏪 Branch Pickup',
         delivery: '🛵 Delivery Order'
@@ -1142,5 +1146,5 @@ window.renderLangToggle = renderLangToggle;
 window.initStaffI18n = initStaffI18n;
 
 /* ═══════════════════════════════════════════
-   نهاية i18n-staff.js (v2.1)
+   نهاية i18n-staff.js (v2.2)
    ═══════════════════════════════════════════ */
