@@ -1,5 +1,14 @@
 /* =====================================================
    مكرونجي — الطبقة السحابية (cloud.js)
+   v18.0: إصلاح حرج — لا فقدان طلبات صامت:
+          • createCloudOrder ترجع سبب الفشل الحقيقي (لا null مبتلع)
+          • عند الفشل: السلة تبقى كما هي + لا رسالة «بنجاح» أبداً
+          • شاشة فشل واضحة: السبب + إعادة المحاولة + واتساب يدوي مُعلَّم
+          • الإجمالي في رسالة واتساب يُؤخذ من الخادم لا من العميل
+          • تحذير صريح عند اختلاف إجمالي الخادم عن المعروض
+          • مهلة 20 ثانية للطلب (كان بلا مهلة → تعليق لا نهائي)
+          • زر إلغاء في دليل الموقع (كان حلقة لا مخرج منها)
+          • تهريب رقم الطلب ورابط التتبع في شاشة النجاح
    v17.8: لغة العميل تُرسل مع الطلب (orders.lang)
           + كل ميزات v17.7 كما هي بدون أي حذف:
           • قفل الطلب المكرر
@@ -10,6 +19,7 @@
    ===================================================== */
 
 const CLOUD_API = 'https://makaronjy-api.makaronjy.workers.dev';
+const ORDER_TIMEOUT_MS = 20000;   /* v18: مهلة إرسال الطلب */
 
 /* ===== أدوات ===== */
 function sanitize(str){
@@ -19,6 +29,12 @@ function sanitize(str){
             .replace(/on\w+=/gi,'')
             .trim()
             .slice(0,1000);
+}
+/* v18: تهريب للعرض داخل HTML */
+function mkEsc(s){
+  return String(s==null?'':s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 function getCustomerInfo(){
   try{ return JSON.parse(localStorage.getItem('mk_customer')) || {name:'',phone:''}; }
@@ -42,8 +58,8 @@ function deliveryAvailability(){
 function branchHasDelivery(br){
   if(!br) return true;
   const da = deliveryAvailability();
-  if(da.mode === 'none') return false;
-  if(da.mode === 'selected') return da.branchIds.includes(br.id);
+  if (da.mode === 'none') return false;
+  if (da.mode === 'selected') return da.branchIds.includes(br.id);
   return true;
 }
 function enforceDeliveryUI(){
@@ -420,10 +436,15 @@ function showLocationGuide(){
             (ar ? '🏪 تحويل لاستلام من الفرع' : '🏪 Switch to pickup') +
           '</button>' +
         '</div>' +
+        /* v18: مخرج من الحلقة — إلغاء الطلب مع الحفاظ على السلة */
+        '<button id="mkLocCancel" style="display:block;width:100%;border:none;border-radius:12px;padding:.7rem;margin-top:.5rem;background:transparent;color:#8a6f63;font-family:inherit;font-weight:800;font-size:.8rem;cursor:pointer">' +
+          (ar ? '✕ إلغاء الطلب (سلتك محفوظة)' : '✕ Cancel order (cart is kept)') +
+        '</button>' +
       '</div>';
     box.style.display = 'flex';
     el('mkLocRetry').onclick = function(){ box.style.display = 'none'; resolve('retry'); };
     el('mkLocConvert').onclick = function(){ box.style.display = 'none'; resolve('convert'); };
+    el('mkLocCancel').onclick = function(){ box.style.display = 'none'; resolve('cancel'); };
   });
 }
 async function ensureDeliveryLocation(){
@@ -432,6 +453,7 @@ async function ensureDeliveryLocation(){
     if(st === 'denied'){
       const choice = await showLocationGuide();
       if(choice === 'convert') return { convert: true };
+      if(choice === 'cancel') return { cancel: true };
       continue;
     }
     const loc = await captureGeoRaw();
@@ -440,25 +462,200 @@ async function ensureDeliveryLocation(){
     if(st2 === 'denied'){
       const choice = await showLocationGuide();
       if(choice === 'convert') return { convert: true };
+      if(choice === 'cancel') return { cancel: true };
       continue;
     }
     const choice = await showLocationGuide();
     if(choice === 'convert') return { convert: true };
+    if(choice === 'cancel') return { cancel: true };
   }
 }
 
-/* ===== إرسال للـ Worker ===== */
+/* =====================================================
+   ===== v18: إرسال للـ Worker مع سبب فشل صريح =====
+   يرجع دائماً كائناً: { ok:true, data } أو { ok:false, kind, status, message }
+   لا يبتلع السبب أبداً — يسجّله في Console للتشخيص
+===================================================== */
 async function createCloudOrder(payload){
+  const ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+  const to = ctrl ? setTimeout(function(){ ctrl.abort(); }, ORDER_TIMEOUT_MS) : null;
   try{
-    const r = await fetch(CLOUD_API + '/api/orders', {
+    const opts = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
+    };
+    if(ctrl) opts.signal = ctrl.signal;
+    const r = await fetch(CLOUD_API + '/api/orders', opts);
+    let j = null;
+    try{ j = await r.json(); }catch(e){ j = null; }
+
+    if(r.ok && j && j.success){
+      return { ok:true, data:j };
+    }
+
+    const serverMsg = (j && (j.error || j.message)) ? String(j.error || j.message) : '';
+    let kind = 'server';
+    if(r.status === 429) kind = 'rate';
+    else if(r.status === 409 || r.status === 400) kind = 'reject';
+    else if(r.status === 503) kind = 'unavailable';
+    else if(r.status >= 500) kind = 'server';
+
+    console.error('[MK ORDER] فشل تسجيل الطلب', {
+      status: r.status,
+      kind: kind,
+      serverMessage: serverMsg,
+      branch: payload.branch_id,
+      type: payload.order_type,
+      items: (payload.items || []).map(function(i){ return { id:i.id, qty:i.qty }; })
     });
-    const j = await r.json();
-    if(r.ok && j.success) return j;
-    return null;
-  }catch(e){ return null; }
+    return { ok:false, kind:kind, status:r.status, message:serverMsg };
+  }catch(e){
+    const aborted = (e && (e.name === 'AbortError'));
+    console.error('[MK ORDER] خطأ شبكة', aborted ? 'انتهت المهلة (20 ثانية)' : e);
+    return { ok:false, kind: aborted ? 'timeout' : 'network', status:0, message:'' };
+  }finally{
+    if(to) clearTimeout(to);
+  }
+}
+
+/* v18: نص الفشل المفهوم للعميل حسب نوعه */
+function failureText(res){
+  const ar = isAr();
+  const k = res && res.kind;
+  if(k === 'reject'){
+    return {
+      title: ar ? '⚠️ لم يُقبل الطلب' : '⚠️ Order not accepted',
+      msg: res.message || (ar ? 'أحد الأصناف غير متاح' : 'An item is unavailable'),
+      hint: ar ? 'راجع سلتك — قد يكون صنف نفد اليوم أو غير متوفر لفرعك. سلتك محفوظة كما هي.'
+               : 'Check your cart — an item may be sold out today or unavailable at your branch. Your cart is intact.',
+      retry: true
+    };
+  }
+  if(k === 'rate'){
+    return {
+      title: ar ? '⏳ محاولات كثيرة' : '⏳ Too many attempts',
+      msg: ar ? 'أرسلت عدة طلبات في وقت قصير' : 'Several orders were sent in a short time',
+      hint: ar ? 'انتظر دقيقة ثم اضغط «إعادة المحاولة». سلتك محفوظة.'
+               : 'Wait a minute then tap Retry. Your cart is intact.',
+      retry: true
+    };
+  }
+  if(k === 'unavailable'){
+    return {
+      title: ar ? '🍝 القائمة غير متاحة' : '🍝 Menu unavailable',
+      msg: res.message || (ar ? 'القائمة غير جاهزة حالياً' : 'Menu is not ready right now'),
+      hint: ar ? 'حاول بعد قليل. سلتك محفوظة.' : 'Try again shortly. Your cart is intact.',
+      retry: true
+    };
+  }
+  if(k === 'timeout'){
+    return {
+      title: ar ? '⏱️ انتهى وقت الاتصال' : '⏱️ Connection timed out',
+      msg: ar ? 'لم يرد الخادم خلال 20 ثانية' : 'The server did not respond within 20 seconds',
+      hint: ar ? 'تحقق من الإنترنت ثم أعد المحاولة. سلتك محفوظة — لم يُفقد شيء.'
+               : 'Check your internet then retry. Your cart is intact — nothing was lost.',
+      retry: true
+    };
+  }
+  if(k === 'network'){
+    return {
+      title: ar ? '📡 تعذّر الاتصال' : '📡 Connection failed',
+      msg: ar ? 'لا يوجد اتصال بالخادم' : 'Could not reach the server',
+      hint: ar ? 'تحقق من الإنترنت ثم أعد المحاولة. سلتك محفوظة.'
+               : 'Check your internet then retry. Your cart is intact.',
+      retry: true
+    };
+  }
+  return {
+    title: ar ? '⚠️ خطأ في الخادم' : '⚠️ Server error',
+    msg: (res && res.message) ? res.message : (ar ? ('رمز الخطأ: ' + (res ? res.status : '?')) : ('Error code: ' + (res ? res.status : '?'))),
+    hint: ar ? 'أعد المحاولة بعد قليل. سلتك محفوظة.' : 'Retry shortly. Your cart is intact.',
+    retry: true
+  };
+}
+
+/* =====================================================
+   ===== v18: شاشة الفشل — لا «بنجاح» كاذبة أبداً =====
+   السلة تبقى كما هي. إعادة المحاولة تعيد الإرسال بنفس البيانات.
+===================================================== */
+let LAST_ORDER_ATTEMPT = null;
+
+function showOrderFailure(res){
+  const a = LAST_ORDER_ATTEMPT;
+  if(!a) return;
+  const ar = isAr();
+  const f = failureText(res);
+
+  let box = el('mkFailBox');
+  if(!box){
+    box = document.createElement('div');
+    box.id = 'mkFailBox';
+    box.style.cssText = 'position:fixed;inset:0;z-index:5300;background:rgba(40,12,24,.78);display:none;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)';
+    document.body.appendChild(box);
+  }
+  box.innerHTML =
+    '<div style="background:#fffdf9;border:2px solid #b91c1c;border-radius:22px;padding:1.5rem 1.2rem;max-width:390px;width:100%;font-family:Cairo,sans-serif;max-height:90vh;overflow-y:auto">' +
+      '<div style="text-align:center;font-size:2.6rem">⚠️</div>' +
+      '<b style="display:block;text-align:center;color:#b91c1c;font-size:1.05rem;font-weight:900;margin:.3rem 0 .5rem">' + mkEsc(f.title) + '</b>' +
+      '<div style="background:#fee2e2;border-radius:12px;padding:.6rem .8rem;font-size:.82rem;font-weight:800;color:#b91c1c;line-height:1.7;text-align:center">' + mkEsc(f.msg) + '</div>' +
+      '<p style="color:#8a6f63;font-size:.75rem;font-weight:700;line-height:1.8;margin:.7rem 0 .3rem;text-align:center">' + mkEsc(f.hint) + '</p>' +
+      '<div style="background:#fff6e6;border:1px dashed #e0912f;border-radius:10px;padding:.5rem .7rem;font-size:.72rem;font-weight:800;color:#a06b1c;line-height:1.7;margin:.5rem 0 1rem">' +
+        (ar ? '🛒 سلتك لم تُفرَّغ — لم يُسجّل أي طلب ولم يُخصم شيء.' : '🛒 Your cart was not cleared — no order was registered.') +
+      '</div>' +
+      '<button id="mkFailRetry" style="display:block;width:100%;border:none;border-radius:12px;padding:.9rem;background:linear-gradient(135deg,#e0912f,#f2b95f);color:#5a1830;font-family:inherit;font-weight:900;font-size:.95rem;cursor:pointer;margin-bottom:.5rem">' +
+        (ar ? '🔄 إعادة المحاولة' : '🔄 Retry') +
+      '</button>' +
+      '<button id="mkFailWa" style="display:block;width:100%;border:none;border-radius:12px;padding:.8rem;background:#128c5e;color:#fff;font-family:inherit;font-weight:900;font-size:.85rem;cursor:pointer;margin-bottom:.35rem">' +
+        (ar ? '📲 إرسال عبر واتساب بدلاً من ذلك' : '📲 Send via WhatsApp instead') +
+      '</button>' +
+      '<small style="display:block;color:#b91c1c;font-size:.66rem;font-weight:800;line-height:1.6;text-align:center;margin-bottom:.6rem">' +
+        (ar ? '⚠️ واتساب لا يُسجّل الطلب في النظام ولا يمكن تتبعه — استخدمه فقط عند تعذّر الإرسال' : '⚠️ WhatsApp does not register the order in the system and cannot be tracked — use only if sending keeps failing') +
+      '</small>' +
+      '<button id="mkFailClose" style="display:block;width:100%;border:none;border-radius:12px;padding:.7rem;background:transparent;color:#8a6f63;font-family:inherit;font-weight:800;font-size:.82rem;cursor:pointer">' +
+        (ar ? 'إغلاق والاحتفاظ بالسلة' : 'Close and keep cart') +
+      '</button>' +
+    '</div>';
+  box.style.display = 'flex';
+
+  el('mkFailRetry').onclick = async function(){
+    if(CHECKOUT_BUSY) return;
+    CHECKOUT_BUSY = true;
+    const b = el('mkFailRetry');
+    const old = b.textContent;
+    b.disabled = true;
+    b.textContent = ar ? '⏳ جارٍ الإرسال...' : '⏳ Sending...';
+    const again = await createCloudOrder(a.payload);
+    b.disabled = false;
+    b.textContent = old;
+    CHECKOUT_BUSY = false;
+    if(again.ok){
+      box.style.display = 'none';
+      finishSuccess(again.data, a);
+    } else {
+      showOrderFailure(again);
+    }
+  };
+
+  el('mkFailWa').onclick = function(){
+    box.style.display = 'none';
+    const waNum = String(a.br.wa || '').replace(/\D/g,'');
+    const warn = ar
+      ? '⚠️ طلب غير مسجّل في النظام — يرجى تأكيده يدوياً\n'
+      : '⚠️ Order NOT registered in the system — please confirm manually\n';
+    const localRef = a.localRef;
+    const body = warn + a.msgTemplate
+      .split('@@NUM@@').join(localRef)
+      .split('@@TOTAL@@').join(String(a.clientTotal))
+      .split('@@FEE@@').join(a.feeLabel);
+    const url = 'https://wa.me/' + waNum + '?text=' + encodeURIComponent(body);
+    const w = window.open(url, '_blank');
+    if(!w) location.href = url;
+    /* السلة تبقى — الطلب غير مسجّل، فلا نُفرّغها */
+    toast(ar ? '📲 فُتح واتساب — الطلب غير مسجّل في النظام' : '📲 WhatsApp opened — order not registered');
+  };
+
+  el('mkFailClose').onclick = function(){ box.style.display = 'none'; };
 }
 
 /* ===== شاشة النجاح ===== */
@@ -479,15 +676,26 @@ function showOrderSuccess(res, waMsg, br, orderType){
   const hint = isPickup
     ? (ar ? '💵 ادفع نقداً عند الكاشير' : '💵 Pay cash at the cashier')
     : (ar ? '💵 ادفع نقداً للسائق عند التسليم' : '💵 Pay cash to the driver upon delivery');
+  /* v18: تهريب رقم الطلب والرابط */
+  const numSafe = mkEsc(res.order_number);
+  const trackSafe = mkEsc(res.track_url || ('track.html?order=' + encodeURIComponent(res.order_number)));
+  /* v18: الإجمالي المعتمد من الخادم */
+  const srvTotal = (typeof res.total === 'number') ? res.total : null;
+  const totalLine = (srvTotal !== null)
+    ? '<div style="background:#fffdf9;border:1.5px solid #eadfd2;border-radius:10px;padding:.5rem;margin:.4rem 0;font-size:.85rem;font-weight:900;color:#1e5b4f">' +
+        (ar ? '💰 الإجمالي المعتمد: ' : '💰 Confirmed total: ') + mkEsc(srvTotal) + ' ' + mkEsc(T().currency) +
+      '</div>'
+    : '';
   box.innerHTML =
-    '<div style="background:#fffdf9;border:2px solid #e0912f;border-radius:22px;padding:1.6rem 1.3rem;max-width:380px;width:100%;text-align:center;font-family:Cairo,sans-serif">' +
+    '<div style="background:#fffdf9;border:2px solid #e0912f;border-radius:22px;padding:1.6rem 1.3rem;max-width:380px;width:100%;text-align:center;font-family:Cairo,sans-serif;max-height:92vh;overflow-y:auto">' +
       '<div style="font-size:3rem">✅</div>' +
       '<b style="display:block;font-size:1.15rem;color:#8e2a4a;margin:.4rem 0">' + (ar ? 'تم استلام طلبك بنجاح' : 'Order received successfully') + '</b>' +
-      '<div style="display:inline-block;background:#5a1830;color:#f2b95f;border-radius:50px;padding:.3rem 1.2rem;font-weight:900;font-size:1.2rem;direction:ltr;margin:.4rem 0">' + res.order_number + '</div>' +
+      '<div style="display:inline-block;background:#5a1830;color:#f2b95f;border-radius:50px;padding:.3rem 1.2rem;font-weight:900;font-size:1.2rem;direction:ltr;margin:.4rem 0">' + numSafe + '</div>' +
       '<p style="color:#8a6f63;font-size:.78rem;font-weight:700;margin:.4rem 0">' + (ar ? 'احتفظ برقم الطلب لمتابعة حالته في أي وقت' : 'Keep this number to track your order') + '</p>' +
+      totalLine +
       '<div style="background:' + (isPickup ? '#dcf5e8' : '#fff6e6') + ';border-radius:10px;padding:.55rem;margin:.4rem 0;font-size:.82rem;font-weight:900;color:' + (isPickup ? '#1e5b4f' : '#b45309') + '">' + subtitle + '</div>' +
       '<div style="background:#f3e7d7;border-radius:10px;padding:.55rem;margin:.4rem 0 1rem;font-size:.78rem;font-weight:800;color:#8e2a4a">' + hint + '</div>' +
-      '<a id="osTrack" href="' + (res.track_url || ('track.html?order=' + encodeURIComponent(res.order_number))) + '" style="display:block;border-radius:12px;padding:.85rem;background:linear-gradient(135deg,#e0912f,#f2b95f);color:#5a1830;font-weight:900;text-decoration:none;margin-bottom:.5rem">' + (ar ? '🗺️ تتبع طلبك مباشرة' : '🗺️ Track your order') + '</a>' +
+      '<a id="osTrack" href="' + trackSafe + '" style="display:block;border-radius:12px;padding:.85rem;background:linear-gradient(135deg,#e0912f,#f2b95f);color:#5a1830;font-weight:900;text-decoration:none;margin-bottom:.5rem">' + (ar ? '🗺️ تتبع طلبك مباشرة' : '🗺️ Track your order') + '</a>' +
       '<button id="osWa" style="display:block;width:100%;border:none;border-radius:12px;padding:.85rem;background:#128c5e;color:#fff;font-weight:900;cursor:pointer;margin-bottom:.5rem">' + (ar ? '📲 أكد طلبك عبر واتساب' : '📲 Confirm via WhatsApp') + '</button>' +
       '<button id="osClose" style="display:block;width:100%;border:none;border-radius:12px;padding:.7rem;background:transparent;color:#8a6f63;font-weight:800;cursor:pointer">' + (ar ? 'إغلاق' : 'Close') + '</button>' +
     '</div>';
@@ -501,7 +709,47 @@ function showOrderSuccess(res, waMsg, br, orderType){
 }
 
 /* =====================================================
-   checkout() السحابي v17.8
+   ===== v18: إتمام النجاح — يستخدم إجمالي الخادم =====
+===================================================== */
+function finishSuccess(cloudData, a){
+  const ar = isAr();
+  const srvTotal = (typeof cloudData.total === 'number') ? cloudData.total : a.clientTotal;
+  const srvFee = (typeof cloudData.delivery_fee === 'number') ? cloudData.delivery_fee : a.clientFee;
+  const feeTxt = (srvFee === 0)
+    ? (ar ? 'مجاني' : 'Free')
+    : (srvFee + ' ' + a.currency);
+
+  /* تحذير صريح إن اختلف إجمالي الخادم عن المعروض للعميل */
+  const mismatch = Math.abs(srvTotal - a.clientTotal) > 0.01;
+  if(mismatch){
+    console.warn('[MK ORDER] اختلاف الإجمالي', {
+      client: a.clientTotal, server: srvTotal, order: cloudData.order_number
+    });
+  }
+  const mismatchLine = mismatch
+    ? ('\nℹ️ ' + (ar
+        ? 'الإجمالي المعتمد من المطعم: ' + srvTotal + ' ' + a.currency + ' (بدلاً من ' + a.clientTotal + ')'
+        : 'Restaurant-confirmed total: ' + srvTotal + ' ' + a.currency + ' (instead of ' + a.clientTotal + ')') + '\n')
+    : '';
+
+  const finalMsg = a.msgTemplate
+    .split('@@NUM@@').join(cloudData.order_number)
+    .split('@@TOTAL@@').join(String(srvTotal))
+    .split('@@FEE@@').join(feeTxt)
+    .split('@@MISMATCH@@').join(mismatchLine);
+
+  /* النجاح فقط هنا: نفرّغ السلة */
+  cart.clear();
+  if(el('cnotes')) el('cnotes').value = '';
+  updateCart();
+  closeCart();
+  LAST_ORDER_ATTEMPT = null;
+
+  showOrderSuccess(cloudData, finalMsg, a.br, a.isPickup ? 'pickup' : 'delivery');
+}
+
+/* =====================================================
+   checkout() السحابي v18.0
    ===================================================== */
 let CHECKOUT_BUSY = false;
 
@@ -536,7 +784,7 @@ async function checkout(){
   }catch(e){
     CHECKOUT_BUSY = false;
     console.error('checkout error:', e);
-    toast('⚠️ ' + (e && e.message ? e.message : 'حدث خطأ — حاول مرة أخرى'));
+    toast('⚠️ ' + (e && e.message ? e.message : (isAr() ? 'حدث خطأ — حاول مرة أخرى' : 'An error occurred — please retry')));
   }
 }
 
@@ -562,6 +810,11 @@ async function doCheckoutFlow(TT, br, btn, btnLabel){
   let loc = null, addrText = '';
   if(!isPickup){
     const res = await ensureDeliveryLocation();
+    /* v18: إلغاء صريح — السلة محفوظة */
+    if(res.cancel){
+      toast(isAr() ? '✕ أُلغي الطلب — سلتك محفوظة' : '✕ Order cancelled — cart kept');
+      return;
+    }
     if(res.convert){
       if(typeof setOrderMode === 'function') setOrderMode('pickup');
       isPickup = true;
@@ -615,11 +868,12 @@ async function doCheckoutFlow(TT, br, btn, btnLabel){
   const payLine = isPickup
     ? ('💵 ' + tt('payCashier','الدفع: عند الكاشير','Payment: at cashier'))
     : ('💵 ' + tt('payDriver','الدفع: للسائق عند التسليم','Payment: to driver on delivery'));
-  const feeLine = isPickup ? '' : ('🛵 ' + tt('deliveryFee','رسوم التوصيل','Delivery fee') + ': ' + feeLabel(fee) + '\n');
+  /* v18: الرسوم والإجمالي كعناصر نائبة — تُملأ من الخادم عند النجاح */
+  const feeLine = isPickup ? '' : ('🛵 ' + tt('deliveryFee','رسوم التوصيل','Delivery fee') + ': @@FEE@@\n');
   const grand = total + fee;
   const pickupNote = isPickup ? ('⏳ ' + tt('pickupNote','طلبك يكون جاهزاً عند وصولك للفرع','Your order will be ready upon arrival') + '\n') : '';
 
-  const msg =
+  const msgTemplate =
     brandize(TT.waGreeting) + '\n' +
     '🧾 ' + TT.waOrderTitle + ' | *@@NUM@@*\n' +
     '📅 ' + dateStr + ' • ⏰ ' + timeStr + '\n' +
@@ -633,7 +887,8 @@ async function doCheckoutFlow(TT, br, btn, btnLabel){
     lines.join('\n') + '\n' +
     '━━━━━━━━━━━━\n' +
     feeLine +
-    '*' + TT.total + ': ' + grand + ' ' + TT.currency + '* ' + TT.taxInc + '\n' +
+    '*' + TT.total + ': @@TOTAL@@ ' + TT.currency + '* ' + TT.taxInc + '\n' +
+    '@@MISMATCH@@' +
     (notes ? ('📝 ' + TT.waNote + ': ' + notes + '\n') : '') +
     '━━━━━━━━━━━━\n' +
     brandize(TT.waThanks);
@@ -641,7 +896,7 @@ async function doCheckoutFlow(TT, br, btn, btnLabel){
   /* v17.8: إضافة لغة العميل إلى حمولة الطلب (orders.lang) */
   const orderLang = (typeof currentLang !== 'undefined' && currentLang === 'en') ? 'en' : 'ar';
 
-  const cloud = await createCloudOrder({
+  const payload = {
     customer_name: cname,
     customer_phone: cphone,
     branch_id: br.id,
@@ -655,23 +910,30 @@ async function doCheckoutFlow(TT, br, btn, btnLabel){
     notes: notes,
     order_type: isPickup ? 'pickup' : 'delivery',
     lang: orderLang
-  });
+  };
 
-  const finalNum = cloud ? cloud.order_number : invoiceID;
-  const finalMsg = msg.split('@@NUM@@').join(finalNum);
+  /* v18: نحفظ المحاولة لإعادة الإرسال بدون إعادة سؤال العميل */
+  LAST_ORDER_ATTEMPT = {
+    payload: payload,
+    msgTemplate: msgTemplate,
+    br: br,
+    isPickup: isPickup,
+    clientTotal: grand,
+    clientFee: fee,
+    currency: TT.currency,
+    feeLabel: feeLabel(fee),
+    localRef: invoiceID
+  };
 
-  cart.clear();
-  if(el('cnotes')) el('cnotes').value = '';
-  updateCart();
-  closeCart();
+  const result = await createCloudOrder(payload);
 
-  if(cloud){
-    showOrderSuccess(cloud, finalMsg, br, isPickup ? 'pickup' : 'delivery');
-  } else {
-    const waUrl = 'https://wa.me/' + br.wa + '?text=' + encodeURIComponent(finalMsg);
-    const w = window.open(waUrl, '_blank');
-    if(!w){ location.href = waUrl; }
-    toast(TT.orderSent);
+  if(result.ok){
+    finishSuccess(result.data, LAST_ORDER_ATTEMPT);
+    return;
   }
+
+  /* ❌ فشل: لا تفريغ السلة، لا إغلاقها، لا رسالة «بنجاح» */
+  console.error('[MK ORDER] لم يُسجّل الطلب — السلة محفوظة', result);
+  showOrderFailure(result);
 }
-/* ===== END cloud.js (v17.8) ===== */
+/* ===== END cloud.js (v18.0) ===== */
