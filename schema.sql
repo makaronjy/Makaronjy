@@ -1,7 +1,14 @@
 -- ═══════════════════════════════════════════
 --  مكرونجي — نظام الطلبات السحابي
 --  قاعدة البيانات (Cloudflare D1)
---  الإصدار: 2.1
+--  الإصدار: 2.2
+--  v2.2: • إضافة جدول app_data (المنيو + الإعدادات) — كان مفقوداً كلياً
+--          بدونه أي تثبيت جديد ينهار: المنيو فارغ والطلبات تُرفض
+--        • إصلاح بذرة المالك: الهاش القديم SHA-256 لا يعمل مع PBKDF2
+--          والملح الثابت مكشوف في المستودع → استُبدل بقفل صريح
+--        • ملء عمود wa للفروع (كان فارغاً)
+--        • فهارس مركّبة لتسريع التقارير بعد إصلاح المنطقة الزمنية
+--        • قسم ترحيل اختياري لتصحيح معرّف فرع الروابي في D1 القائمة
 --  v2.1: عمود lang في orders (لغة العميل عند الطلب)
 --        ← مرجع ثابت لترجمة الرسائل طوال دورة الطلب
 -- ═══════════════════════════════════════════
@@ -171,8 +178,23 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_ledger_unique
   ON order_ledger(order_number, kind);
 
 -- ───────────────────────────────────────────
---  فهرسة للسرعة
+--  9) v2.2: بيانات التطبيق (المنيو + الإعدادات)
+--  ⚠️ هذا الجدول كان مفقوداً — الووركر يقرأ منه في:
+--     /api/data/menu   /api/data/settings
+--     handleCreateOrder (التحقق من الأسعار والتوفر)
+--     scanItemOrphans  buildAndStoreBackup
+--  صف واحد فقط (id=1) — القيد CHECK يمنع تعدد الصفوف
 -- ───────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS app_data (
+  id INTEGER PRIMARY KEY CHECK(id = 1),
+  menu_json TEXT NOT NULL DEFAULT '[]',
+  settings_json TEXT NOT NULL DEFAULT '{}',
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ═══════════════════════════════════════════
+--  فهرسة للسرعة
+-- ═══════════════════════════════════════════
 CREATE INDEX IF NOT EXISTS idx_orders_branch ON orders(branch_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_driver ON orders(driver_id);
@@ -196,54 +218,148 @@ CREATE INDEX IF NOT EXISTS idx_ledger_kind ON order_ledger(kind);
 CREATE INDEX IF NOT EXISTS idx_ledger_driver ON order_ledger(driver_id);
 CREATE INDEX IF NOT EXISTS idx_ledger_type ON order_ledger(order_type);
 
+-- ───────────────────────────────────────────
+--  v2.2: فهارس مركّبة لتسريع الاستعلامات الفعلية
+--  (كل استعلامات التقارير تصفّي بـ status ثم تجمع بتاريخ)
+-- ───────────────────────────────────────────
+CREATE INDEX IF NOT EXISTS idx_orders_status_created
+  ON orders(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_orders_status_delivered
+  ON orders(status, delivered_at);
+CREATE INDEX IF NOT EXISTS idx_orders_branch_created
+  ON orders(branch_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_orders_driver_status_delivered
+  ON orders(driver_id, status, delivered_at);
+CREATE INDEX IF NOT EXISTS idx_ledger_closed_kind
+  ON order_ledger(closed_at, kind);
+CREATE INDEX IF NOT EXISTS idx_ledger_branch_closed
+  ON order_ledger(branch_id, closed_at);
+
 -- ═══════════════════════════════════════════
 --  بيانات أولية: الفروع الخمسة
+--  v2.2: أُضيف عمود wa (كان فارغاً) — نفس أرقام الهاتف
+--  المعرّفات مطابقة تماماً لـ settings.js
 -- ═══════════════════════════════════════════
 INSERT OR IGNORE INTO branches
-  (id, num, name_ar, name_en, addr_ar, addr_en, phone, lat, lng, map_url, delivery_fee)
+  (id, num, name_ar, name_en, addr_ar, addr_en, phone, wa, lat, lng, map_url, delivery_fee)
 VALUES
   ('b-badiah', 1, 'فرع البديعة', 'Al Badi''ah Branch',
    'الشيخ عبدالعزيز بن محمد، ظهرة البديعة، الرياض 11461',
    'Al Cheikh Abd Al Aziz, Dhahrat Al Badi''ah, Riyadh 11461',
-   '966561296463', 24.591045, 46.647204,
+   '966561296463', '966561296463', 24.591045, 46.647204,
    'https://maps.app.goo.gl/qwS3kpF2JUeHBCrH6', 10),
   ('b-malqa', 2, 'فرع الملقا', 'Al Malqa Branch',
    'الأماسي، الملقا، الرياض 13525',
    'Al Amasi, Al Malqa, Riyadh 13525',
-   '966568183145', 24.801454, 46.597488,
+   '966568183145', '966568183145', 24.801454, 46.597488,
    'https://maps.app.goo.gl/VjqWsGHn3xZgWoGu9', 10),
   ('b-yasmeen', 3, 'فرع الياسمين', 'Al Yasmeen Branch',
    'القادسية، الياسمين، الرياض 13322',
    'Al Qadisiyah, Al Yasmeen, Riyadh 13322',
-   '966561203593', 24.817399, 46.656308,
+   '966561203593', '966561203593', 24.817399, 46.656308,
    'https://maps.app.goo.gl/59Rpm3zbqfFzstev8', 10),
   ('b-suwaidi', 4, 'فرع السويدي الغربي', 'Al Suwaidi Al Gharabi Branch',
    'الفجر، السويدي الغربي، الرياض 12992',
    'Al Fajar St, As Suwaidi Al Gharabi, Riyadh 12992',
-   '966544030086', 24.572362, 46.621672,
+   '966544030086', '966544030086', 24.572362, 46.621672,
    'https://maps.app.goo.gl/tCieuNxohr4kyVrK7', 10),
   ('b-rawabi', 5, 'فرع الروابي', 'Al-Rawabi Branch',
    'الزبير بن العوام , الروابي , الرياض 11461',
    'Al-Zubayr bin Al-Awwam, Al-Rawabi, Riyadh 11461',
-   '966567326558', 24.694382, 46.790105,
+   '966567326558', '966567326558', 24.694382, 46.790105,
    'https://maps.app.goo.gl/AxGgzM4JUFSfciyu7', 10);
 
 -- ═══════════════════════════════════════════
---  بيانات أولية: حساب المالك
---  كلمة المرور الافتراضية: admin123 (تُغيَّر أول دخول)
+--  v2.2: الصف الابتدائي لبيانات التطبيق
+--  منيو وإعدادات فارغة — يملؤها المالك من اللوحة عبر
+--  «حفظ ونشر المنيو» و«حفظ ونشر الإعدادات»
+--  ⚠️ حتى ينشر المالك، الطلبات تُرفض بـ «المنيو غير متاح حالياً»
+--     وهذا سلوك صحيح ومقصود (لاطلبات على منيو فارغ)
+-- ═══════════════════════════════════════════
+INSERT OR IGNORE INTO app_data (id, menu_json, settings_json)
+VALUES (1, '[]', '{}');
+
+-- ═══════════════════════════════════════════
+--  v2.2: حساب المالك — مقفول عمداً
+--
+--  ❌ البذرة القديمة كانت خاطئة من ثلاث جهات:
+--     1) الهاش 8d969eef... هو SHA-256 لـ "123456"
+--        بينما التحقق يستخدم PBKDF2-SHA256 بـ 100000 دورة
+--        → الحساب لا يستطيع تسجيل الدخول أبداً
+--     2) الملح 'salt_example_12345' ثابت ومكشوف في مستودع عام
+--     3) التعليق قال admin123 والهاش لـ 123456 — تناقض
+--
+--  ✅ الآن: صف موجود لكن بقفل صريح لا يطابق أي كلمة مرور.
+--     لتفعيله: اضبط RECOVERY_KEY في Worker Secrets ثم افتح
+--     /api/recover-owner?key=<سرك>&new=<كلمة قوية>
+--     فتُستبدل القيم بـ PBKDF2 حقيقي + ملح عشوائي.
+--
+--  🔒 لا تضع أبداً هاش كلمة مرور حقيقية في هذا الملف.
 -- ═══════════════════════════════════════════
 INSERT OR IGNORE INTO users
-  (name, phone, username, password_hash, password_salt, role, must_change_password)
+  (name, phone, username, password_hash, password_salt, role, is_active, must_change_password)
 VALUES (
   'مالك النظام',
   '966500000000',
   'owner',
-  '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
-  'salt_example_12345',
+  'LOCKED_NO_LOGIN__SET_VIA_RECOVERY_ENDPOINT',
+  'LOCKED_NO_SALT__SET_VIA_RECOVERY_ENDPOINT',
   'super_admin',
+  1,
   1
 );
 
 -- ═══════════════════════════════════════════
---  نهاية schema.sql (v2.1)
+--  قسم ترحيل اختياري — لقاعدة بيانات قائمة
+--  ⚠️ لا تُنفّذ هذا القسم على تثبيت جديد (لا حاجة له)
+--  ⚠️ نفّذه فقط إن كانت D1 عندك تحتوي معرّف الروابي القديم
+--
+--  الخطوات:
+--  1) شغّل استعلام الفحص أولاً (السطر التالي بعد إلغاء التعليق)
+--  2) إن أرجع صفوفاً → ألغِ تعليقstatements الترحيل بالترتيب
+--  3) أعد الفحص — يجب أن يرجع صفر صفوف
+-- ═══════════════════════════════════════════
+
+-- استعلام الفحص (اقرأ فقط — آمن):
+-- SELECT 'orders' AS tbl, COUNT(*) AS n FROM orders WHERE branch_id = 'b-1791819751585'
+-- UNION ALL SELECT 'users', COUNT(*) FROM users WHERE branch_id = 'b-1791819751585'
+-- UNION ALL SELECT 'ledger', COUNT(*) FROM order_ledger WHERE branch_id = 'b-1791819751585'
+-- UNION ALL SELECT 'branches', COUNT(*) FROM branches WHERE id = 'b-1791819751585';
+
+-- الترحيل (بالترتيب — الفرع الجديد b-rawabi موجود من البذرة أعلاه):
+-- UPDATE orders       SET branch_id = 'b-rawabi' WHERE branch_id = 'b-1791819751585';
+-- UPDATE users        SET branch_id = 'b-rawabi' WHERE branch_id = 'b-1791819751585';
+-- UPDATE order_ledger SET branch_id = 'b-rawabi' WHERE branch_id = 'b-1791819751585';
+-- DELETE FROM branches WHERE id = 'b-1791819751585';
+
+-- ═══════════════════════════════════════════
+--  استعلامات تحقق بعد التثبيت (اقرأ فقط — آمنة)
+-- ═══════════════════════════════════════════
+-- SELECT COUNT(*) AS branches_count FROM branches;          -- المتوقع: 5
+-- SELECT COUNT(*) AS app_data_rows  FROM app_data;          -- المتوقع: 1
+-- SELECT id, length(menu_json) AS menu_len,
+--        length(settings_json) AS settings_len FROM app_data;
+-- SELECT username, role, is_active,
+--        CASE WHEN password_hash LIKE 'LOCKED%'
+--             THEN 'مقفول — استخدم /api/recover-owner'
+--             ELSE 'مفعّل' END AS status
+-- FROM users WHERE role = 'super_admin';
+-- SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;
+--   المتوقع: app_data, branches, driver_locations, order_ledger,
+--            order_tracking, orders, sessions, used_order_numbers, users
+
+-- ═══════════════════════════════════════════
+--  ملاحظات تشغيلية
+--  • التخزين UTC دائماً — التحويل للرياض (+3) يحدث في الووركر
+--    عند التجميع فقط (v2.9). لا تخزّن توقيتاً محلياً هنا.
+--  • hours_json يبقى NULL: ساعات العمل تُقرأ من settings_json
+--    في app_data (مصدر واحد للحقيقة).
+--  • used_order_numbers.order_id لا يُملأ حالياً — عمود محفوظ
+--    للتوافق، لا يؤثر على منع التكرار.
+--  • الجلسات (sessions) تُكتب ولا تُقرأ للتحقق حالياً؛
+--    التحقق يتم بـ JWT فقط. إبطال الجلسات تحسين مستقبلي.
+-- ═══════════════════════════════════════════
+
+-- ═══════════════════════════════════════════
+--  نهاية schema.sql (v2.2)
 -- ═══════════════════════════════════════════
