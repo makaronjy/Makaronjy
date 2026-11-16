@@ -1,5 +1,10 @@
-/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v9.9) ===== */
-/* v9.9: إصلاح صيغة OOXML (customHeight + alignment) ← Excel يفتح سليماً
+/* ===== admin-tabs.js — التبويبات والحفظ والنشر (v10.0) ===== */
+/* v10.0: • إصلاح STATUS_MAP: إضافة driver_at_restaurant (كان يظهر نصاً إنجليزياً خاماً)
+          • الضريبة تُقرأ من settings.taxRate بدل 15% المثبّتة في 6 مواضع
+          • حقل نسبة الضريبة في الإعدادات + حفظه
+          • نصوص «15%» في التقارير/Excel/PDF تتبدّل تلقائياً بالنسبة الفعلية
+          • إضافة حالتي driver_at_restaurant و archived لخيارات تصفية الطلبات
+   v9.9: إصلاح صيغة OOXML (customHeight + alignment) ← Excel يفتح سليماً
          + حذف مرجع التقرير نهائياً من Excel وPDF واسم الملف */
 function nmOf(x){
 return (ALANG===`ar`) ? x.ar : (x.en || x.ar);
@@ -15,6 +20,11 @@ const SQ_STYLE =
 `gap:3px;vertical-align:middle"`;
 function disSt(on){
 return on ? ` disabled style="opacity:.35;pointer-events:none"` : ``;
+}
+/* v10: ترجمة بمفتاح + نص احتياطي (لا يظهر مفتاح خام إن كان القاموس أقدم) */
+function TL(k, fallback){
+var v = L(k);
+return (v === k) ? fallback : v;
 }
 /* ===== v9: الطبقة السحابية ===== */
 const CLOUD_API = 'https://makaronjy-api.makaronjy.workers.dev';
@@ -1415,6 +1425,16 @@ el(`settingsForm`).innerHTML =
 `<label>` + L(`lblTagEn`) +
 `<input id="s_tagEn" class="ltr" value="` + esc(s.brand.tagEn) + `"></label>` +
 `</div>` +
+/* ===== v10: نسبة الضريبة ===== */
+`<fieldset style="margin-top:1rem">` +
+`<legend>` + TL(`taxTitle`,`💰 ضريبة القيمة المضافة`) + `</legend>` +
+`<div class="note">` +
+TL(`taxNote`,`النسبة المستخدمة لحساب الصافي والضريبة في التقارير وExcel وPDF. الافتراضي 15%. اكتب 0 لإلغاء الضريبة.`) +
+`</div>` +
+`<label>` + TL(`taxRateLbl`,`نسبة الضريبة %`) +
+`<input id="s_taxRate" class="ltr" type="number" min="0" max="50" step="0.5" value="` +
+taxPct() + `"></label>` +
+`</fieldset>` +
 `<fieldset style="margin-top:1rem">` +
 `<legend>` + L(`legendImages`) + `</legend>` +
 `<div class="note">` + L(`imagesNote`) + `</div>` +
@@ -1527,6 +1547,14 @@ s.brand.nameAr = mv(`s_nameAr`).trim() || s.brand.nameAr;
 s.brand.nameEn = mv(`s_nameEn`).trim() || s.brand.nameEn;
 s.brand.tagAr = mv(`s_tagAr`).trim();
 s.brand.tagEn = mv(`s_tagEn`).trim();
+/* v10: حفظ نسبة الضريبة (من % إلى كسر عشري) */
+var trNode = el(`s_taxRate`);
+if(trNode){
+var tr = parseFloat(trNode.value);
+if(isFinite(tr) && tr >= 0 && tr < 100){
+s.taxRate = Math.round(tr * 10) / 1000;
+}
+}
 var btn = el(`saveSettings`);
 var label = L(`btnSaveSettings`);
 btn.textContent = L(`publishing`);
@@ -1780,15 +1808,18 @@ var brOpts = `<option value="">` + L(`ordersAllBranches`) + `</option>` +
 brs.map(function(b){
 return `<option value="` + esc(b.id) + `">` + esc(brName(b)) + `</option>`;
 }).join(``);
+/* v10: أُضيفت حالتا driver_at_restaurant و archived للتصفية */
 var statusOpts = `<option value="">` + L(`ordersAllStatuses`) + `</option>` +
 `<option value="pending">` + L(`statusPending`) + `</option>` +
 `<option value="accepted">` + L(`statusAccepted`) + `</option>` +
 `<option value="preparing">` + L(`statusPreparing`) + `</option>` +
 `<option value="ready">` + L(`statusReady`) + `</option>` +
 `<option value="driver_assigned">` + L(`statusDrvAssigned`) + `</option>` +
+`<option value="driver_at_restaurant">` + L(`statusDrvAtRest`) + `</option>` +
 `<option value="out_for_delivery">` + L(`statusOutForDel`) + `</option>` +
 `<option value="delivered">` + L(`statusDelivered`) + `</option>` +
-`<option value="cancelled">` + L(`statusCancelled`) + `</option>`;
+`<option value="cancelled">` + L(`statusCancelled`) + `</option>` +
+`<option value="archived">` + L(`statusArchived`) + `</option>`;
 var typeOpts =
 `<option value="">` + ((ALANG===`ar`)?`كل الأنواع`:`All types`) + `</option>` +
 `<option value="pickup">🏪 ` + ((ALANG===`ar`)?`استلام`:`Pickup`) + `</option>` +
@@ -1814,12 +1845,14 @@ if(s) s.addEventListener(`change`, loadOrdersTab);
 async function loadOrdersTab(){
 var tbl = el(`coTable`);
 if(!tbl) return;
+/* v10: أُضيف driver_at_restaurant — كان يظهر نصاً إنجليزياً خاماً */
 var STATUS_MAP = {
 pending: L(`statusPending`),
 accepted: L(`statusAccepted`),
 preparing: L(`statusPreparing`),
 ready: L(`statusReady`),
 driver_assigned: L(`statusDrvAssigned`),
+driver_at_restaurant: L(`statusDrvAtRest`),
 out_for_delivery: L(`statusOutForDel`),
 delivered: L(`statusDelivered`),
 cancelled: L(`statusCancelled`),
@@ -1876,6 +1909,29 @@ tbl.innerHTML = `<tr><td colspan="9" class="cl-empty">⚠️ ` + esc(err.message
 /* ===== v9.7: التبويب المحاسبي ===== */
 let LAST_ACCT = null;
 function money(v){ return Math.round((+v||0)*100)/100; }
+/* =====================================================
+   ===== v10: الضريبة من الإعدادات بدل 15% المثبّتة =====
+===================================================== */
+function taxRate(){
+var s = (typeof STATE !== `undefined` && STATE && STATE.SETTINGS)
+? STATE.SETTINGS : null;
+var r = s ? parseFloat(s.taxRate) : NaN;
+if(!isFinite(r) || r < 0 || r >= 1) r = 0.15;
+return r;
+}
+/* النسبة المئوية للعرض (15 أو 15.5) */
+function taxPct(){
+return Math.round(taxRate() * 1000) / 10;
+}
+function taxDiv(){ return 1 + taxRate(); }
+/* الصافي من الإجمالي شامل الضريبة */
+function netOf(g){ return money((+g||0) / taxDiv()); }
+/* الضريبة من الإجمالي شامل الضريبة */
+function vatOf(g){ return money((+g||0) - netOf(g)); }
+/* يستبدل «15%» في نص القاموس بالنسبة الفعلية */
+function taxLbl(k){
+return String(L(k)).replace(/15\s*%/g, taxPct() + `%`);
+}
 function stat(v, label){ return `<div class="cl-stat"><b>` + v + `</b><small>` + label + `</small></div>`; }
 function table(title, heads, rows){
 return `<h4 style="margin:1rem 0 .5rem;color:var(--brown);font-weight:900">` + title + `</h4>` +
@@ -1977,7 +2033,8 @@ box.innerHTML = `<div class="cl-empty">⚠️ ` + esc(err.message) + `</div>`;
 function renderAcct(d, box){
 const t = d.totals || {};
 const gross = money(t.gross), fees = money(t.fees);
-const net = money(gross / 1.15), vat = money(gross - net);
+/* v10: الضريبة من الإعدادات */
+const net = netOf(gross), vat = vatOf(gross);
 let html = `<div class="cl-stats">` +
 stat(t.orders||0,        L(`acctOrders`)) +
 stat(t.delivered||0,     L(`acctDelivered`)) +
@@ -1985,7 +2042,7 @@ stat(t.cancelled||0,     L(`acctCancelled`)) +
 stat(t.abandoned||0,     L(`acctAbandoned`)) +
 stat(gross,              L(`acctGross`)) +
 stat(net,                L(`acctNet`)) +
-stat(vat,                L(`acctVat`)) +
+stat(vat,                taxLbl(`acctVat`)) +
 stat(fees,               L(`acctFees`)) +
 stat(t.avg||0,           L(`acctAvg`)) +
 stat((t.cancel_rate||0)+`%`, L(`acctCancelRate`)) +
@@ -2009,7 +2066,7 @@ html += table(L(`acctMonthsTbl`),
 [L(`acctColMonth`), L(`acctColOrders`), L(`acctColDelivered`), L(`acctColCancelled`), L(`acctColAbandoned`), L(`acctColGross`), L(`acctColVat`)],
 months.map(function(m){
 const g = money(m.gross);
-return [m.ym, m.orders, m.delivered, m.cancelled, m.abandoned, g, money(g - g/1.15)];
+return [m.ym, m.orders, m.delivered, m.cancelled, m.abandoned, g, vatOf(g)];
 }));
 }
 if((d.drivers||[]).length){
@@ -2139,13 +2196,13 @@ return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
 `<xf numFmtId="0" fontId="3" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>` +
 `<xf numFmtId="0" fontId="4" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>` +
 `<xf numFmtId="164" fontId="6" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"/>` +
-`<xf numFmtId="0" fontId="6" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>` +
+`<xf numFmtId="0" fontId="6" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"/>` +
 `<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>` +
 `<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/>` +
 `<xf numFmtId="165" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/>` +
 `<xf numFmtId="0" fontId="0" fillId="6" borderId="1" xfId="0" applyFill="1" applyBorder="1"/>` +
-`<xf numFmtId="164" fontId="0" fillId="6" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1" applyBorder="1"/>` +
-`<xf numFmtId="165" fontId="0" fillId="6" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1" applyBorder="1"/>` +
+`<xf numFmtId="164" fontId="0" fillId="6" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/>` +
+`<xf numFmtId="165" fontId="0" fillId="6" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/>` +
 `<xf numFmtId="0" fontId="7" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>` +
 `<xf numFmtId="0" fontId="8" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>` +
 `</cellXfs>` +
@@ -2185,7 +2242,8 @@ function exportExcel(){
 if(!LAST_ACCT){ toast(L(`acctShowFirst`), `warn`); return; }
 try{
 const d = LAST_ACCT.data, t = d.totals || {};
-const gross = money(t.gross), net = money(gross/1.15), vat = money(gross-net);
+/* v10: الضريبة من الإعدادات */
+const gross = money(t.gross), net = netOf(gross), vat = vatOf(gross);
 const months = d.months || [], drivers = d.drivers || [],
 branchesR = d.branches || [], items = d.top_items || [];
 const S = XS;
@@ -2201,7 +2259,7 @@ const pairs = [
 [L(`acctAbandoned`), t.abandoned||0, 'i'],
 [L(`acctGross`), gross, 'g'],
 [L(`acctNet`), net, 'n'],
-[L(`acctVat`), vat, 'n'],
+[taxLbl(`acctVat`), vat, 'n'],
 [L(`acctFees`), money(t.fees), 'n'],
 [L(`acctAvg`), t.avg||0, 'n'],
 [L(`acctCancelRate`) + ` %`, t.cancel_rate||0, 'i'],
@@ -2229,7 +2287,7 @@ const monRows = [
 const g = money(m.gross);
 const zb = (i % 2 === 1);
 const c = zb?S.zeb:S.cell, cn = zb?S.zebNum:S.num, ci = zb?S.zebInt:S.int;
-return [T(m.ym,c), N(m.orders,ci), N(m.delivered,ci), N(m.cancelled,ci), N(m.abandoned,ci), N(g,cn), N(money(g-g/1.15),cn), N(money(m.fees),cn)];
+return [T(m.ym,c), N(m.orders,ci), N(m.delivered,ci), N(m.cancelled,ci), N(m.abandoned,ci), N(g,cn), N(vatOf(g),cn), N(money(m.fees),cn)];
 }));
 const monLast = 2 + months.length;
 const drvRows = [
@@ -2328,7 +2386,8 @@ toast(`⚠️ ` + (err.message || err), `error`);
 function printAcct(){
 if(!LAST_ACCT){ toast(L(`acctShowFirst`), `warn`); return; }
 const d = LAST_ACCT.data, t = d.totals||{};
-const gross = money(t.gross), net = money(gross/1.15), vat = money(gross-net);
+/* v10: الضريبة من الإعدادات */
+const gross = money(t.gross), net = netOf(gross), vat = vatOf(gross);
 const months = d.months||[];
 const maxM = Math.max.apply(null, months.map(m=>+m.gross||0).concat([1]));
 const scope = (el(`crBranch2`) && el(`crBranch2`).value)
@@ -2370,20 +2429,20 @@ body{font-family:Cairo,'Segoe UI',Tahoma,sans-serif;color:#2B1A15;margin:0;paddi
 </div>
 ` + secTitle(L(`acctSecSummary`)) + `
 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px">
-` + kpi(gross, L(`acctGross`)) + kpi(net, L(`acctNet`)) + kpi(vat, L(`acctVat`)) + kpi(money(t.fees), L(`acctFees`)) +
+` + kpi(gross, L(`acctGross`)) + kpi(net, L(`acctNet`)) + kpi(vat, taxLbl(`acctVat`)) + kpi(money(t.fees), L(`acctFees`)) +
 kpi(t.orders||0, L(`acctOrders`)) + kpi(t.delivered||0, L(`acctDelivered`)) +
 kpi(t.cancelled||0, L(`acctCancelled`)) + kpi((t.cancel_rate||0)+`%`, L(`acctCancelRate`)) + `
 </div>` +
 (months.length ? secTitle(L(`acctSecMonths`)) +
 `<div style="border:1.5px solid #EADFD2;border-radius:14px;padding:10px;background:#fff"><div style="display:flex;gap:5px;align-items:flex-end;height:140px;justify-content:center">` + bars + `</div></div>` +
 tbl([L(`acctColMonth`),L(`acctColOrders`),L(`acctColDelivered`),L(`acctColCancelled`),L(`acctColAbandoned`),L(`acctColGross`),L(`acctColVat`)],
-months.map(function(m){ const g=money(m.gross); return [m.ym, m.orders, m.delivered, m.cancelled, m.abandoned, g, money(g-g/1.15)]; }))
+months.map(function(m){ const g=money(m.gross); return [m.ym, m.orders, m.delivered, m.cancelled, m.abandoned, g, vatOf(g)]; }))
 : ``) +
 secTitle(L(`acctSecVat`)) +
 `<div style="background:#FFF6E6;border:1.5px dashed #E0912F;border-radius:12px;padding:10px">` +
-tbl([L(`acctVatBoxTotal`), L(`acctVatBoxVat`), L(`acctVatBoxNet`)],
+tbl([L(`acctVatBoxTotal`), taxLbl(`acctVatBoxVat`), L(`acctVatBoxNet`)],
 [[gross, vat, net]]) +
-`<div style="font-size:9px;color:#A06B1C;font-weight:800;margin-top:4px">` + L(`acctVatNote`) + `</div>
+`<div style="font-size:9px;color:#A06B1C;font-weight:800;margin-top:4px">` + taxLbl(`acctVatNote`) + `</div>
 </div>` +
 ((d.drivers||[]).length || (d.branches||[]).length || (d.top_items||[]).length
 ? secTitle(L(`acctSecTables`)) +
@@ -2499,4 +2558,4 @@ return;
 applyAdminLang();
 })();
 window.__ADMIN_BOOTED = true;
-/* ===== END admin-tabs.js (v9.9) ===== */
+/* ===== END admin-tabs.js (v10.0) ===== */
