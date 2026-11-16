@@ -1,7 +1,9 @@
-/* ===== admin-core.js — النواة: D1 + صور R2 مضغوطة + سلة مهملات (v6.3) =====
-   v6.3: • زر «تنظيف صور الأصناف اليتيمة» مع عرض القائمة والأحجام
-         • حمايات: رفض عند منيو فارغ + تحذير النسبة العالية + تأكيد delete
-         • النقل إلى سلة المهملات (لا حذف نهائي) قابل للاسترجاع
+/* ===== admin-core.js — النواة: D1 + صور R2 مضغوطة + سلة مهملات (v6.4) =====
+   v6.4: • تنظيف الكود الميت (10 عناصر غير مستخدمة — بقايا حقبة GitHub)
+         • لا تغيير وظيفي إطلاقاً — نفس سلوك v6.3 بالكامل
+   v6.3: زر «تنظيف صور الأصناف اليتيمة» مع عرض القائمة والأحجام
+         + حمايات: رفض عند منيو فارغ + تحذير النسبة العالية + تأكيد delete
+         + النقل إلى سلة المهملات (لا حذف نهائي) قابل للاسترجاع
    v6.2: ضغط كل صورة قبل رفعها (WebP/JPEG + تصغير الأبعاد + هدف حجم)
          + بطاقة تحكم في الضغط + سلة مهملات الصور + بطاقة النسخ الاحتياطي
    v6.1: حذف زر «نقل صور المستودع إلى السحابة» (النقل صار ذاتياً في الووركر)
@@ -14,7 +16,6 @@
    v5.3: الدخول عبر API، وقراءة/حفظ menu.js و settings.js من D1
    v3.7: إصلاح معالج التبويبات
    v3.5: كسر كاش المتصفح/Service Worker
-   v3.4: نشر صلب 4 محاولات + التقاط SHA
    v3.2: حذف البانر الفعلي + تنظيف اليتيمة
    v3.1: try-catch شامل + هجرات */
 
@@ -176,7 +177,6 @@ if(STATE && typeof renderAll === `function`) renderAll();
 });
 
 /* ===== التوستات ===== */
-let toastSeq = 0;
 function toast(title, kind, sub){
 kind = kind || `info`;
 var wrap = el(`toasts`);
@@ -456,7 +456,6 @@ return Object.assign({}, CMP_DEFAULTS);
 function cmpSave(){
 try{ localStorage.setItem(CMP_KEY, JSON.stringify(CMP)); }catch(e){}
 }
-let LAST_CMP = null;
 function cmpPreset(kind){
 var max = CMP.itemMax;
 if(kind === `banner`) max = CMP.bannerMax;
@@ -563,7 +562,6 @@ type: outType, width: tw, height: th, skipped: false
 };
 }
 function cmpReport(res, label){
-LAST_CMP = res;
 var box = el(`cmpLast`);
 var pct = res.before ? Math.max(0, Math.round((1 - res.after/res.before)*100)) : 0;
 if(box){
@@ -602,13 +600,6 @@ if(STATE && STATE.SETTINGS){
 STATE.SETTINGS.imagesVersion = Date.now();
 }
 }
-function b64ToUtf8(b64){
-var bin = atob(b64);
-var bytes = new Uint8Array(bin.length);
-for(var i=0;i<bin.length;i++){ bytes[i] = bin.charCodeAt(i); }
-if(window.TextDecoder){ return new TextDecoder(`utf-8`).decode(bytes); }
-return decodeURIComponent(escape(bin));
-}
 function b64OfFile(file){
 return file.arrayBuffer().then(function(buf){
 var bytes = ``;
@@ -620,7 +611,8 @@ u8.subarray(i, i+32768));
 return btoa(bytes);
 });
 }
-/* استخراج البيانات من نص JS أو JSON */
+/* استخراج البيانات من نص JS أو JSON
+   ملاحظة: مستخدمة من putFile فقط — واجهة كتابة عامة محفوظة للتوافق */
 function extractData(text, kind){
 try{
 var w = parseJs(text);
@@ -649,6 +641,8 @@ sha: null
 }
 return { text:``, sha:null, url: IMG_BASE + path };
 }
+/* واجهة كتابة عامة — غير مستخدمة حالياً (النشر يمرّ عبر publishMenu/publishSettings)
+   محفوظة عمداً للتوافق مع أي مستدعٍ خارجي */
 async function putFile(path, content, sha, msg){
 if(path === `menu.js`){
 var menu = extractData(content, `menu`);
@@ -668,11 +662,6 @@ return { content:{ sha:null } };
 }
 await imgPut(path, content);
 return { content:{ sha:null } };
-}
-/* حذف صورة من السحابة (تنتقل لسلة المهملات) */
-async function ghDeleteFile(path, sha, msg){
-await imgDelete(path);
-return { success:true };
 }
 /* سرد صور مجلد من السحابة */
 async function listDir(dirPath){
@@ -733,23 +722,6 @@ if(it.id === id) return it;
 }
 }
 return null;
-}
-function findSectionOfItem(id){
-for(var s of STATE.MENU){
-var hit = s.items.some(function(x){
-return x.id===id;
-});
-if(hit) return s;
-}
-return null;
-}
-function nextBranchNum(){
-var used = branches().map(function(b){
-return b.num;
-}).filter(Number.isFinite);
-var n = 1;
-while(used.includes(n)) n++;
-return n;
 }
 function renumberBranches(){
 branches().forEach(function(b, i){
@@ -1136,30 +1108,6 @@ toast(
 b.disabled = false;
 b.textContent = old;
 });
-
-/* ===== نصوص النشر ===== */
-function menuText(){
-return `window.MENU = ` +
-JSON.stringify(STATE.MENU, null, 2) + `;\n`;
-}
-function settingsText(){
-return `window.APP_SETTINGS = ` +
-JSON.stringify(STATE.SETTINGS, null, 2) + `;\n`;
-}
-
-/* ===== أدوات تعارض SHA (توافق) ===== */
-function isShaConflict(e){
-if(!e) return false;
-if(e.http === 409 || e.http === 412 || e.http === 422) return true;
-var m = (e.message || ``).toLowerCase();
-return m.includes(`does not match`) ||
-(m.includes(`sha`) && m.includes(`match`));
-}
-function shaFromError(e){
-var m = (e && e.message) ? e.message : ``;
-var hit = m.match(/[0-9a-f]{40}/);
-return hit ? hit[0] : null;
-}
 
 /* ===== النشر إلى D1 + حذف الصور القديمة تلقائياً ===== */
 var LAST_MENU = null;
@@ -2073,4 +2021,4 @@ uiApplyAll();
 renderTrash();
 return r;
 };
-/* ===== END admin-core.js (v6.3) ===== */
+/* ===== END admin-core.js (v6.4) ===== */
