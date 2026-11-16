@@ -1,3 +1,9 @@
+/* ===== style.css — v17.0: خلفية البطاقات من R2 عبر --mk-bg =====
+   5 مواضع فقط تغيّرت: .f-img-box · .c-img · .l-img · .dt-hero · .dt-thumb
+   url('img/bg.png') → var(--mk-bg, url('img/bg.png'))
+   الاحتياطي يبقى — لو لم يُحمّل app.js تظهر خلفية المستودع.
+   + كتلة prefers-reduced-motion في النهاية (إضافة فقط، لا تؤثر على الافتراضي)
+===================================================== */
 :root{
   --brown:#8e2a4a; --brown2:#a4385c; --dark:#5a1830;
   --gold:#e0912f; --gold2:#f2b95f; --cream:#faf3ea; --card:#fffdf9;
@@ -77,7 +83,7 @@ img{-ms-interpolation-mode:bicubic;max-width:100%}
 .f-title{font-family:'Aref Ruqaa',serif;color:var(--brown);font-size:clamp(1.5rem,6vw,2.2rem);font-weight:700;margin-top:.7rem;line-height:1.6}
 .f-stage{position:relative;width:100%;max-width:600px;flex:1;min-height:300px;display:flex;align-items:center;justify-content:center;padding:1rem 0}
 .f-img-box{width:88%;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;
-  border-radius:16px;background-color:var(--phbg);background-image:url('img/bg.png');background-size:cover;background-position:center;
+  border-radius:16px;background-color:var(--phbg);background-image:var(--mk-bg, url('img/bg.png'));background-size:cover;background-position:center;
   box-shadow:0 10px 26px rgba(90,24,48,.15)}
 .f-img-box img{max-width:100%;max-height:52vh;object-fit:contain;padding:4%;user-select:none;-webkit-user-drag:none;
   filter:drop-shadow(0 14px 24px rgba(90,24,48,.25))}
@@ -153,7 +159,7 @@ main{max-width:1100px;margin:auto;padding:1.5rem 1rem 3rem}
 .card-gray{opacity:.6;filter:grayscale(.85);border-style:dashed}
 .card-gray:hover{transform:none;box-shadow:0 2px 8px rgba(90,24,48,.06)}
 .c-img{position:relative;aspect-ratio:4/3;overflow:hidden;
-  background-color:var(--phbg);background-image:url('img/bg.png');background-size:cover;background-position:center}
+  background-color:var(--phbg);background-image:var(--mk-bg, url('img/bg.png'));background-size:cover;background-position:center}
 .c-img img{width:100%;height:100%;object-fit:contain;padding:7% 9%;display:block;transition:.35s}
 .c-img img.full{object-fit:cover;padding:0}
 .card:hover .c-img img{transform:scale(1.05)}
@@ -383,7 +389,7 @@ html[dir="ltr"] .fav-badge{left:auto;right:-4px}
 .lrow{display:flex;gap:.8rem;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:.7rem;cursor:pointer;transition:.2s;box-shadow:0 2px 8px rgba(90,24,48,.06)}
 .lrow:active{transform:scale(.99)}
 .lrow.card-gray{opacity:.6;filter:grayscale(.85);border-style:dashed}
-.l-img{width:96px;height:96px;flex-shrink:0;border-radius:14px;overflow:hidden;background-color:var(--phbg);background-image:url('img/bg.png');background-size:cover;background-position:center}
+.l-img{width:96px;height:96px;flex-shrink:0;border-radius:14px;overflow:hidden;background-color:var(--phbg);background-image:var(--mk-bg, url('img/bg.png'));background-size:cover;background-position:center}
 .l-img img{width:100%;height:100%;object-fit:contain;padding:6%;display:block}
 .l-img img.full{object-fit:cover;padding:0}
 .l-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:.3rem}
@@ -399,7 +405,7 @@ html[dir="ltr"] .fav-badge{left:auto;right:-4px}
 .detail{position:fixed;inset:0;z-index:2600;background:var(--cream);display:flex;flex-direction:column;opacity:0;pointer-events:none;transition:.35s;transform:translateY(4%)}
 .detail.show{opacity:1;pointer-events:auto;transform:translateY(0)}
 .dt-card{flex:1;display:flex;flex-direction:column;min-height:0}
-.dt-hero{position:relative;height:32vh;min-height:200px;flex-shrink:0;background-color:var(--phbg);background-image:url('img/bg.png');background-size:cover;background-position:center}
+.dt-hero{position:relative;height:32vh;min-height:200px;flex-shrink:0;background-color:var(--phbg);background-image:var(--mk-bg, url('img/bg.png'));background-size:cover;background-position:center}
 .dt-hero img{width:100%;height:100%;object-fit:contain;padding:5%}
 .dt-close{position:absolute;top:.8rem;inset-inline-start:.8rem;width:38px;height:38px;border-radius:50%;border:none;background:#ffffffcc;color:var(--brown);font-weight:900;cursor:pointer;font-size:1rem;z-index:2}
 .dt-body{flex:1;overflow-y:auto;padding:1rem 1rem 1.2rem;min-height:0}
@@ -413,7 +419,7 @@ html[dir="ltr"] .fav-badge{left:auto;right:-4px}
 .dt-modgroup small{display:block;color:var(--muted);font-weight:700;font-size:.7rem;margin:.15rem 0 .4rem}
 .dt-modrow{display:flex;align-items:center;gap:.6rem;padding:.55rem 0;border-bottom:1px dashed var(--line)}
 .dt-modrow:last-child{border-bottom:none}
-.dt-thumb{width:52px;height:52px;flex-shrink:0;border-radius:10px;overflow:hidden;background-color:var(--phbg);background-image:url('img/bg.png');background-size:cover}
+.dt-thumb{width:52px;height:52px;flex-shrink:0;border-radius:10px;overflow:hidden;background-color:var(--phbg);background-image:var(--mk-bg, url('img/bg.png'));background-size:cover}
 .dt-thumb img{width:100%;height:100%;object-fit:contain;padding:8%}
 .dt-modinfo{flex:1;min-width:0}
 .dt-modinfo b{display:block;font-size:.85rem;font-weight:800;color:var(--ink)}
@@ -611,7 +617,7 @@ body.sm-open{ overflow:hidden; }
 .oc-hours{ display:block; color:var(--muted); font-size:.72rem; font-weight:700; margin-top:4px; }
 .oc-foot{ display:flex; align-items:center; justify-content:space-between; margin-top:8px; gap:8px; }
 .oc-acts{ display:flex; gap:6px; align-items:center; }
-.oc-act{ width:38px; height:38px; flex:0 0 38px; border-radius:12px; display:flex; align-items:center; justify-content:center;
+.oc-act{ width:38px; height:38px; flex:0 0 38px; border-radius:12px; display:flex;align-items:center;justify-content:center;
   background:#fff; border:1.5px solid var(--line); color:var(--brown2); transition:transform .15s; }
 .oc-act:active{ transform:scale(.9); }
 .oc-act svg{ width:18px; height:18px; fill:currentColor; }
@@ -692,4 +698,26 @@ body.cb-on footer{ padding-bottom:86px; }
   .cb-total b{ font-size:.95rem; }
   .cb-view{ padding:11px 16px; font-size:.85rem; }
   .otp-zone-title{ font-size:.8rem; }
+}
+
+/* =====================================================
+   ===== v17.0: احترام تفضيل تقليل الحركة =====
+   إضافة فقط — لا تؤثر على أي مستخدم لم يفعّل الخيار
+   في إعدادات نظامه. توقف 5 حركات لا نهائية كانت تستنزف
+   البطارية وتسبب إزعاجاً لمن يعاني حساسية الحركة.
+===================================================== */
+@media (prefers-reduced-motion: reduce){
+  *, ::before, ::after{
+    animation-duration:.01ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;
+    scroll-behavior:auto !important;
+  }
+  html{ scroll-behavior:auto; }
+  .gd-btn{ animation:none !important; }
+  .fab-install::after{ animation:none !important; opacity:.35; }
+  .otp-nearest .ping::after{ animation:none !important; opacity:.35; }
+  .card:hover{ transform:none; }
+  .card:hover .c-img img{ transform:none; }
+  .banners-track{ transition:none; }
 }
