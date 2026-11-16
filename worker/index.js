@@ -1,10 +1,13 @@
 // ═══════════════════════════════════════════
 //  مكرونجي - Cloudflare Worker API (كامل)
-//  الإصدار: 2.8
-//  v2.8: • احترام deliveryFeeMode من الإعدادات (مجاني/ثابت/لكل فرع)
-//        • سقف كمية لكل صنف + سقف عدد الأصناف + فحص التوفر والنفد
-//        • حد معدل على التتبع وقراءة البيانات + عداد المحاولات الفاشلة
-//        • تقييد إحداثيات العميل بنطاق جغرافي صحيح
+//  الإصدار: 2.9
+//  v2.9: • إصلاح المنطقة الزمنية: كل التجميعات بتوقيت الرياض (UTC+3)
+//          - «طلبات/مبيعات اليوم» لم تعد تُخطئ بعد منتصف الليل
+//          - «أرباح السائق اليوم» صحيحة حتى 3 فجراً
+//          - حدود الأشهر في التقرير المحاسبي صحيحة
+//          - اسم ملف النسخة الاحتياطية بتاريخ الرياض
+//        • التخزين يبقى UTC — التحويل عند القراءة فقط (لا ترحيل بيانات)
+//  v2.8: احترام deliveryFeeMode + سقف كمية/عدد + حد معدل + عداد محاولات فاشلة
 //  v2.7-P0: التحقق من الأسعار من D1، منع حذف الطلبات النشطة، حماية صور التسليم
 // ═══════════════════════════════════════════
 
@@ -24,6 +27,23 @@ const APP_IMG_FALLBACK = [
   'img/d-jahez.png', 'img/d-hungerstation.png', 'img/d-keeta.png'
 ];
 const TRASH_DAYS = 30;
+
+/* ===== v2.9: المنطقة الزمنية للتقارير (Asia/Riyadh) =====
+   التخزين UTC دائماً — التحويل عند التجميع/القراءة فقط.
+   لتغيير المنطقة مستقبلاً: عدّل هذين الثابتين فقط. */
+const TZ_OFFSET = '+3 hours';
+const TZ_HOURS = 3;
+const TZ_LABEL = 'Asia/Riyadh (UTC+3)';
+
+/* تاريخ محلي YYYY-MM-DD */
+function localDateStr(d) {
+  const base = (d instanceof Date) ? d.getTime() : Date.now();
+  return new Date(base + TZ_HOURS * 3600000).toISOString().slice(0, 10);
+}
+/* شهر محلي YYYY-MM */
+function localYearMonth(d) {
+  return localDateStr(d).slice(0, 7);
+}
 
 /* ===== v2.8: حدود الطلبات (ضد الإرهاق والتلاعب) ===== */
 const MAX_QTY_PER_ITEM = 50;
@@ -226,6 +246,7 @@ async function ledgerInsert(env, order, kind) {
 
 // ═══════════════════════════════════════════
 //  الحذف الكسول (P0 Fixed: حذف pending فقط > 24 ساعة)
+//  ملاحظة: مقارنة نسبية بين طابعين UTC — لا تحتاج تحويل منطقة
 // ═══════════════════════════════════════════
 async function purgeStaleOrders(env) {
   try {
@@ -248,6 +269,7 @@ async function purgeStaleOrders(env) {
 
 // ═══════════════════════════════════════════
 //  توليد رقم طلب عشوائي
+//  v2.9: تاريخ الانتهاء بتوقيت الرياض
 // ═══════════════════════════════════════════
 async function generateOrderNumber(db) {
   const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -261,7 +283,7 @@ async function generateOrderNumber(db) {
     if (exists) continue;
     await db.prepare(`
       INSERT INTO used_order_numbers (order_number, created_at, expires_at)
-      VALUES (?, CURRENT_DATE, DATE('now', '+1 year'))
+      VALUES (?, date('now', '${TZ_OFFSET}'), date('now', '${TZ_OFFSET}', '+1 year'))
     `).bind(orderNumber).run();
     return orderNumber;
   }
@@ -923,6 +945,7 @@ async function handleClaim(orderId, request, env) {
 
 // ═══════════════════════════════════════════
 //  10) توصيلات السائق
+//  v2.9: «اليوم» بتوقيت الرياض — أرباح ما بعد منتصف الليل صحيحة
 // ═══════════════════════════════════════════
 async function handleDriverOrders(request, env) {
   const auth = await requireAuth(request, env, ['driver']);
@@ -941,7 +964,12 @@ async function handleDriverOrders(request, env) {
     customer_lat: o.customer_lat, customer_lng: o.customer_lng, items: JSON.parse(o.items_json),
     total: o.total, delivery_fee: o.delivery_fee, status: o.status, status_text: statusTextFor(o), created_at: o.created_at,
   }));
-  const today = await env.DB.prepare(`SELECT COUNT(*) as total_delivered, SUM(delivery_fee) as earnings FROM orders WHERE driver_id = ? AND status = 'delivered' AND date(delivered_at) = date('now')`).bind(auth.user.id).first();
+  const today = await env.DB.prepare(`
+    SELECT COUNT(*) as total_delivered, SUM(delivery_fee) as earnings
+    FROM orders
+    WHERE driver_id = ? AND status = 'delivered'
+      AND date(delivered_at, '${TZ_OFFSET}') = date('now', '${TZ_OFFSET}')
+  `).bind(auth.user.id).first();
   return json({ orders, stats: { delivered_today: today?.total_delivered || 0, earnings_today: today?.earnings || 0 } });
 }
 
@@ -1079,6 +1107,7 @@ async function handleGetPhoto(orderId, request, env) {
 
 // ═══════════════════════════════════════════
 //  16) كل الطلبات (المالك)
+//  v2.9: فلترة التاريخ بتوقيت الرياض
 // ═══════════════════════════════════════════
 async function handleAdminOrders(request, env) {
   const auth = await requireAuth(request, env, ['super_admin']);
@@ -1097,8 +1126,8 @@ async function handleAdminOrders(request, env) {
   if (status) { query += ' AND o.status = ?'; params.push(status); }
   if (type) { query += ' AND o.order_type = ?'; params.push(type); }
   if (search) { query += ' AND (o.order_number LIKE ? OR o.customer_phone LIKE ? OR o.customer_name LIKE ?)'; const s = `%${search}%`; params.push(s, s, s); }
-  if (dateFrom) { query += ' AND date(o.created_at) >= ?'; params.push(dateFrom); }
-  if (dateTo) { query += ' AND date(o.created_at) <= ?'; params.push(dateTo); }
+  if (dateFrom) { query += ` AND date(o.created_at, '${TZ_OFFSET}') >= ?`; params.push(dateFrom); }
+  if (dateTo) { query += ` AND date(o.created_at, '${TZ_OFFSET}') <= ?`; params.push(dateTo); }
   query += ' ORDER BY o.created_at DESC LIMIT 200';
   const result = await env.DB.prepare(query).bind(...params).all();
   const orders = result.results.map(o => ({
@@ -1189,6 +1218,7 @@ async function handleAdminUsersReset(userId, request, env) {
 
 // ═══════════════════════════════════════════
 //  18) التقرير التشغيلي
+//  v2.9: كل التجميعات بتوقيت الرياض
 // ═══════════════════════════════════════════
 async function handleReportsSummary(request, env) {
   const auth = await requireAuth(request, env, ['super_admin', 'supervisor']);
@@ -1198,10 +1228,10 @@ async function handleReportsSummary(request, env) {
   const period = url.searchParams.get('period') || 'today';
   if (auth.user.role === 'supervisor') branchId = auth.user.branch_id;
   const dateCondition = {
-    today: "date(o.created_at) = date('now')",
-    week: "date(o.created_at) >= date('now', '-7 days')",
-    month: "date(o.created_at) >= date('now', '-30 days')",
-  }[period] || "date(o.created_at) = date('now')";
+    today: `date(o.created_at, '${TZ_OFFSET}') = date('now', '${TZ_OFFSET}')`,
+    week: `date(o.created_at, '${TZ_OFFSET}') >= date('now', '${TZ_OFFSET}', '-7 days')`,
+    month: `date(o.created_at, '${TZ_OFFSET}') >= date('now', '${TZ_OFFSET}', '-30 days')`,
+  }[period] || `date(o.created_at, '${TZ_OFFSET}') = date('now', '${TZ_OFFSET}')`;
   let where = dateCondition;
   const params = [];
   if (branchId) { where += ' AND o.branch_id = ?'; params.push(branchId); }
@@ -1245,6 +1275,8 @@ async function handleReportsSummary(request, env) {
   } catch (e) { topItems = []; }
   return json({
     period,
+    timezone: TZ_LABEL,
+    local_date: localDateStr(),
     totals: {
       total_orders: totals?.total_orders || 0, delivered: totals?.delivered || 0, cancelled: totals?.cancelled || 0,
       pickup_delivered: totals?.pickup_delivered || 0, delivery_delivered: totals?.delivery_delivered || 0,
@@ -1256,6 +1288,7 @@ async function handleReportsSummary(request, env) {
 
 // ═══════════════════════════════════════════
 //  19) التقرير المحاسبي
+//  v2.9: حدود الأشهر والأيام بتوقيت الرياض
 // ═══════════════════════════════════════════
 async function handleReportsAccounting(request, env) {
   const auth = await requireAuth(request, env, ['super_admin', 'supervisor']);
@@ -1263,15 +1296,14 @@ async function handleReportsAccounting(request, env) {
   const url = new URL(request.url);
   let branchId = url.searchParams.get('branch_id') || '';
   if (auth.user.role === 'supervisor') branchId = auth.user.branch_id || '';
-  const now = new Date();
-  const ym = now.toISOString().slice(0, 7);
+  const ym = localYearMonth();
   const from = url.searchParams.get('from') || (ym + '-01');
-  const to = url.searchParams.get('to') || now.toISOString().slice(0, 10);
+  const to = url.searchParams.get('to') || localDateStr();
   const rows = await env.DB.prepare(`
-    SELECT substr(closed_at,1,7) AS ym, kind, order_type, branch_id, driver_id,
+    SELECT strftime('%Y-%m', closed_at, '${TZ_OFFSET}') AS ym, kind, order_type, branch_id, driver_id,
            COUNT(*) AS n, SUM(gross) AS gross, SUM(fees) AS fees
     FROM order_ledger
-    WHERE date(closed_at) BETWEEN ? AND ?
+    WHERE date(closed_at, '${TZ_OFFSET}') BETWEEN ? AND ?
       AND (? = '' OR branch_id = ?)
     GROUP BY ym, kind, order_type, branch_id, driver_id
     ORDER BY ym
@@ -1342,13 +1374,13 @@ async function handleReportsAccounting(request, env) {
              SUM(CAST(json_extract(j.value,'$.qty') AS INTEGER)) AS qty,
              SUM(CAST(json_extract(j.value,'$.qty') AS INTEGER) * CAST(json_extract(j.value,'$.price') AS REAL)) AS revenue
       FROM orders o, json_each(o.items_json) j
-      WHERE o.status = 'delivered' AND date(o.delivered_at) BETWEEN ? AND ?
+      WHERE o.status = 'delivered' AND date(o.delivered_at, '${TZ_OFFSET}') BETWEEN ? AND ?
         AND (? = '' OR o.branch_id = ?)
       GROUP BY name_ar ORDER BY qty DESC LIMIT 10
     `).bind(from, to, branchId, branchId).all();
     topItems = ti.results;
   } catch (e) { topItems = []; }
-  return json({ from, to, totals, months, branches, drivers, top_items: topItems });
+  return json({ from, to, timezone: TZ_LABEL, totals, months, branches, drivers, top_items: topItems });
 }
 
 // ═══════════════════════════════════════════
@@ -1539,6 +1571,7 @@ async function purgeOldTrash(env, days) {
 
 // ═══════════════════════════════════════════
 //  21) النسخ الاحتياطي (يشمل المنيو والإعدادات)
+//  v2.9: اسم الملف بتاريخ الرياض
 // ═══════════════════════════════════════════
 async function buildAndStoreBackup(env) {
   const [orders, users, branches, tracking, ledger, appRow] = await Promise.all([
@@ -1566,7 +1599,9 @@ async function buildAndStoreBackup(env) {
 
   const backup = {
     exported_at: new Date().toISOString(),
-    version: '2.8',
+    local_date: localDateStr(),
+    timezone: TZ_LABEL,
+    version: '2.9',
     app_data: appData,
     images_inventory: imageKeys,
     branches: branches.results,
@@ -1576,7 +1611,7 @@ async function buildAndStoreBackup(env) {
     order_ledger: ledger.results,
   };
 
-  const key = `backups/backup-${new Date().toISOString().slice(0, 10)}.json`;
+  const key = `backups/backup-${localDateStr()}.json`;
   await env.BACKUPS.put(key, JSON.stringify(backup), {
     httpMetadata: { contentType: 'application/json' }
   });
@@ -1711,9 +1746,11 @@ export default {
     try {
       if (path === '/api/health' && request.method === 'GET') return json({
         status: 'ok',
-        version: '2.8',
-        features: ['r2-images','image-trash','trash-restore','backup-appdata','item-orphans','read-through-app-only','server-pricing','fee-mode-honored','order-caps','public-rate-limit','track-anti-enum'],
+        version: '2.9',
+        features: ['r2-images','image-trash','trash-restore','backup-appdata','item-orphans','read-through-app-only','server-pricing','fee-mode-honored','order-caps','public-rate-limit','track-anti-enum','riyadh-time-reports'],
         live_mode: env.LIVE_MODE || 'polling',
+        timezone: TZ_LABEL,
+        local_date: localDateStr(),
         trash_days: TRASH_DAYS,
         limits: { max_qty_per_item: MAX_QTY_PER_ITEM, max_items_per_order: MAX_ITEMS_PER_ORDER }
       });
@@ -1793,11 +1830,13 @@ export default {
 
   // ═════════════════════════════════════════
   //  المهام المجدولة
+  //  ملاحظة: المقارنات النسبية (-7 days / -90 days) تبقى UTC — صحيحة
+  //  لأنها الفرق بين طابعين UTC، لا تعتمد على بداية اليوم
   // ═════════════════════════════════════════
   async scheduled(event, env, ctx) {
     try {
       if (event.cron === '0 3 * * *') {
-        await env.DB.prepare("DELETE FROM used_order_numbers WHERE expires_at < date('now')").run();
+        await env.DB.prepare(`DELETE FROM used_order_numbers WHERE expires_at < date('now', '${TZ_OFFSET}')`).run();
         await env.DB.prepare("DELETE FROM sessions WHERE expires_at < datetime('now')").run();
         await env.DB.prepare("DELETE FROM driver_locations WHERE created_at < datetime('now', '-7 days')").run();
         await env.DB.prepare(`DELETE FROM order_tracking WHERE order_id IN (SELECT id FROM orders WHERE status = 'archived' AND updated_at < datetime('now', '-90 days'))`).run();
@@ -1845,5 +1884,5 @@ export default {
 };
 
 // ═══════════════════════════════════════════
-//  نهاية worker/index.js (v2.8)
+//  نهاية worker/index.js (v2.9)
 // ═══════════════════════════════════════════
