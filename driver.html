@@ -169,12 +169,17 @@ h3.sec .cnt{background:var(--maroon);color:var(--gold);border-radius:50px;paddin
 <input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
 <div id="toast"></div>
 
+<!-- v3.1: settings.js يبقى كاحتياطي offline — يُستبدل ببيانات D1 عند النجاح -->
 <script src="settings.js"></script>
 <script src="i18n-staff.js"></script>
 
 <script>
 /* ═══════════════════════════════════════════
-   مكرونجي — بوابة السائق (v3.0)
+   مكرونجي — بوابة السائق (v3.1)
+   v3.1: • المنيو والإعدادات تُقرأ من D1 (نفس مصدر تطبيق الزبون)
+           مع رجوع تلقائي لنسخة المستودع عند فشل الشبكة
+         • تحديث دوري كل 60 ثانية — الأصناف الجديدة تظهر بلا إعادة تحميل
+         • كل دوال v3.0 كما هي (واتساب بلغة الطلب، ضغط الصور، الحوض، الموقع)
    v3.0: رسائل الواتساب بلغة الطلب (ttLang)
          + حذف "عزيزنا" من الرسائل
          + ذاكرة لغة معزولة (mk_lang_driver)
@@ -186,6 +191,8 @@ h3.sec .cnt{background:var(--maroon);color:var(--gold);border-radius:50px;paddin
 const API = 'https://makaronjy-api.makaronjy.workers.dev';
 const REFRESH_MS = 10000;      // 10 ثوانٍ للتحديث الدوري (بيانات من Worker)
 const TIME_REFRESH_MS = 5000;  // 5 ثوانٍ للوقت النسبي (محلي مجاني 100%)
+const LIVE_REFRESH_MS = 60000; // v3.1: دقيقة للمنيو/الإعدادات (خفيف على الحصة)
+const DATA_TTL_MS = 60000;     // v3.1: صلاحية الكاش المحلي
 
 let JWT = localStorage.getItem('mk_driver_jwt') || '';
 let ME = null;
@@ -197,6 +204,9 @@ let photoForOrder = null;
 let LAST_DELIVERED = null;
 let MENU_DATA = null;
 let MENU_LOADING = null;
+let MENU_STAMP = 0;            // v3.1
+let SETTINGS_LOADING = null;   // v3.1
+let SETTINGS_STAMP = 0;        // v3.1
 
 /* ═══════════════════════════════════════════
    الزمن النسبي + الألوان الذكية (توقيت الرياض)
@@ -257,24 +267,91 @@ function tmBadge(ts){
 }
 
 /* ═══════════════════════════════════════════
-   ترجمة المنيو (الأصناف القديمة)
+   v3.1: المنيو من D1 أولاً + رجوع للمستودع
    ═══════════════════════════════════════════ */
-async function loadMenu(){
-  if(MENU_DATA) return MENU_DATA;
+async function loadMenu(force){
+  const fresh = MENU_DATA && (Date.now() - MENU_STAMP < DATA_TTL_MS);
+  if(!force && fresh) return MENU_DATA;
   if(MENU_LOADING) return MENU_LOADING;
   MENU_LOADING = (async function(){
+    /* 1) المصدر الأساسي: D1 عبر الووركر — نفس ما يراه الزبون */
     try{
-      const r = await fetch('menu.js', { cache:'no-store' });
-      if(!r.ok) return [];
-      const text = await r.text();
-      const match = text.match(/window\.MENU\s*=\s*(\[[\s\S]*?\]);/);
-      if(!match) return [];
-      try{ return JSON.parse(match[1]); }catch(e){ return []; }
-    }catch(e){ return []; }
+      const r = await fetch(API + '/api/data/menu', { cache:'no-store' });
+      if(r.ok){
+        const j = await r.json();
+        if(j && Array.isArray(j.menu) && j.menu.length){
+          MENU_STAMP = Date.now();
+          return j.menu;
+        }
+      }
+    }catch(e){}
+    /* 2) احتياطي: نسخة المستودع — تعمل لو تعطل الووركر */
+    try{
+      const r2 = await fetch('menu.js', { cache:'no-store' });
+      if(r2.ok){
+        const text = await r2.text();
+        const match = text.match(/window\.MENU\s*=\s*(\[[\s\S]*?\]);/);
+        if(match){
+          try{
+            const arr = JSON.parse(match[1]);
+            if(Array.isArray(arr) && arr.length){
+              MENU_STAMP = Date.now();
+              return arr;
+            }
+          }catch(e){}
+        }
+      }
+    }catch(e){}
+    /* 3) آخر احتياطي: ما لدينا في الذاكرة */
+    return MENU_DATA || [];
   })();
-  MENU_DATA = await MENU_LOADING;
+  try{
+    MENU_DATA = await MENU_LOADING;
+  }finally{
+    MENU_LOADING = null;
+  }
   return MENU_DATA;
 }
+
+/* ═══════════════════════════════════════════
+   v3.1: الإعدادات من D1 (أسماء الفروع بالإنجليزية)
+   settings.js المحمّل عبر <script> يبقى احتياطياً
+   ═══════════════════════════════════════════ */
+async function loadSettings(force){
+  const fresh = window.APP_SETTINGS && (Date.now() - SETTINGS_STAMP < DATA_TTL_MS);
+  if(!force && fresh) return window.APP_SETTINGS || null;
+  if(SETTINGS_LOADING) return SETTINGS_LOADING;
+  SETTINGS_LOADING = (async function(){
+    try{
+      const r = await fetch(API + '/api/data/settings', { cache:'no-store' });
+      if(r.ok){
+        const j = await r.json();
+        if(j && j.settings && typeof j.settings === 'object' && Object.keys(j.settings).length){
+          window.APP_SETTINGS = j.settings;
+          SETTINGS_STAMP = Date.now();
+          return window.APP_SETTINGS;
+        }
+      }
+    }catch(e){}
+    /* احتياطي: settings.js يبقى كما هو في window.APP_SETTINGS */
+    SETTINGS_STAMP = Date.now();
+    return window.APP_SETTINGS || null;
+  })();
+  try{
+    return await SETTINGS_LOADING;
+  }finally{
+    SETTINGS_LOADING = null;
+  }
+}
+
+/* v3.1: تحديث المنيو/الإعدادات وإعادة الرسم عند التغيير */
+async function refreshLiveData(){
+  try{
+    await Promise.all([loadMenu(false), loadSettings(false)]);
+    if(JWT && (ORDERS.length || POOL.length || LAST_DELIVERED)) renderAll();
+  }catch(e){}
+}
+
 function findMenuById(id){
   if(!MENU_DATA || !id) return null;
   for(const sec of MENU_DATA){
@@ -496,6 +573,9 @@ function enterApp(){
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('hName').textContent = ME ? ME.name : '—';
   load();
+  /* v3.1: ضمان بيانات حديثة عند الدخول */
+  loadMenu(false);
+  loadSettings(false);
 }
 
 /* ===== التحميل ===== */
@@ -763,6 +843,15 @@ setInterval(sendLocation, 30000);
 /* المؤقتات: بيانات 10 ثوانٍ (مع إيقاف بالخلفية) + وقت نسبي 5 ثوانٍ */
 setInterval(function(){ if(JWT && !document.hidden) load(); }, REFRESH_MS);
 setInterval(function(){ if(!document.hidden) refreshTimeAgo(); }, TIME_REFRESH_MS);
+/* v3.1: تحديث المنيو/الإعدادات كل دقيقة — الأصناف الجديدة تظهر بلا إعادة تحميل */
+setInterval(function(){ if(JWT && !document.hidden) refreshLiveData(); }, LIVE_REFRESH_MS);
+/* v3.1: عند العودة للتبويب — حدّث كل شيء */
+document.addEventListener('visibilitychange', function(){
+  if(!document.hidden && JWT){
+    load();
+    refreshLiveData();
+  }
+});
 
 window.addEventListener('staff-lang-changed', function(){
   syncLangUI();
@@ -772,11 +861,12 @@ window.addEventListener('staff-lang-changed', function(){
 initStaffI18n({ autoLangToggle: false });
 syncLangUI();
 
+/* v3.1: المنيو + الإعدادات من D1 قبل الدخول */
 (async function(){
-  await loadMenu();
+  await Promise.all([loadMenu(true), loadSettings(true)]);
   if(JWT && ME){ enterApp(); } else { logout(); }
 })();
 </script>
 </body>
 </html>
-<!-- ===== END driver.html (v3.0) ===== -->
+<!-- ===== END driver.html (v3.1) ===== -->
