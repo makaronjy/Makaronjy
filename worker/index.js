@@ -1,7 +1,11 @@
 // ═══════════════════════════════════════════
 //  مكرونجي - Cloudflare Worker API (كامل)
-//  الإصدار: 2.7-P0-Fixed
-//  إصلاحات P0: التحقق من الأسعار/الرسوم من D1، منع حذف الطلبات النشطة، حماية صور التسليم.
+//  الإصدار: 2.8
+//  v2.8: • احترام deliveryFeeMode من الإعدادات (مجاني/ثابت/لكل فرع)
+//        • سقف كمية لكل صنف + سقف عدد الأصناف + فحص التوفر والنفد
+//        • حد معدل على التتبع وقراءة البيانات + عداد المحاولات الفاشلة
+//        • تقييد إحداثيات العميل بنطاق جغرافي صحيح
+//  v2.7-P0: التحقق من الأسعار من D1، منع حذف الطلبات النشطة، حماية صور التسليم
 // ═══════════════════════════════════════════
 
 const CORS_HEADERS = {
@@ -20,6 +24,17 @@ const APP_IMG_FALLBACK = [
   'img/d-jahez.png', 'img/d-hungerstation.png', 'img/d-keeta.png'
 ];
 const TRASH_DAYS = 30;
+
+/* ===== v2.8: حدود الطلبات (ضد الإرهاق والتلاعب) ===== */
+const MAX_QTY_PER_ITEM = 50;
+const MAX_ITEMS_PER_ORDER = 60;
+const MAX_ORDER_TOTAL = 100000;
+
+/* ===== v2.8: حدود معدل القراءة العامة ===== */
+const TRACK_RATE_PER_MIN = 300;      // يكفي ~40 عميل يتتبعون كل 8 ثوانٍ من نفس الشبكة
+const TRACK_MISS_LIMIT = 30;         // محاولات فاشلة per 5 دقائق — يوقف التعداد
+const TRACK_MISS_WINDOW = 300;
+const DATA_RATE_PER_MIN = 240;       // يكفي ~30 عميل يفحصون كل 8 ثوانٍ من نفس الشبكة
 
 const STATUS_TEXT = {
   pending: 'بانتظار القبول',
@@ -127,6 +142,69 @@ async function r2ListAll(bucket, prefix) {
     cursor = res.cursor;
   }
   return out;
+}
+
+// ═══════════════════════════════════════════
+//  v2.8: قراءة الإعدادات + حساب رسوم التوصيل
+// ═══════════════════════════════════════════
+async function readAppSettings(env) {
+  try {
+    const row = await env.DB.prepare('SELECT settings_json FROM app_data WHERE id = 1').first();
+    if (!row || !row.settings_json) return {};
+    const s = JSON.parse(row.settings_json);
+    return (s && typeof s === 'object') ? s : {};
+  } catch (e) {
+    console.error('read settings error:', e);
+    return {};
+  }
+}
+
+/* يحترم وضع الرسوم المحدد في لوحة التحكم — لا يثق بأي رقم من العميل */
+function computeDeliveryFee(settings, branch, orderType) {
+  if (orderType !== 'delivery') return 0;
+
+  const mode = settings.deliveryFeeMode;
+
+  if (mode === 'free') return 0;
+
+  if (mode === 'perBranch') {
+    let fromSettings = null;
+    if (Array.isArray(settings.branches)) {
+      const sb = settings.branches.find(b => b && b.id === branch.id);
+      if (sb && typeof sb.deliveryFee === 'number' && isFinite(sb.deliveryFee)) {
+        fromSettings = sb.deliveryFee;
+      }
+    }
+    if (fromSettings !== null) return Math.max(0, fromSettings);
+    const fromDb = parseFloat(branch.delivery_fee);
+    return isFinite(fromDb) ? Math.max(0, fromDb) : 0;
+  }
+
+  if (mode === 'fixed') {
+    const f = parseFloat(settings.deliveryFee);
+    return isFinite(f) ? Math.max(0, f) : 0;
+  }
+
+  /* لا وضع محدد في الإعدادات → نستخدم رسوم الفرع من قاعدة البيانات */
+  const fallback = parseFloat(branch.delivery_fee);
+  return isFinite(fallback) ? Math.max(0, fallback) : 0;
+}
+
+/* فحص توفر الصنف للفرع (التوفر الدائم + النفد اليومي) */
+function itemAllowedForBranch(sec, it, branchId) {
+  if (sec && sec.hidden === true) return { ok: false, reason: 'hidden' };
+  if (it && it.hidden === true) return { ok: false, reason: 'hidden' };
+
+  const secOnly = (sec && Array.isArray(sec.only)) ? sec.only : [];
+  const itOnly = (it && Array.isArray(it.only)) ? it.only : [];
+  const secOk = !secOnly.length || secOnly.includes(branchId);
+  const itOk = !itOnly.length || itOnly.includes(branchId);
+  if (!secOk || !itOk) return { ok: false, reason: 'branch' };
+
+  const so = (it && Array.isArray(it.so)) ? it.so : [];
+  if (so.includes(branchId)) return { ok: false, reason: 'sold' };
+
+  return { ok: true };
 }
 
 // ═══════════════════════════════════════════
@@ -538,16 +616,17 @@ async function handleChangePassword(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  4) إنشاء طلب (P0 Fixed: التحقق من الأسعار والرسوم من D1)
+//  4) إنشاء طلب
+//  v2.8: أسعار من D1 + رسوم حسب وضع الإعدادات + حدود كمية/عدد + فحص التوفر
 // ═══════════════════════════════════════════
 async function handleCreateOrder(request, env) {
   const ip = getIP(request);
   const rateCheck = await checkRateLimit(env, `create_order:${ip}`, 10, 60);
   if (!rateCheck.allowed) return error('محاولات كثيرة، حاول بعد دقيقة', 429);
-  
+
   const body = await request.json().catch(() => null);
   if (!body) return error('بيانات ناقصة');
-  
+
   const customerName = sanitize(body.customer_name);
   const customerPhone = sanitize(body.customer_phone);
   const branchId = sanitize(body.branch_id);
@@ -555,66 +634,104 @@ async function handleCreateOrder(request, env) {
   const notes = sanitize(body.notes || '');
   const orderType = body.order_type === 'pickup' ? 'pickup' : 'delivery';
   const orderLang = normLang(body.lang);
-  
+
   if (!customerName || customerName.length < 2) return error('الاسم مطلوب (حرفان على الأقل)');
+  if (customerName.length > 60) return error('الاسم طويل جداً (الحد 60 حرفاً)');
   if (!customerPhone || !/^\d{9,15}$/.test(customerPhone.replace(/[^0-9]/g, ''))) return error('رقم الجوال غير صحيح');
   if (!branchId) return error('الفرع مطلوب');
   if (items.length === 0) return error('السلة فارغة');
+  if (items.length > MAX_ITEMS_PER_ORDER) return error(`عدد الأصناف كبير جداً (الحد ${MAX_ITEMS_PER_ORDER} صنف)`, 400);
 
-  // 🔒 جلب بيانات الفرع والمنيوم من قاعدة البيانات للتحقق
+  /* جلب الفرع + المنيو + الإعدادات من قاعدة البيانات */
   const branch = await env.DB.prepare('SELECT id, name_ar, phone, delivery_fee FROM branches WHERE id = ? AND is_active = 1').bind(branchId).first();
   if (!branch) return error('الفرع غير موجود أو غير نشط');
 
   const menuRow = await env.DB.prepare('SELECT menu_json FROM app_data WHERE id = 1').first();
   let menuData = [];
-  try { menuData = menuRow ? JSON.parse(menuRow.menu_json) : []; } catch(e) {}
-  
+  try { menuData = menuRow ? JSON.parse(menuRow.menu_json) : []; } catch (e) { menuData = []; }
+  if (!Array.isArray(menuData) || !menuData.length) return error('المنيو غير متاح حالياً — حاول لاحقاً', 503);
+
+  const settings = await readAppSettings(env);
+
+  /* فحص توفر التوصيل للفرع */
+  if (orderType === 'delivery') {
+    const da = settings.deliveryAvailability;
+    if (da && typeof da === 'object') {
+      if (da.mode === 'none') return error('التوصيل غير متاح حالياً — اختر الاستلام من الفرع', 409);
+      if (da.mode === 'selected') {
+        const list = Array.isArray(da.branchIds) ? da.branchIds : [];
+        if (!list.includes(branchId)) return error('هذا الفرع للاستلام فقط — لا يتوفر توصيل', 409);
+      }
+    }
+  }
+
+  /* فهرس الأصناف مع القسم الأب (لفحص التوفر والإخفاء) */
   const menuMap = new Map();
   menuData.forEach(sec => {
     (sec.items || []).forEach(it => {
-      menuMap.set(it.id, { 
-        price: it.prices && it.prices[0] ? it.prices[0] : 0, 
-        hidden: it.hidden || false,
-        name: it.name || it.ar,
-        name_ar: it.name_ar || it.ar,
-        name_en: it.name_en || it.en
+      if (!it || !it.id) return;
+      menuMap.set(it.id, {
+        sec: sec,
+        item: it,
+        price: (Array.isArray(it.prices) && typeof it.prices[0] === 'number') ? it.prices[0] : 0,
+        name: it.ar || it.name || '',
+        name_ar: it.ar || it.name_ar || '',
+        name_en: it.en || it.name_en || it.ar || ''
       });
     });
   });
 
   let subtotal = 0;
   const cleanItems = [];
-  
+
   for (const item of items) {
-    const dbItem = menuMap.get(item.id);
-    if (!dbItem) return error(`الصنف غير موجود: ${item.id}`);
-    if (dbItem.hidden) return error(`الصنف غير متاح حالياً: ${item.id}`);
-    
-    const qty = Math.max(1, parseInt(item.qty) || 1);
-    const price = dbItem.price; // 🔒 استخدام السعر من قاعدة البيانات
+    const id = sanitize(item && item.id ? item.id : '');
+    if (!id) return error('صنف بدون معرّف في السلة');
+
+    const dbItem = menuMap.get(id);
+    if (!dbItem) return error(`الصنف غير موجود: ${id}`);
+
+    const avail = itemAllowedForBranch(dbItem.sec, dbItem.item, branchId);
+    if (!avail.ok) {
+      const label = dbItem.name_ar || dbItem.name || id;
+      if (avail.reason === 'sold') return error(`الصنف نفد اليوم في هذا الفرع: ${label}`, 409);
+      if (avail.reason === 'branch') return error(`الصنف غير متوفر في هذا الفرع: ${label}`, 409);
+      return error(`الصنف غير متاح حالياً: ${label}`, 409);
+    }
+
+    let qty = parseInt(item.qty, 10);
+    if (!isFinite(qty) || qty < 1) qty = 1;
+    if (qty > MAX_QTY_PER_ITEM) return error(`الكمية كبيرة جداً لصنف واحد (الحد ${MAX_QTY_PER_ITEM})`, 400);
+
+    const price = dbItem.price;
     subtotal += qty * price;
-    
-    cleanItems.push({ 
-      id: sanitize(item.id), 
-      name: sanitize(dbItem.name), 
-      name_ar: sanitize(dbItem.name_ar), 
-      name_en: sanitize(dbItem.name_en), 
-      qty, 
-      price, 
-      size: sanitize(item.size || '') 
+
+    cleanItems.push({
+      id: id,
+      name: sanitize(dbItem.name),
+      name_ar: sanitize(dbItem.name_ar),
+      name_en: sanitize(dbItem.name_en),
+      qty,
+      price,
+      size: sanitize(item.size || '')
     });
   }
 
-  let deliveryFee = 0;
-  if (orderType === 'delivery') {
-    // 🔒 استخدام رسوم التوصيل من قاعدة البيانات، وتجاهل مدخلات العميل
-    deliveryFee = parseFloat(branch.delivery_fee) || 0;
-  }
-  
-  const total = subtotal + deliveryFee;
+  /* الرسوم من الإعدادات — لا ثقة بأي رقم قادم من العميل */
+  const deliveryFee = computeDeliveryFee(settings, branch, orderType);
+  const total = Math.round((subtotal + deliveryFee) * 100) / 100;
+
+  if (total <= 0) return error('إجمالي الطلب غير صالح');
+  if (total > MAX_ORDER_TOTAL) return error('إجمالي الطلب يتجاوز الحد المسموح', 400);
+
   const orderNumber = await generateOrderNumber(env.DB);
-  const customerLat = parseFloat(body.customer_lat) || null;
-  const customerLng = parseFloat(body.customer_lng) || null;
+
+  /* إحداثيات مُقيّدة بنطاق جغرافي صحيح */
+  let customerLat = parseFloat(body.customer_lat);
+  let customerLng = parseFloat(body.customer_lng);
+  customerLat = (isFinite(customerLat) && customerLat >= -90 && customerLat <= 90) ? customerLat : null;
+  customerLng = (isFinite(customerLng) && customerLng >= -180 && customerLng <= 180) ? customerLng : null;
+
   const customerAddress = orderType === 'delivery' ? sanitize(body.customer_address || '') : '';
 
   const result = await env.DB.prepare(`
@@ -624,10 +741,10 @@ async function handleCreateOrder(request, env) {
       delivery_fee, total, payment_method, status, notes
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'cod', 'pending', ?)
   `).bind(orderNumber, branchId, orderType, orderLang, customerName, customerPhone, customerAddress, customerLat, customerLng, JSON.stringify(cleanItems), subtotal, deliveryFee, total, notes).run();
-  
+
   const orderId = result.meta.last_row_id;
   await env.DB.prepare(`INSERT INTO order_tracking (order_id, status, notes) VALUES (?, 'pending', ?)`).bind(orderId, orderType === 'pickup' ? 'تم استلام الطلب — استلام من الفرع' : 'تم استلام الطلب').run();
-  
+
   return json({
     success: true, order_number: orderNumber, order_id: orderId, order_type: orderType, lang: orderLang,
     total, delivery_fee: deliveryFee, branch_name: branch.name_ar, branch_phone: branch.phone,
@@ -637,16 +754,37 @@ async function handleCreateOrder(request, env) {
 
 // ═══════════════════════════════════════════
 //  5) تتبع الطلب
+//  v2.8: حد معدل + عداد محاولات فاشلة يوقف تعداد الأرقام
 // ═══════════════════════════════════════════
-async function handleTrackOrder(orderNumber, env) {
+async function handleTrackOrder(orderNumber, request, env) {
+  const ip = getIP(request);
+
+  const rate = await checkRateLimit(env, `track:${ip}`, TRACK_RATE_PER_MIN, 60);
+  if (!rate.allowed) return error('محاولات كثيرة — انتظر قليلاً ثم أعد المحاولة', 429);
+
+  const missKey = `track_miss:${ip}`;
+  let misses = 0;
+  try { misses = parseInt(await env.KV.get(missKey) || '0', 10) || 0; } catch (e) { misses = 0; }
+  if (misses >= TRACK_MISS_LIMIT) {
+    return error('تم إيقاف المحاولات مؤقتاً — تحقق من رقم الطلب أو رابط التتبع', 429);
+  }
+
+  const num = String(orderNumber || '').trim().slice(0, 40);
+  if (!num) return error('الطلب غير موجود', 404);
+
   const order = await env.DB.prepare(`
     SELECT o.*, b.name_ar as branch_name, b.phone as branch_phone, b.lat as branch_lat, b.lng as branch_lng,
       u.name as driver_name, u.phone as driver_phone
     FROM orders o JOIN branches b ON o.branch_id = b.id
     LEFT JOIN users u ON o.driver_id = u.id
     WHERE o.order_number = ?
-  `).bind(orderNumber).first();
-  if (!order) return error('الطلب غير موجود', 404);
+  `).bind(num).first();
+
+  if (!order) {
+    try { await env.KV.put(missKey, String(misses + 1), { expirationTtl: TRACK_MISS_WINDOW }); } catch (e) {}
+    return error('الطلب غير موجود', 404);
+  }
+
   const trackingResult = await env.DB.prepare(`SELECT status, notes, created_at FROM order_tracking WHERE order_id = ? ORDER BY created_at ASC`).bind(order.id).all();
   const isPickup = order.order_type === 'pickup';
   let driverLocation = null;
@@ -874,6 +1012,7 @@ async function handleDriverLocation(request, env) {
   const speed = parseFloat(body.speed) || 0;
   const heading = parseFloat(body.heading) || 0;
   if (!isFinite(lat) || !isFinite(lng)) return error('إحداثيات غير صالحة');
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return error('إحداثيات خارج النطاق', 400);
   if (orderId) {
     const order = await env.DB.prepare(`SELECT * FROM orders WHERE id = ? AND driver_id = ? AND order_type = 'delivery' AND status IN ('driver_assigned','driver_at_restaurant','out_for_delivery')`).bind(orderId, auth.user.id).first();
     if (order) {
@@ -1240,9 +1379,9 @@ function validImgKey(key) {
 
 async function handleImgServe(key, env) {
   if (!validImgKey(key)) return error('مفتاح صورة غير صالح', 400);
-  // 🔒 حماية صور التسليم من الوصول العام (P0 Fixed)
+  /* حماية صور التسليم من الوصول العام */
   if (!key.startsWith('img/')) return error('غير مصرح بالوصول', 403);
-  
+
   try {
     const obj = await env.IMAGES.get(key);
     if (obj) {
@@ -1427,7 +1566,7 @@ async function buildAndStoreBackup(env) {
 
   const backup = {
     exported_at: new Date().toISOString(),
-    version: '2.7',
+    version: '2.8',
     app_data: appData,
     images_inventory: imageKeys,
     branches: branches.results,
@@ -1486,7 +1625,7 @@ async function handleBackupList(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  22) صور الأصناف اليتيمة (v2.7)
+//  22) صور الأصناف اليتيمة
 // ═══════════════════════════════════════════
 async function scanItemOrphans(env) {
   const row = await env.DB.prepare('SELECT menu_json FROM app_data WHERE id = 1').first();
@@ -1572,23 +1711,33 @@ export default {
     try {
       if (path === '/api/health' && request.method === 'GET') return json({
         status: 'ok',
-        version: '2.7',
-        features: ['r2-images','image-trash','trash-restore','backup-appdata','item-orphans','read-through-app-only'],
+        version: '2.8',
+        features: ['r2-images','image-trash','trash-restore','backup-appdata','item-orphans','read-through-app-only','server-pricing','fee-mode-honored','order-caps','public-rate-limit','track-anti-enum'],
         live_mode: env.LIVE_MODE || 'polling',
-        trash_days: TRASH_DAYS
+        trash_days: TRASH_DAYS,
+        limits: { max_qty_per_item: MAX_QTY_PER_ITEM, max_items_per_order: MAX_ITEMS_PER_ORDER }
       });
       if (path === '/api/recover-owner' && request.method === 'GET') return await handleRecoverOwner(request, env);
 
-      if (path === '/api/data/menu' && request.method === 'GET') return await handleGetMenu(env);
+      /* ===== قراءة عامة بحد معدل (v2.8) ===== */
+      if (path === '/api/data/menu' && request.method === 'GET') {
+        const r = await checkRateLimit(env, `data:${getIP(request)}`, DATA_RATE_PER_MIN, 60);
+        if (!r.allowed) return error('محاولات كثيرة — انتظر قليلاً', 429);
+        return await handleGetMenu(env);
+      }
       if (path === '/api/data/menu' && request.method === 'PUT') return await handleSaveMenu(request, env);
-      if (path === '/api/data/settings' && request.method === 'GET') return await handleGetSettings(env);
+      if (path === '/api/data/settings' && request.method === 'GET') {
+        const r = await checkRateLimit(env, `data:${getIP(request)}`, DATA_RATE_PER_MIN, 60);
+        if (!r.allowed) return error('محاولات كثيرة — انتظر قليلاً', 429);
+        return await handleGetSettings(env);
+      }
       if (path === '/api/data/settings' && request.method === 'PUT') return await handleSaveSettings(request, env);
       if (path === '/api/migrate/github' && request.method === 'POST') return await handleMigrateFromGithub(request, env);
       if (path === '/api/auth/login' && request.method === 'POST') return await handleLogin(request, env);
       if (path === '/api/auth/admin-bridge' && request.method === 'POST') return await handleAdminBridge(request, env);
       if (path === '/api/auth/change-password' && request.method === 'POST') return await handleChangePassword(request, env);
       if (path === '/api/orders' && request.method === 'POST') return await handleCreateOrder(request, env);
-      if (path.startsWith('/api/track/') && request.method === 'GET') return await handleTrackOrder(decodeURIComponent(path.split('/').pop()), env);
+      if (path.startsWith('/api/track/') && request.method === 'GET') return await handleTrackOrder(decodeURIComponent(path.split('/').pop()), request, env);
       if (path === '/api/branch/pool' && request.method === 'GET') return await handleBranchPool(request, env);
       if (path === '/api/supervisor/orders' && request.method === 'GET') return await handleSupervisorOrders(request, env);
       if (path === '/api/supervisor/drivers' && request.method === 'GET') return await handleSupervisorDrivers(request, env);
@@ -1652,14 +1801,14 @@ export default {
         await env.DB.prepare("DELETE FROM sessions WHERE expires_at < datetime('now')").run();
         await env.DB.prepare("DELETE FROM driver_locations WHERE created_at < datetime('now', '-7 days')").run();
         await env.DB.prepare(`DELETE FROM order_tracking WHERE order_id IN (SELECT id FROM orders WHERE status = 'archived' AND updated_at < datetime('now', '-90 days'))`).run();
-        
-        // P0 Fixed: حذف الطلبات المعلقة فقط الأقدم من 24 ساعة
+
+        /* حذف الطلبات المعلقة فقط الأقدم من 24 ساعة */
         const old = await env.DB.prepare(`SELECT * FROM orders WHERE status = 'pending' AND created_at < datetime('now', '-24 hours')`).all();
         for (const o of old.results) {
           await ledgerInsert(env, o, 'abandoned');
           await env.DB.prepare('DELETE FROM orders WHERE id = ?').bind(o.id).run();
         }
-        
+
         await env.DB.prepare('DELETE FROM order_tracking WHERE order_id NOT IN (SELECT id FROM orders)').run();
         await env.DB.prepare('DELETE FROM driver_locations WHERE order_id NOT IN (SELECT id FROM orders)').run();
         await env.DB.prepare(`
@@ -1696,5 +1845,5 @@ export default {
 };
 
 // ═══════════════════════════════════════════
-//  نهاية worker/index.js (v2.7-P0-Fixed)
+//  نهاية worker/index.js (v2.8)
 // ═══════════════════════════════════════════
