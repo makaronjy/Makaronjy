@@ -31,13 +31,34 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
+
+      # ─────────────────────────────────────────────
+      #  استثناء ملفات الخادم من النشر العام
+      #  هذه الملفات لا يحتاجها المتصفح إطلاقاً، وخدمتها
+      #  للعامة تكشف بنية القاعدة ومعرّفاتها ومنطق الـAPI.
+      #  ⚠️ الحذف من نسخة العمل فقط — المستودع لا يتأثر.
+      # ─────────────────────────────────────────────
+      - name: Exclude server-side files from public artifact
+        run: |
+          rm -rf worker
+          rm -f wrangler.toml
+          rm -f schema.sql
+          rm -rf .github
+          rm -f .gitignore
+          echo "── الملفات المستثناة من النشر ──"
+          echo "worker/ · wrangler.toml · schema.sql · .github/ · .gitignore"
+          echo "── ما تبقّى (يُنشر) ──"
+          ls -1
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload entire repository
+          # Upload entire repository (after server-side exclusions above)
           path: '.'
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
