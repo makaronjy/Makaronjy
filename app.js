@@ -1,5 +1,10 @@
 /* =====================================================
 مكرونجي — سكربت التطبيق الرئيسي (app.js)
+v17.0: • الفاحص الحي يطبّق البيانات من أول فحص (منع أسعار قديمة أول 8 ثوانٍ)
+       • تقييد دوامة بانر الصور المفقودة (6 محاولات/5ث → 2/15ث ثم إيقاف نهائي)
+       • checkout() الاحتياطية لم تعد ترسل واتساب صامتاً — تمنع طلبات غير مسجّلة
+       • تهريب كل نصوص المالك (أسماء/عناوين/أوصاف) قبل innerHTML
+       • --mk-bg: متغيّر خلفية البطاقات من R2 (يمهّد لإصلاح style.css)
 v16.1: إصلاح حرج للفاحص الحي (liveBusy كان يبقى عالقاً بعد أول فحص
        فيتوقف التحديث نهائياً) + تسريع الفحص إلى 8 ثوانٍ
 v16.0: الفاحص الحي من D1 مدمج + الصور من R2 عبر imgUrl
@@ -152,7 +157,7 @@ function generateInvoiceID(code){
 function hav(la1,lo1,la2,lo2){
   const R=6371, r=d=>d*Math.PI/180;
   const dLa=r(la2-la1), dLo=r(lo2-lo1);
-  const a=Math.sin(dLa/2)**2 + Math.cos(r(la1))*Math.cos(r(la2))*Math.sin(dLo/2);
+  const a=Math.sin(dLa/2)**2 + Math.cos(r(la1))*Math.cos(r(la2))*Math.sin(dLo/2)**2;
   return 2*R*Math.asin(Math.sqrt(a));
 }
 function findMenuItem(id){
@@ -254,10 +259,11 @@ function updateAddOnCard(ref){
   const ctrl = card.querySelector('.dt-octrl');
   if(!ctrl) return;
   const q = dtState.sel[ref] || 0;
+  const r = esc(ref);
   if(q > 0){
-    ctrl.innerHTML = '<span class="dt-mini"><button class="dec" data-mact="dec" data-ref="'+ref+'">−</button><span>'+q+'</span><button data-mact="inc" data-ref="'+ref+'">+</button></span>';
+    ctrl.innerHTML = '<span class="dt-mini"><button class="dec" data-mact="dec" data-ref="'+r+'">−</button><span>'+q+'</span><button data-mact="inc" data-ref="'+r+'">+</button></span>';
   } else {
-    ctrl.innerHTML = '<button class="dt-pick" data-mact="inc" data-ref="'+ref+'">+</button>';
+    ctrl.innerHTML = '<button class="dt-pick" data-mact="inc" data-ref="'+r+'">+</button>';
   }
 }
 /* ===== مفاتيح السلة ===== */
@@ -383,7 +389,13 @@ const SOC_SVG = {
   custom:'<svg viewBox="0 0 24 24"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>'
 };
 const SOC_EMOJI = { snapchat:{ch:'👻', bg:'#FFFC00'} };
-function socEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+/* v17: تهريب كامل (5 محارف) — يُستخدم لكل نص يملكه المالك قبل innerHTML */
+function socEsc(s){
+  return String(s==null?'':s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function esc(s){ return socEsc(s); }
 function socialList(){
   const s = S().social;
   if(Array.isArray(s)) return s.filter(x=> x && x.url).slice(0,5);
@@ -425,6 +437,11 @@ function applyImageVersions(){
     const want = imgUrl(p) + (v ? '?v='+v : '');
     if(im.getAttribute('src') !== want) im.src = want;
   });
+  /* v17: خلفية البطاقات من R2 — تُستهلك عبر var(--mk-bg) في CSS */
+  try{
+    const bg = imgUrl('img/bg.png') + (v ? '?v='+v : '');
+    document.documentElement.style.setProperty('--mk-bg', 'url("' + bg + '")');
+  }catch(e){}
 }
 /* ===== شركاء التوصيل: احتياطي مدمج ===== */
 const DEFAULT_DELIVERY_APPS = [
@@ -442,10 +459,11 @@ function renderDelivery(){
   if(!box) return;
   if(!d.length){ box.innerHTML = ''; return; }
   const name = x=> currentLang==='ar' ? x.nameAr : (x.nameEn || x.nameAr);
-  box.innerHTML = `<div class="gd-tiles">${d.map((x,i)=>`<button class="gd-btn" aria-label="${name(x)}" onclick="return openDeliveryApp(event, ${i});">
-      <img src="${imgUrl(x.img || 'img/missing.png')}" alt="${name(x)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-      <span class="gd-fallback" style="display:none;background:${x.color || '#8e2a4a'}">${name(x).charAt(0)}</span>
-      <span class="gd-name">${name(x)}</span></button>`).join('')}</div>`;
+  /* v17: تهريب أسماء وألوان ومسارات التطبيقات */
+  box.innerHTML = `<div class="gd-tiles">${d.map((x,i)=>`<button class="gd-btn" aria-label="${esc(name(x))}" onclick="return openDeliveryApp(event, ${i});">
+      <img src="${esc(imgUrl(x.img || 'img/missing.png'))}" alt="${esc(name(x))}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <span class="gd-fallback" style="display:none;background:${esc(x.color || '#8e2a4a')}">${esc(name(x).charAt(0))}</span>
+      <span class="gd-name">${esc(name(x))}</span></button>`).join('')}</div>`;
 }
 function openDeliveryApp(event, idx){
   event.preventDefault();
@@ -884,8 +902,9 @@ let dtState = null;
     '.dt-ocard{flex:0 0 150px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:.6rem;' +
     'display:flex;flex-direction:column;gap:.35rem;align-items:center;text-align:center;' +
     'box-shadow:0 2px 8px rgba(90,24,48,.06)}' +
+    /* v17: الخلفية من R2 عبر --mk-bg مع احتياطي للمستودع */
     '.dt-oimg{width:100%;aspect-ratio:1;border-radius:12px;overflow:hidden;' +
-    'background-color:var(--phbg);background-image:url("img/bg.png");background-size:cover;background-position:center}' +
+    'background-color:var(--phbg);background-image:var(--mk-bg, url("img/bg.png"));background-size:cover;background-position:center}' +
     '.dt-oimg img{width:100%;height:100%;object-fit:contain;padding:8%;display:block}' +
     '.dt-ocard b{font-size:.8rem;font-weight:900;color:var(--ink);line-height:1.5;' +
     'display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}' +
@@ -996,23 +1015,25 @@ function renderDetailMods(){
   const ar = (currentLang==='ar');
   const head = ar ? modsTitleAr(it) : modsTitleEn(it);
   const sub = ar ? modsSubAr() : modsSubEn();
+  /* v17: تهريب العناوين وأسماء الأصناف */
   const cards = refs.map(ref=>{
     const rit = findMenuItem(ref);
     const q = dtState.sel[ref] || 0;
     const thumb = itemImgUrl(rit) || itemPlaceholder(rit.ar);
+    const r = esc(ref);
     const ctrl = q > 0
-      ? `<span class="dt-mini"><button class="dec" data-mact="dec" data-ref="${ref}">−</button><span>${q}</span><button data-mact="inc" data-ref="${ref}">+</button></span>`
-      : `<button class="dt-pick" data-mact="inc" data-ref="${ref}">+</button>`;
-    return `<div class="dt-ocard" data-ref="${ref}">
-      <div class="dt-oimg"><img src="${thumb}" alt="${itemName(rit)}" loading="lazy"></div>
-      <b>${itemName(rit)}</b>
+      ? `<span class="dt-mini"><button class="dec" data-mact="dec" data-ref="${r}">−</button><span>${q}</span><button data-mact="inc" data-ref="${r}">+</button></span>`
+      : `<button class="dt-pick" data-mact="inc" data-ref="${r}">+</button>`;
+    return `<div class="dt-ocard" data-ref="${r}">
+      <div class="dt-oimg"><img src="${esc(thumb)}" alt="${esc(itemName(rit))}" loading="lazy"></div>
+      <b>${esc(itemName(rit))}</b>
       <span class="dt-oprice">+${rit.prices[0]} ${T().currency}</span>
       <div class="dt-octrl">${ctrl}</div>
     </div>`;
   }).join('');
   box.innerHTML = `<div class="dt-often">
-    <h5>${head}</h5>
-    <small>${sub}</small>
+    <h5>${esc(head)}</h5>
+    <small>${esc(sub)}</small>
     <div class="dt-often-row">${cards}</div>
   </div>`;
   const newRow = box.querySelector('.dt-often-row');
@@ -1054,7 +1075,7 @@ function openDetail(si, ii){
   else cEl.style.display = 'none';
   const sw = el('dtSizeWrap');
   sw.innerHTML = it.prices.length > 1
-    ? `<select id="dtSize" class="dt-size">${it.prices.map((p,i)=>`<option value="${i}"${i===sizeIdx?' selected':''}>${TT.sizes[i]} • ${p} ${TT.currency}</option>`).join('')}</select>`
+    ? `<select id="dtSize" class="dt-size">${it.prices.map((p,i)=>`<option value="${i}"${i===sizeIdx?' selected':''}>${esc(TT.sizes[i])} • ${p} ${TT.currency}</option>`).join('')}</select>`
     : '';
   renderDetailMods();
   renderDetailBar();
@@ -1144,7 +1165,8 @@ function buildMenu(){
     cats.appendChild(chip);
     const s = document.createElement('section');
     s.className='section'; s.id='sec-'+si;
-    s.innerHTML = `<h3 class="ribbon"><span class="rib-ico">${sec.i}</span> ${secTitle}</h3><div class="${DO.mode==='list'?'listwrap':'grid'}"></div>`;
+    /* v17: تهريب عنوان القسم وأيقونته */
+    s.innerHTML = `<h3 class="ribbon"><span class="rib-ico">${esc(sec.i)}</span> ${esc(secTitle)}</h3><div class="${DO.mode==='list'?'listwrap':'grid'}"></div>`;
     const g = s.querySelector('.listwrap, .grid');
     sec.items.forEach((it,ii)=>{
       const view = views[ii];
@@ -1159,18 +1181,23 @@ function buildMenu(){
       const calTxt = cal ? ('🔥 '+cal+' '+TT.cal) : TT.zeroCal;
       const priceTxt = multi ? (TT.from+' '+prices[0]+' '+TT.currency) : (prices[0]+' '+TT.currency);
       const bestBadge = isBestSeller(it)
-        ? `<span class="c-badge" data-openfeat="1" style="cursor:pointer">🏆 ${bestTxt}</span>` : '';
+        ? `<span class="c-badge" data-openfeat="1" style="cursor:pointer">🏆 ${esc(bestTxt)}</span>` : '';
       const sd = {
         ar: (it.ar||'').toLowerCase(),
         en: (it.en||'').toLowerCase(),
         dar: (it.desc||'').toLowerCase(),
         den: (it.descEn||'').toLowerCase()
       };
+      /* v17: نصوص المالك مهرّبة */
+      const nmH = esc(itemName(it));
+      const descH = esc(desc);
+      const phH = esc(ph);
+      const imgH = esc(imgURL || ph);
       if(DO.mode === 'list'){
         const badges = [];
-        if(gray) badges.push(`<span class="l-badge">${grayTxt}</span>`);
-        else if(sold) badges.push(`<span class="l-badge sold">${soldTxt}</span>`);
-        else if(isBestSeller(it)) badges.push(`<span class="l-badge best" data-openfeat="1">🏆 ${bestTxt}</span>`);
+        if(gray) badges.push(`<span class="l-badge">${esc(grayTxt)}</span>`);
+        else if(sold) badges.push(`<span class="l-badge sold">${esc(soldTxt)}</span>`);
+        else if(isBestSeller(it)) badges.push(`<span class="l-badge best" data-openfeat="1">🏆 ${esc(bestTxt)}</span>`);
         if(DO.showCal && cal) badges.push(`<span class="l-badge cal">🔥 ${cal} ${TT.cal}</span>`);
         const row = document.createElement('div');
         row.className='lrow' + (gray?' card-gray':'');
@@ -1178,21 +1205,21 @@ function buildMenu(){
         row.dataset.dar = sd.dar; row.dataset.den = sd.den;
         row.dataset.si = si; row.dataset.ii = ii;
         row.innerHTML = `
-          <div class="l-img"><img class="${mode}" src="${imgURL || ph}" alt="${itemName(it)}" loading="lazy" onerror="this.onerror=null;this.src='${ph}'"></div>
+          <div class="l-img"><img class="${mode}" src="${imgH}" alt="${nmH}" loading="lazy" onerror="this.onerror=null;this.src='${phH}'"></div>
           <div class="l-body">
-            <h4>${itemName(it)}</h4>
-            ${DO.showDesc && desc ? `<p class="l-desc">${desc}</p>` : ''}
+            <h4>${nmH}</h4>
+            ${DO.showDesc && desc ? `<p class="l-desc">${descH}</p>` : ''}
             <div class="l-badges">${badges.join('')}</div>
-            <div class="l-price">${priceTxt}</div>
+            <div class="l-price">${esc(priceTxt)}</div>
           </div>`;
         g.appendChild(row);
         return;
       }
-      const badge = gray ? `<span class="c-badge grayb">${grayTxt}</span>`
-        : (sold ? `<span class="c-badge sold">${soldTxt}</span>` : bestBadge);
+      const badge = gray ? `<span class="c-badge grayb">${esc(grayTxt)}</span>`
+        : (sold ? `<span class="c-badge sold">${esc(soldTxt)}</span>` : bestBadge);
       const metaParts = [];
-      if(DO.showCal) metaParts.push(calTxt);
-      if(DO.showDesc && desc) metaParts.push(desc);
+      if(DO.showCal) metaParts.push(esc(calTxt));
+      if(DO.showDesc && desc) metaParts.push(descH);
       const card = document.createElement('div');
       card.className='card' + (gray?' card-gray':'');
       card.dataset.name = sd.ar; card.dataset.en = sd.en;
@@ -1201,8 +1228,8 @@ function buildMenu(){
       card.dataset.ii = ii;
       card.innerHTML = `
         <div class="c-img">
-          <img class="${mode}" src="${imgURL || ph}" alt="${itemName(it)}" loading="lazy"
-               onerror="this.onerror=null;this.src='${ph}'">
+          <img class="${mode}" src="${imgH}" alt="${nmH}" loading="lazy"
+               onerror="this.onerror=null;this.src='${phH}'">
           ${badge}
           <div class="step ${(sold||gray)?'disabled':''}" data-si="${si}" data-ii="${ii}">
             <button class="st inc" aria-label="إضافة"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
@@ -1212,11 +1239,11 @@ function buildMenu(){
         </div>
         <div class="c-body">
           <div class="c-info">
-            <h4>${itemName(it)}</h4>
+            <h4>${nmH}</h4>
             ${metaParts.length ? `<p class="c-meta">${metaParts.join(' | ')}</p>` : ''}
-            ${multi? `<select class="size" ${(sold||gray)?'disabled':''}>${prices.map((p,i)=>`<option value="${i}">${TT.sizes[i]} • ${p} ${TT.currency}</option>`).join('')}</select>`:''}
+            ${multi? `<select class="size" ${(sold||gray)?'disabled':''}>${prices.map((p,i)=>`<option value="${i}">${esc(TT.sizes[i])} • ${p} ${TT.currency}</option>`).join('')}</select>`:''}
           </div>
-          <div class="c-price">${priceTxt}</div>
+          <div class="c-price">${esc(priceTxt)}</div>
         </div>`;
       g.appendChild(card);
     });
@@ -1237,10 +1264,10 @@ function buildMenu(){
     nav.innerHTML = `
       <button class="nav-btn" data-go="${prev}">
         <span class="arr">→</span>
-        <span class="lbl"><small>${TT.prevSec}</small><b>${MENU[pSi].i} ${prevT}</b></span>
+        <span class="lbl"><small>${TT.prevSec}</small><b>${esc(MENU[pSi].i)} ${esc(prevT)}</b></span>
       </button>
       <button class="nav-btn" data-go="${next}">
-        <span class="lbl"><small>${TT.nextSec}</small><b>${MENU[nSi].i} ${nextT}</b></span>
+        <span class="lbl"><small>${TT.nextSec}</small><b>${esc(MENU[nSi].i)} ${esc(nextT)}</b></span>
         <span class="arr">←</span>
       </button>`;
     s.appendChild(nav);
@@ -1506,11 +1533,12 @@ function renderFavSheet(){
   let html = '';
   favs.forEach((f, i) => {
     if(f){
+      /* v17: تهريب أسماء الأصناف والمقاسات */
       const preview = f.items.map(xi=>{
         const it = findMenuItem(xi.id);
         if(!it) return null;
         const size = xi.sizeIdx >= 0 ? ' (' + TT.sizes[xi.sizeIdx] + ')' : '';
-        return xi.qty + '× ' + itemName(it) + size;
+        return esc(xi.qty + '× ' + itemName(it) + size);
       }).filter(Boolean).join('، ');
       let total = 0;
       f.items.forEach(xi=>{
@@ -1518,11 +1546,11 @@ function renderFavSheet(){
         if(it) total += xi.qty * itemPrice(it, xi.sizeIdx);
       });
       html += `<div class="fav-card">
-        <div class="fav-card-head"><span class="fav-slot-name">${slots[i]}</span><span class="fav-total">${total} ${TT.currency}</span></div>
+        <div class="fav-card-head"><span class="fav-slot-name">${esc(slots[i])}</span><span class="fav-total">${total} ${TT.currency}</span></div>
         <p class="fav-items-preview">${preview}</p>
         <div class="fav-actions">
           <button class="fav-order-btn" onclick="orderFav(${i})">${tt('favOrderNow','🛒 اطلبها الآن','🛒 Order Now')}</button>
-          <button class="fav-del-btn" onclick="deleteFav(${i})">${tt('favDelete','🗑 حذف',' Delete')}</button>
+          <button class="fav-del-btn" onclick="deleteFav(${i})">${tt('favDelete','🗑 حذف','🗑 Delete')}</button>
         </div></div>`;
     } else {
       html += `<div class="fav-empty-slot">💭 ${tt('favEmptySlot','خانة فارغة — احفظ وجبة من السلة','Empty slot — save a meal from the cart')}</div>`;
@@ -1546,7 +1574,7 @@ function openSlotPicker(){
   const favs = getFavs();
   const slots = favSlotsArr();
   document.querySelectorAll('#slotBtns .slot-btn').forEach((b, i) => {
-    b.innerHTML = slots[i] + (favs[i] ? `<small>✔ ${currentLang==='ar'?'موجودة':'Saved'}</small>` : '');
+    b.innerHTML = esc(slots[i]) + (favs[i] ? `<small>✔ ${currentLang==='ar'?'موجودة':'Saved'}</small>` : '');
   });
   pushOverlay('slot');
   el('slotPicker').classList.add('show');
@@ -1746,21 +1774,38 @@ function refreshStickyMetrics(){
 }
 window.addEventListener('resize', refreshStickyMetrics);
 
-/* ===== الكاروسيل ===== */
+/* =====================================================
+   ===== الكاروسيل (v17: تقييد دوامة الصور المفقودة) =====
+===================================================== */
 let bnIndex = 0, bnTimer = null, bnTouchX = null;
-function bannersList(){ return Array.isArray(S().banners) ? S().banners.filter(b=> b && b.img && b.hidden !== true) : []; }
+const BN_MAX_RETRY = 2;        /* كان 6 */
+const BN_RETRY_MS = 15000;     /* كان 5000 */
+const bnDead = {};             /* مسار → فشل نهائي في هذه الجلسة */
+function bannersList(){
+  if(!Array.isArray(S().banners)) return [];
+  return S().banners.filter(b=> b && b.img && b.hidden !== true && !bnDead[imgUrl(b.img)]);
+}
 function retryBannerImg(im){
   if(!im || im.dataset.retrying) return;
+  const s = im.getAttribute('src') || '';
+  const pathKey = s.split('?')[0];
+  if(bnDead[pathKey]){ im.style.visibility = 'hidden'; return; }
   const n = (+im.dataset.retry || 0) + 1;
-  if(n > 6) return;
+  if(n > BN_MAX_RETRY){
+    bnDead[pathKey] = true;
+    im.style.visibility = 'hidden';
+    console.warn('[MK BANNER] صورة بانر مفقودة — أُوقفت المحاولات نهائياً:', pathKey);
+    setTimeout(()=>{ try{ renderBanners(); }catch(e){} }, 60);
+    return;
+  }
   im.dataset.retry = n;
   im.dataset.retrying = '1';
-  const s = im.getAttribute('src');
   setTimeout(()=>{
     delete im.dataset.retrying;
+    if(bnDead[pathKey]){ im.style.visibility = 'hidden'; return; }
     im.removeAttribute('src');
     im.src = s;
-  }, 5000);
+  }, BN_RETRY_MS);
 }
 function renderBanners(){
   const box = el('bannersBox'), track = el('bannersTrack'), dots = el('bannersDots');
@@ -1772,7 +1817,8 @@ function renderBanners(){
   const ar = currentLang==='ar';
   track.innerHTML = list.map(b=>{
     const cap = ar ? (b.titleAr||'') : (b.titleEn||b.titleAr||'');
-    return `<div class="bn-slide"><img src="${imgUrl(b.img)}${b.v ? '?v='+b.v : ''}" alt="${socEsc(cap||'')}" loading="lazy" onerror="retryBannerImg(this)">${cap ? `<div class="bn-cap">${socEsc(cap)}</div>` : ''}</div>`;
+    const src = imgUrl(b.img) + (b.v ? '?v='+b.v : '');
+    return `<div class="bn-slide"><img src="${esc(src)}" alt="${socEsc(cap||'')}" loading="lazy" onerror="retryBannerImg(this)">${cap ? `<div class="bn-cap">${socEsc(cap)}</div>` : ''}</div>`;
   }).join('');
   if(dots){
     dots.innerHTML = list.map((_,i)=> `<i data-bn="${i}" class="${i===0?'on':''}"></i>`).join('');
@@ -1943,6 +1989,7 @@ function renderOtpList(){
   const dirTxt = tt('goBranch','التوجه','Directions');
   const phoneIco = '<svg viewBox="0 0 24 24"><path d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.02-.24 11.36 11.36 0 0 0 3.56.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1 11.36 11.36 0 0 0 .57 3.56 1 1 0 0 1-.25 1.02l-2.2 2.21z"/></svg>';
   const navIco = '<svg viewBox="0 0 24 24"><path d="M12 2 4.5 20.3l.7.7L12 18l6.8 3 .7-.7z"/></svg>';
+  /* v17: تهريب أسماء الفروع وعناوينها وروابطها */
   box.innerHTML = brs.map(b=>{
     const st = branchStatus(b);
     const ri = routeInfo[b.id];
@@ -1957,18 +2004,20 @@ function renderOtpList(){
     const hoursTxt = today && !today.closed
       ? ('🕐 ' + fmtMin(hmToMin(today.o), lang) + ' - ' + fmtMin(hmToMin(today.c), lang))
       : '';
-    const telHref = 'tel:+' + String(b.wa||'');
-    return `<div class="otp-card ${b.id===nearestId?'is-nearest':''} ${b.id===cur?'is-active':''}" data-ob="${b.id}">
-      <div class="oc-top"><span class="oc-name">${branchName(b)}</span>
+    const telHref = 'tel:+' + String(b.wa||'').replace(/[^\d]/g,'');
+    const bId = esc(b.id);
+    const addr = esc((lang==='ar') ? b.addrAr : b.addrEn);
+    return `<div class="otp-card ${b.id===nearestId?'is-nearest':''} ${b.id===cur?'is-active':''}" data-ob="${bId}">
+      <div class="oc-top"><span class="oc-name">${esc(branchName(b))}</span>
         <span class="oc-badges">${nearBadge}${openBadge}${feeBadge}${kmBadge}</span></div>
-      <div class="oc-addr">📍 ${(lang==='ar') ? b.addrAr : b.addrEn}</div>
+      <div class="oc-addr">📍 ${addr}</div>
       <small class="oc-hours">${hoursTxt}</small>
       <div class="oc-foot">
         <div class="oc-acts">
-          <a class="oc-act call" href="${telHref}" aria-label="${callTxt}">${phoneIco}</a>
-          ${b.map ? `<a class="oc-act dir" href="${b.map}" target="_blank" rel="noopener noreferrer" aria-label="${dirTxt}">${navIco}</a>` : ''}
+          <a class="oc-act call" href="${esc(telHref)}" aria-label="${esc(callTxt)}">${phoneIco}</a>
+          ${b.map ? `<a class="oc-act dir" href="${esc(b.map)}" target="_blank" rel="noopener noreferrer" aria-label="${esc(dirTxt)}">${navIco}</a>` : ''}
         </div>
-        <button class="oc-choose" data-choose="${b.id}">${b.id===cur ? tt('currentBranchFlag','✓ فرعك الحالي','✓ Your Branch') : tt('chooseBtn','اختر ✓','Choose ✓')}</button>
+        <button class="oc-choose" data-choose="${bId}">${b.id===cur ? tt('currentBranchFlag','✓ فرعك الحالي','✓ Your Branch') : tt('chooseBtn','اختر ✓','Choose ✓')}</button>
       </div>
     </div>`;
   }).join('');
@@ -1989,9 +2038,10 @@ function requestBranchSelect(id){
     const n = branches().find(x=>x.id===nearestId);
     if(b && n){
       const dTxt = x=> routeInfo[x] ? (routeInfo[x].km.toFixed(1) + ' ' + tt('kmUnit','كم','km')) : '';
+      /* v17: أسماء الفروع مهرّبة قبل innerHTML */
       const msg = '⚠️ ' + tt('notNearestWarn','فرع اختيارك ليس الأقرب لك.','Your chosen branch is not the nearest.') +
-        '<br>📍 ' + branchName(b) + (dTxt(id) ? ' (' + dTxt(id) + ')' : '') +
-        '<br>🎯 ' + tt('nearestIs','الأقرب لك:','Your nearest:') + ' ' + branchName(n) + (dTxt(nearestId) ? ' (' + dTxt(nearestId) + ')' : '');
+        '<br>📍 ' + esc(branchName(b)) + (dTxt(id) ? ' (' + dTxt(id) + ')' : '') +
+        '<br>🎯 ' + tt('nearestIs','الأقرب لك:','Your nearest:') + ' ' + esc(branchName(n)) + (dTxt(nearestId) ? ' (' + dTxt(nearestId) + ')' : '');
       showActionToast(msg,
         tt('confirmChoice','✓ تأكيد الاختيار','✓ Confirm'),
         tt('cancelChoice','إلغاء','Cancel'),
@@ -2076,7 +2126,7 @@ function initOtpMap(){
       if(typeof b.lat !== 'number' || typeof b.lng !== 'number') return;
       const icon = L.divIcon({ className:'', html:'<div class="mk-pin"></div>', iconSize:[34,34], iconAnchor:[17,34], popupAnchor:[0,-38] });
       const mk = L.marker([b.lat, b.lng], { icon }).addTo(otpMap);
-      mk.bindPopup(branchName(b));
+      mk.bindPopup(esc(branchName(b)));
       otpMarkers[b.id] = mk;
       pts.push([b.lat, b.lng]);
     });
@@ -2179,15 +2229,17 @@ function updateCart(){
   const saveBtn = el('saveFavBtn');
   if(saveBtn) saveBtn.style.display = cart.size ? 'block' : 'none';
   const box = el('dItems');
+  /* v17: تهريب اسم الصنف والمقاس والمفتاح */
   box.innerHTML = cart.size ? [...cart.entries()].map(([k,i])=>{
     const it = findMenuItem(i.id);
     if(!it) return '';
-    const name = itemName(it);
+    const name = esc(itemName(it));
     const unit = itemPrice(it, i.sizeIdx);
-    const size = i.sizeIdx>=0 ? TT.sizes[i.sizeIdx] : '';
+    const size = i.sizeIdx>=0 ? esc(TT.sizes[i.sizeIdx]) : '';
+    const kH = esc(k);
     return `<div class="ci">
       <div class="ci-info"><b>${name}${size?`<span class="ci-size">${size}</span>`:''}</b><span class="ci-price">${unit} ${TT.currency}</span></div>
-      <div class="ci-ctrl"><button class="q" data-k="${k}" data-a="dec">−</button><span>${i.qty}</span><button class="q" data-k="${k}" data-a="inc">+</button></div>
+      <div class="ci-ctrl"><button class="q" data-k="${kH}" data-a="dec">−</button><span>${i.qty}</span><button class="q" data-k="${kH}" data-a="inc">+</button></div>
       <div class="ci-total">${i.qty*unit} ${TT.currency}</div>
     </div>`;
   }).join('')
@@ -2235,63 +2287,23 @@ function updateBranchFooter(){
   if(otpShown()) refreshOtpTexts();
 }
 
-/* ===== الدفع واتساب (احتياطي — cloud.js يتجاوزه) ===== */
+/* =====================================================
+   ===== v17: حاجز الأمان عند غياب cloud.js =====
+   النسخة القديمة كانت ترسل طلب واتساب غير مسجّل بصمت
+   وتقول «تم بنجاح» — الآن تمنع ذلك وتطلب إعادة التحميل.
+   cloud.js يستبدل هذه الدالة عند تحميله طبيعياً.
+===================================================== */
 function checkout(){
-  if(orderLocked()) return;
-  const TT = T();
-  const br = currentBranch();
-  if(!br){ openGate('switch'); return; }
-  if(!cart.size){ toast(TT.emptyMsg); return; }
-  const m = getOrderMode();
-  const fee = (m==='delivery') ? deliveryFee() : 0;
-  const invoiceID = generateInvoiceID(branchCode(br));
-  const d = new Date();
-  const p = n=> String(n).padStart(2,'0');
-  const dateStr = `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()}`;
-  let hh = d.getHours();
-  const ampm = hh>=12 ? (currentLang==='ar' ? 'م' : 'PM') : (currentLang==='ar' ? 'ص' : 'AM');
-  hh = hh%12 || 12;
-  const timeStr = `${hh}:${p(d.getMinutes())} ${ampm}`;
-  let total = 0;
-  const lines = [...cart.values()].map(i=>{
-    const it = findMenuItem(i.id);
-    if(!it) return null;
-    const unit = itemPrice(it, i.sizeIdx);
-    total += i.qty*unit;
-    const size = i.sizeIdx>=0 ? ' ('+TT.sizes[i.sizeIdx]+')' : '';
-    return `▪️ ${i.qty} × ${itemName(it)}${size} = ${i.qty*unit} ${TT.currency}`;
-  }).filter(Boolean);
-  const notes = el('cnotes').value.trim();
-  const typeLine = (m==='delivery')
-    ? `🛵 ${tt('restaurantDelivery','توصيل المطعم','Restaurant delivery')}`
-    : `🛍️ ${tt('orderPickup','استلام من الفرع','Branch pickup')}`;
-  const feeLine = (m==='delivery') ? `🛵 ${tt('deliveryFee','رسوم التوصيل','Delivery fee')}: ${feeLabel(fee)}\n` : '';
-  const grand = total + fee;
-  let msg =
-`${brandize(TT.waGreeting)}
-🧾 ${TT.waOrderTitle} | *${invoiceID}*
-📅 ${dateStr} • ⏰ ${timeStr}
-🛍️ ${tt('waOrderType','نوع الطلب','Order type')}: *${typeLine}*
-${m==='pickup' ? `⏳ ${tt('pickupNote','طلبك يكون جاهزاً عند وصولك للفرع','Your order will be ready upon arrival')}\n` : ''}🍝 ${tt('waBranch','الفرع','Branch')}: ${branchName(br)}
-━━━━━━━━━━━━
-${lines.join('\n')}
-━━━━━━━━━━━━
-${feeLine}*${TT.total}: ${grand} ${TT.currency}* ${TT.taxInc}
-${notes ? `📝 ${TT.waNote}: ${notes}\n` : ''}━━━━━━━━━━━━
-${brandize(TT.waThanks)}`;
-  const waUrl = 'https://wa.me/'+br.wa+'?text='+encodeURIComponent(msg);
-  const w = window.open(waUrl, '_blank');
-  if(!w){ location.href = waUrl; }
-  cart.clear();
-  el('cnotes').value = '';
-  updateCart();
-  closeCart();
-  toast(TT.orderSent);
+  console.error('[MK CHECKOUT] cloud.js غير محمّل — الإتمام معطّل لمنع طلبات غير مسجّلة في النظام');
+  toast(currentLang==='ar'
+    ? '⚠️ تعذّر تحميل نظام الطلبات — أعد تحميل الصفحة'
+    : '⚠️ Ordering system failed to load — please reload the page');
 }
 
 /* =====================================================
-   ===== v16.1: التحديث الحي من D1 (مُصلَح) =====
-   الإصلاح: finally يضمن تحرير liveBusy في كل المسارات
+   ===== v17.0: التحديث الحي من D1 =====
+   الإصلاح الجديد: أول فحص يطبّق البيانات إن اختلفت
+   عمّا هو معروض — يمنع أسعاراً قديمة أول 8 ثوانٍ
 ===================================================== */
 const LIVE_API = 'https://makaronjy-api.makaronjy.workers.dev';
 const LIVE_POLL_MS = 8000;
@@ -2317,9 +2329,24 @@ async function liveCheck(){
   try{
     const [mj, sj] = await Promise.all([ liveJget('/api/data/menu'), liveJget('/api/data/settings') ]);
     const menu = mj.menu, settings = sj.settings;
-    if(!Array.isArray(menu) || !settings || typeof settings !== 'object') return;
+    if(!Array.isArray(menu) || !menu.length || !settings || typeof settings !== 'object') return;
     const ms = liveSnap(menu), ss = liveSnap(settings);
-    if(liveMenuSnap === null){ liveMenuSnap = ms; liveSettingsSnap = ss; return; }
+
+    /* ===== v17: الفحص الأول يطبّق فوراً إن اختلف عن المعروض ===== */
+    if(liveMenuSnap === null){
+      liveMenuSnap = ms; liveSettingsSnap = ss;
+      const curMs = liveSnap(window.MENU);
+      const curSs = liveSnap(window.APP_SETTINGS);
+      if(ms !== curMs || ss !== curSs){
+        window.MENU = menu;
+        window.APP_SETTINGS = settings;
+        applyLive(true);   /* صامت — لا إشعار عند الإقلاع */
+        try{ if(otpShown()) renderOtpList(); }catch(e){}
+        saveLocalSnap();
+      }
+      return;
+    }
+
     const menuChanged = ms !== liveMenuSnap;
     const setChanged  = ss !== liveSettingsSnap;
     if(!menuChanged && !setChanged) return;
@@ -2430,4 +2457,4 @@ function goHome(){
     })();
   }
 })();
-/* ===== END app.js (v16.1) ===== */
+/* ===== END app.js (v17.0) ===== */
