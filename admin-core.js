@@ -1,13 +1,14 @@
-/* ===== admin-core.js — النواة: D1 + صور R2 مضغوطة + سلة مهملات (v6.4) =====
-   v6.4: • تنظيف الكود الميت (10 عناصر غير مستخدمة — بقايا حقبة GitHub)
-         • لا تغيير وظيفي إطلاقاً — نفس سلوك v6.3 بالكامل
+/* ===== admin-core.js — النواة: D1 + صور R2 مضغوطة + سلة مهملات (v6.5) =====
+   v6.5: • كل البطاقات المحقونة تستخدم مفاتيح admin-i18n (ثنائية اللغة فعلياً)
+         • LT(key,fallback) — لا يظهر مفتاح خام إن كان القاموس أقدم
+         • uiRetranslate() — ترجمة فورية للبطاقات عند تبديل اللغة
+   v6.4: تنظيف الكود الميت (10 عناصر غير مستخدمة — بقايا حقبة GitHub)
    v6.3: زر «تنظيف صور الأصناف اليتيمة» مع عرض القائمة والأحجام
          + حمايات: رفض عند منيو فارغ + تحذير النسبة العالية + تأكيد delete
          + النقل إلى سلة المهملات (لا حذف نهائي) قابل للاسترجاع
    v6.2: ضغط كل صورة قبل رفعها (WebP/JPEG + تصغير الأبعاد + هدف حجم)
          + بطاقة تحكم في الضغط + سلة مهملات الصور + بطاقة النسخ الاحتياطي
-   v6.1: حذف زر «نقل صور المستودع إلى السحابة» (النقل صار ذاتياً في الووركر)
-         + إخفاء «إظهار الوصف / إظهار الأسعار» وفرضهما دائمين
+   v6.1: إخفاء «إظهار الوصف / إظهار الأسعار» وفرضهما دائمين
          + نقل «عنوان فوق الإضافات» إلى الإعدادات (عام لكل الأصناف)
          + نقل «توفر خدمة التوصيل» أسفل بطاقة رسوم التوصيل
    v6.0: الصور تُرفع/تُحذف من R2 عبر الووركر بصلاحيات JWT — لا توكن GitHub
@@ -82,6 +83,21 @@ var v = d[k];
 if(v === undefined && src.ar) v = src.ar[k];
 if(typeof v === `function`) return v.apply(null, args);
 return v;
+}
+/* v6.5: ترجمة بمفتاح + نص احتياطي — لا يظهر مفتاح خام أبداً */
+function LT(k, fallback){
+var v = L(k);
+return (v === k) ? fallback : v;
+}
+/* v6.5: ترجمة دالة بمفتاح + احتياطي */
+function LTF(k, fallbackFn){
+var src = (typeof ASTR !== `undefined`) ? ASTR : {};
+var d = src[ALANG] || src.ar || {};
+var v = d[k];
+if(v === undefined && src.ar) v = src.ar[k];
+var args = [].slice.call(arguments, 2);
+if(typeof v === `function`) return v.apply(null, args);
+return fallbackFn.apply(null, args);
 }
 function mv(id){
 var n = el(id);
@@ -166,6 +182,8 @@ var on = s.getAttribute(`data-alang`) === ALANG;
 s.classList.toggle(`active`, on);
 });
 localStorage.setItem(`mk_admin_lang`, ALANG);
+/* v6.5: ترجمة البطاقات المحقونة فوراً */
+try{ uiRetranslate(); }catch(e){}
 }
 el(`adminLangBtn`).addEventListener(`click`,
 function(e){
@@ -476,7 +494,7 @@ resolve(im);
 };
 im.onerror = function(){
 URL.revokeObjectURL(url);
-reject(new Error(`تعذر قراءة الصورة — جرّب صيغة PNG أو JPG`));
+reject(new Error(LT(`cmpReadFail`,`تعذر قراءة الصورة — جرّب صيغة PNG أو JPG`)));
 };
 im.src = url;
 });
@@ -513,7 +531,7 @@ var sw = src.width || src.naturalWidth || 0;
 var sh = src.height || src.naturalHeight || 0;
 if(!sw || !sh){
 if(src.close) src.close();
-throw new Error(`أبعاد الصورة غير معروفة`);
+throw new Error(LT(`cmpNoDim`,`أبعاد الصورة غير معروفة`));
 }
 var wanted = (CMP.format === `jpeg`) ? `image/jpeg` : `image/webp`;
 var maxDim = p.max;
@@ -545,7 +563,7 @@ if(q > 0.56){ q = Math.max(0.5, q - 0.08); }
 else { maxDim = Math.max(320, Math.round(maxDim * 0.84)); }
 }
 if(src.close) src.close();
-if(!blob) throw new Error(`تعذر ضغط الصورة في هذا المتصفح`);
+if(!blob) throw new Error(LT(`cmpFail`,`تعذر ضغط الصورة في هذا المتصفح`));
 /* لا نستخدم نسخة أكبر من الأصل */
 if(before && blob.size >= before){
 return {
@@ -566,14 +584,15 @@ var box = el(`cmpLast`);
 var pct = res.before ? Math.max(0, Math.round((1 - res.after/res.before)*100)) : 0;
 if(box){
 box.innerHTML = res.skipped
-? `آخر صورة: <b>` + esc(label) + `</b> — رُفعت كما هي (` + fmtKB(res.after) + `)`
-: `آخر صورة: <b>` + esc(label) + `</b> — ` +
+? LT(`cmpLastLbl`,`آخر صورة`) + `: <b>` + esc(label) + `</b> — ` +
+LT(`cmpAsIs`,`رُفعت كما هي`) + ` (` + fmtKB(res.after) + `)`
+: LT(`cmpLastLbl`,`آخر صورة`) + `: <b>` + esc(label) + `</b> — ` +
 fmtKB(res.before) + ` ← <b style="color:var(--green)">` + fmtKB(res.after) + `</b> ` +
 `<span style="color:var(--green);font-weight:900">−` + pct + `%</span>` +
 ` · ` + res.width + `×` + res.height + ` · ` + esc(String(res.type).replace(`image/`,``));
 }
 if(!res.skipped && res.before){
-toast(`🗜️ ضُغطت الصورة −` + pct + `%`, `success`,
+toast(LT(`cmpSaved`,`🗜️ ضُغطت الصورة`) + ` −` + pct + `%`, `success`,
 fmtKB(res.before) + ` ← ` + fmtKB(res.after));
 }
 }
@@ -673,7 +692,7 @@ async function uploadItemImgById(id, file){
 var path = `img/items/` + id + `.png`;
 var res = await compressImage(file, `item`);
 await imgPut(path, res.base64);
-cmpReport(res, `صورة صنف`);
+cmpReport(res, LT(`lblItemImg`,`صورة صنف`));
 bumpImagesVersion();
 return path;
 }
@@ -681,27 +700,27 @@ async function uploadAppImage(path, file){
 /* الاستبدال على نفس المفتاح يمسح الصورة القديمة تلقائياً */
 var res = await compressImage(file, `app`);
 await imgPut(path, res.base64);
-cmpReport(res, `صورة التطبيق`);
+cmpReport(res, LT(`lblAppImg`,`صورة التطبيق`));
 bumpImagesVersion();
 return path;
 }
 async function uploadBannerImg(path, file){
 var res = await compressImage(file, `banner`);
 await imgPut(path, res.base64);
-cmpReport(res, `بانر`);
+cmpReport(res, LT(`lblBannerImg`,`بانر`));
 return path;
 }
 
 /* parseJs محمي من النصوص الفارغة أو المكسورة */
 function parseJs(text){
 if(!text || typeof text !== `string`){
-throw new Error(`الملف فارغ أو غير صالح`);
+throw new Error(LT(`jsEmpty`,`الملف فارغ أو غير صالح`));
 }
 var w = { window:{} };
 try{
 new Function(`window`, text)(w.window);
 }catch(e){
-throw new Error(`خطأ في قراءة الملف: ` + e.message);
+throw new Error(LT(`jsReadFail`,`خطأ في قراءة الملف: `) + e.message);
 }
 return w.window;
 }
@@ -793,7 +812,10 @@ publishableKey: ``
 function migrateModsTitles(){
 var s = STATE.SETTINGS;
 if(!s.modsTitles || typeof s.modsTitles !== `object`){
-s.modsTitles = { ar:`غالبًا ما يتم طلبه مع`, en:`Often ordered with` };
+s.modsTitles = {
+ar: LT(`modsTitlePhAr`,`غالبًا ما يتم طلبه مع`),
+en: `Often ordered with`
+};
 }
 if(typeof s.modsTitles.ar !== `string`) s.modsTitles.ar = ``;
 if(typeof s.modsTitles.en !== `string`) s.modsTitles.en = ``;
@@ -914,24 +936,24 @@ try{
 mw = parseJs(menuText);
 }catch(e){
 throw new Error(
-`ملف menu.js غير صالح: ` + e.message
+LT(`menuFileBad`,`ملف menu.js غير صالح: `) + e.message
 );
 }
 try{
 sw = parseJs(settingsText);
 }catch(e){
 throw new Error(
-`ملف settings.js غير صالح: ` + e.message
+LT(`settingsFileBad`,`ملف settings.js غير صالح: `) + e.message
 );
 }
 if(!mw.MENU || !Array.isArray(mw.MENU)){
 throw new Error(
-`ملف menu.js لا يحتوي على مصفوفة MENU`
+LT(`menuNoArray`,`ملف menu.js لا يحتوي على مصفوفة MENU`)
 );
 }
 if(!sw.APP_SETTINGS || typeof sw.APP_SETTINGS !== `object`){
 throw new Error(
-`ملف settings.js لا يحتوي على APP_SETTINGS`
+LT(`settingsNoObj`,`ملف settings.js لا يحتوي على APP_SETTINGS`)
 );
 }
 var newState = {
@@ -972,11 +994,11 @@ var username = el(`inOwner`).value.trim();
 var password = el(`inToken`).value.trim();
 hideBanner(`loginErr`);
 if(!username || !password){
-showBanner(`loginErr`, `اسم المستخدم وكلمة المرور مطلوبان`);
+showBanner(`loginErr`, LT(`loginMissing`,`اسم المستخدم وكلمة المرور مطلوبان`));
 return;
 }
 var btn = el(`btnLogin`);
-btn.textContent = `جارٍ تسجيل الدخول...`;
+btn.textContent = LT(`loggingIn`,`جارٍ تسجيل الدخول...`);
 btn.disabled = true;
 try{
 var response = await fetch(API_BASE + `/api/auth/login`, {
@@ -986,7 +1008,7 @@ body: JSON.stringify({ username: username, password: password })
 });
 var data = await response.json();
 if(!response.ok){
-throw new Error(data.error || `بيانات الدخول غير صحيحة`);
+throw new Error(data.error || LT(`errCreds`,`بيانات الدخول غير صحيحة`));
 }
 sessionStorage.setItem(`mk_admin_token`, data.token);
 sessionStorage.setItem(`mk_admin_user`, JSON.stringify(data.user));
@@ -1027,7 +1049,11 @@ el(`loginScreen`).classList.add(`hidden`);
 el(`app`).classList.add(`hidden`);
 el(`renewScreen`).classList.remove(`hidden`);
 var inp = el(`inRenewToken`);
-if(inp){ inp.type = `password`; inp.placeholder = `كلمة المرور`; inp.value = ``; }
+if(inp){
+inp.type = `password`;
+inp.placeholder = LT(`lblNewToken`,`كلمة المرور`);
+inp.value = ``;
+}
 }
 el(`btnRenew`).addEventListener(`click`,
 async function(){
@@ -1271,13 +1297,13 @@ var card = document.createElement(`div`);
 card.className = `v15-card`;
 card.id = `v15BannerCard`;
 card.innerHTML =
-`<h3>🖼️ سلايدر الصفحة الرئيسية / Home Slider</h3>` +
+`<h3 id="bnCardTitle">` + LT(`sliderTitle`,`🖼️ سلايدر الصفحة الرئيسية`) + `</h3>` +
 `<div class="v15-grid" id="bnAdminList"></div>` +
 `<div class="v15-row">` +
-`<button class="v15-add" id="bnAddBtn">➕ إضافة بانر / Add</button>` +
-`<button class="v15-pub" id="bnPublishBtn">🚀 نشر / Publish</button>` +
-`<button class="v15-clean" id="bnCleanBtn">🧹 تنظيف اليتيمة / Clean orphans</button>` +
-`<button class="v15-clean" id="itCleanBtn">🍝 تنظيف صور الأصناف اليتيمة</button>` +
+`<button class="v15-add" id="bnAddBtn">` + LT(`bnAdd`,`➕ إضافة بانر`) + `</button>` +
+`<button class="v15-pub" id="bnPublishBtn">` + LT(`bnPublish`,`🚀 نشر`) + `</button>` +
+`<button class="v15-clean" id="bnCleanBtn">` + LT(`bnClean`,`🧹 تنظيف صور البانرات اليتيمة`) + `</button>` +
+`<button class="v15-clean" id="itCleanBtn">` + LT(`itClean`,`🍝 تنظيف صور الأصناف اليتيمة`) + `</button>` +
 `<input type="file" id="bnFile" accept="image/*" hidden>` +
 `</div>`;
 host.insertBefore(card, host.firstChild);
@@ -1286,16 +1312,16 @@ var fee = document.createElement(`div`);
 fee.className = `v15-card`;
 fee.id = `v15FeeCard`;
 fee.innerHTML =
-`<h3>🛵 رسوم توصيل المطعم / Restaurant Delivery Fee</h3>` +
+`<h3 id="feeCardTitle">` + LT(`feeTitle`,`🛵 رسوم توصيل المطعم`) + `</h3>` +
 `<div class="v15-row">` +
 `<select class="v15-sel" id="v15FeeMode">` +
-`<option value="free">مجاني / Free</option>` +
-`<option value="fixed">ثابت لكل الفروع / Fixed</option>` +
-`<option value="perBranch">سعر لكل فرع / Per branch</option>` +
+`<option value="free">` + LT(`feeFree`,`مجاني`) + `</option>` +
+`<option value="fixed">` + LT(`feeFixed`,`ثابت لكل الفروع`) + `</option>` +
+`<option value="perBranch">` + LT(`feePerBranch`,`سعر لكل فرع`) + `</option>` +
 `</select>` +
 `<input type="number" min="0" step="0.5" class="v15-fee" id="v15FeeInput">` +
-`<span id="v15FeeUnit">ريال / SAR</span>` +
-`<button class="v15-pub" id="feePublishBtn">🚀 نشر / Publish</button>` +
+`<span id="v15FeeUnit">` + LT(`feeUnit`,`ريال`) + `</span>` +
+`<button class="v15-pub" id="feePublishBtn">` + LT(`feePublish`,`🚀 نشر`) + `</button>` +
 `</div>` +
 `<div class="v15-bfees" id="v15BranchFees"></div>`;
 feeHost.insertBefore(fee, feeHost.firstChild);
@@ -1308,7 +1334,7 @@ var f = e.target.files && e.target.files[0];
 e.target.value = ``;
 if(!f) return;
 try{
-toast(`جارٍ ضغط ورفع البانر...`, `info`);
+toast(LT(`bnUploading`,`جارٍ ضغط ورفع البانر...`), `info`);
 var path = await uploadBannerImg(
 `img/banners/bn-` + Date.now() + `.png`, f);
 STATE.SETTINGS.banners.push({
@@ -1319,9 +1345,9 @@ titleAr: ``,
 titleEn: ``
 });
 renderBannersAdmin();
-toast(`✔ تم إضافة البانر — اضغط نشر`, `success`);
+toast(LT(`bnAdded`,`✔ تم إضافة البانر — اضغط نشر`), `success`);
 }catch(err){
-toast(`فشل الرفع: ` + err.message, `error`);
+toast(L(`imgUploadFail`) + `: ` + err.message, `error`);
 }
 });
 el(`bnPublishBtn`).addEventListener(`click`, publishV15);
@@ -1378,23 +1404,25 @@ return;
 if(del){
 var k = +del.dataset.bndel;
 var bn = list[k];
+var fName = (bn && bn.img) ? bn.img : `—`;
 var ok = await askConfirm(
-`سيُحذف البانر من السلايدر.\nالصورة تنتقل إلى سلة المهملات (30 يوماً) ويمكن استرجاعها.\n\nالملف: ` +
-(bn && bn.img ? bn.img : `—`),
-`حذف بانر`, `🗑`, `حذف`);
+LTF(`bnDelMsg`, function(f){
+return `سيُحذف البانر من السلايدر.\nالصورة تنتقل إلى سلة المهملات (30 يوماً) ويمكن استرجاعها.\n\nالملف: ` + f;
+}, fName),
+LT(`bnDelTitle`,`حذف بانر`), `🗑`, LT(`bnDelBtn`,`حذف`));
 if(!ok) return;
 list.splice(k, 1);
 if(bn && bn.img){
 var dr = await imgDelete(bn.img);
 if(dr && dr.trashed){
-toast(`✔ حُذف — نُسخ إلى سلة المهملات`, `success`);
+toast(LT(`bnTrashed`,`✔ حُذف — نُسخ إلى سلة المهملات`), `success`);
 }else{
-toast(`✔ حُذف من السحابة`, `success`);
+toast(LT(`bnDeletedCloud`,`✔ حُذف من السحابة`), `success`);
 }
 renderTrash();
 }
 renderBannersAdmin();
-toast(`✔ تم الحذف — اضغط نشر`, `success`);
+toast(LT(`bnDeleted`,`✔ تم الحذف — اضغط نشر`), `success`);
 }
 });
 }
@@ -1417,7 +1445,9 @@ if(!box || !STATE) return;
 var list = STATE.SETTINGS.banners || [];
 if(!list.length){
 box.innerHTML =
-`<div class="v15-empty">لا توجد بانرات — أضف أول بانر ليظهر السلايدر بالتطبيق / No banners yet</div>`;
+`<div class="v15-empty">` +
+LT(`bnEmpty`,`لا توجد بانرات — أضف أول بانر ليظهر السلايدر بالتطبيق`) +
+`</div>`;
 }else{
 var bnAdmStamp = Date.now();
 box.innerHTML = list.map(function(b, i){
@@ -1457,7 +1487,7 @@ return `<div class="v15-bfee-row"><span>` +
 esc(brName(b)) + `</span>` +
 `<input type="number" min="0" step="0.5" class="v15-fee" ` +
 `data-bfee="` + esc(b.id) + `" value="` + val + `">` +
-`<small>ريال</small></div>`;
+`<small>` + LT(`feeUnit`,`ريال`) + `</small></div>`;
 }).join(``);
 }else{
 wrap.style.display = `none`;
@@ -1472,7 +1502,7 @@ btn.disabled = true;
 btn.textContent = `...`;
 try{
 await publishSettings(`🖼️ تحديث السلايدر ورسوم التوصيل`);
-toast(`✔ تم النشر — سيظهر بالتطبيق خلال ثوانٍ`,
+toast(LT(`bnPublished`,`✔ تم النشر — سيظهر بالتطبيق خلال ثوانٍ`),
 `success`);
 }catch(e){
 handlePublishError(e, btn, old);
@@ -1485,13 +1515,13 @@ btn.textContent = old;
 /* ===== تنظيف صور البانرات اليتيمة (إلى سلة المهملات) ===== */
 async function cleanOrphanBanners(){
 if(!STATE || !CFG){
-toast(`سجّل الدخول أولاً`, `error`);
+toast(LT(`loginFirst`,`سجّل الدخول أولاً`), `error`);
 return;
 }
 var btn = el(`bnCleanBtn`);
 var old = btn.textContent;
 btn.disabled = true;
-btn.textContent = `... جاري الفحص ...`;
+btn.textContent = LT(`scanning`,`... جاري الفحص ...`);
 try{
 var files = await listDir(`img/banners`);
 var used = {};
@@ -1502,14 +1532,19 @@ var orphans = files.filter(function(f){
 return !used[f.path];
 });
 if(!orphans.length){
-toast(`✔ لا توجد صور يتيمة — التخزين نظيف`, `success`);
+toast(LT(`cleanNone`,`✔ لا توجد صور يتيمة — التخزين نظيف`), `success`);
 btn.disabled = false;
 btn.textContent = old;
 return;
 }
 var list = orphans.map(function(f){ return `• ${f.name}`; }).join(`\n`);
-var msg = `يوجد ${orphans.length} صورة بانر يتيمة:\n\n${list}\n\nستُنقل إلى سلة المهملات (30 يوماً). متابعة؟`;
-var ok = await askConfirm(msg, `تنظيف اليتيمة`, `🧹`, `نقل للمهملات`, true);
+var msg = LTF(`bnOrphanCount`, function(n){
+return `يوجد ${n} صورة بانر يتيمة:`;
+}, orphans.length) + `\n\n` + list + `\n\n` +
+LT(`cleanMoveQ`,`ستُنقل إلى سلة المهملات (30 يوماً) ويمكن استرجاعها. متابعة؟`);
+var ok = await askConfirm(msg,
+LT(`cleanTitle`,`تنظيف اليتيمة`), `🧹`,
+LT(`cleanMoveBtn`,`نقل للمهملات`), true);
 if(!ok){
 btn.disabled = false;
 btn.textContent = old;
@@ -1528,12 +1563,14 @@ console.warn(`فشل حذف:`, orphans[i].path);
 }
 }
 toast(
-`انتهى التنظيف: ${successCount} نُقلت، ${failCount} فشلت`,
+LTF(`cleanDone`, function(ok2, fail2){
+return `انتهى التنظيف: ${ok2} نُقلت، ${fail2} فشلت`;
+}, successCount, failCount),
 successCount > 0 ? `success` : `error`
 );
 renderTrash();
 }catch(err){
-toast(`⚠️ فشل التنظيف: ` + err.message, `error`);
+toast(LT(`cleanFail`,`⚠️ فشل التنظيف: `) + err.message, `error`);
 }
 btn.disabled = false;
 btn.textContent = old;
@@ -1545,22 +1582,26 @@ btn.textContent = old;
 ===================================================== */
 async function cleanOrphanItems(){
 if(!STATE || !CFG){
-toast(`سجّل الدخول أولاً`, `error`);
+toast(LT(`loginFirst`,`سجّل الدخول أولاً`), `error`);
 return;
 }
 var btn = el(`itCleanBtn`);
 var old = btn ? btn.textContent : ``;
-if(btn){ btn.disabled = true; btn.textContent = `... جاري الفحص ...`; }
+if(btn){
+btn.disabled = true;
+btn.textContent = LT(`scanning`,`... جاري الفحص ...`);
+}
 try{
 var scan = await apiFetch(`/api/admin/item-orphans`);
 if(!scan.success){
-toast(scan.error || `أُلغي الفحص`, `warn`);
+toast(scan.error || LT(`itScanCancel`,`أُلغي الفحص`), `warn`);
 if(btn){ btn.disabled = false; btn.textContent = old; }
 return;
 }
 if(!scan.orphan_count){
-toast(`✔ لا توجد صور أصناف يتيمة — التخزين نظيف`, `success`,
-`${scan.images_total} صورة / ${scan.menu_items} صنف`);
+toast(LT(`itCleanNone`,`✔ لا توجد صور أصناف يتيمة — التخزين نظيف`), `success`,
+`${scan.images_total} ` + LT(`bkImagesLbl`,`الصور`) +
+` / ${scan.menu_items} ` + LT(`bkItems`,`صنف`));
 if(btn){ btn.disabled = false; btn.textContent = old; }
 return;
 }
@@ -1568,26 +1609,35 @@ var names = (scan.orphans || []).slice(0,40).map(function(o){
 return `• ` + o.name + ` (` + fmtKB(o.size) + `)`;
 }).join(`\n`);
 if(scan.orphan_count > 40){
-names += `\n… و` + (scan.orphan_count - 40) + ` غيرها`;
+names += `\n` + LTF(`itMore`, function(n){
+return `… و${n} غيرها`;
+}, scan.orphan_count - 40);
 }
 var warn = scan.high_risk
-? `\n\n⚠️ تحذير: عدد اليتيم كبير جداً مقارنة بالإجمالي — تأكد أن المنيو منشور وكامل قبل المتابعة.`
+? `\n\n` + LT(`itHighRisk`,`⚠️ تحذير: عدد اليتيم كبير جداً مقارنة بالإجمالي — تأكد أن المنيو منشور وكامل قبل المتابعة.`)
 : ``;
-var msg = `المنيو: ` + scan.menu_items + ` صنف · صور الأصناف: ` + scan.images_total +
-`\nاليتيمة: ` + scan.orphan_count + ` (` + fmtKB(scan.orphan_bytes) + `)\n\n` +
-names + warn + `\n\nستُنقل إلى سلة المهملات (30 يوماً) ويمكن استرجاعها. متابعة؟`;
-var ok = await askConfirm(msg, `تنظيف صور الأصناف`, `🍝`, `نقل للمهملات`, true);
+var msg = LT(`itStatMenu`,`المنيو`) + `: ` + scan.menu_items + ` ` + LT(`bkItems`,`صنف`) +
+` · ` + LT(`itStatImgs`,`صور الأصناف`) + `: ` + scan.images_total +
+`\n` + LT(`itStatOrphan`,`اليتيمة`) + `: ` + scan.orphan_count +
+` (` + fmtKB(scan.orphan_bytes) + `)\n\n` +
+names + warn + `\n\n` +
+LT(`cleanMoveQ`,`ستُنقل إلى سلة المهملات (30 يوماً) ويمكن استرجاعها. متابعة؟`);
+var ok = await askConfirm(msg,
+LT(`itCleanTitle`,`تنظيف صور الأصناف`), `🍝`,
+LT(`cleanMoveBtn`,`نقل للمهملات`), true);
 if(!ok){
 if(btn){ btn.disabled = false; btn.textContent = old; }
 return;
 }
-if(btn){ btn.textContent = `... جاري النقل ...`; }
+if(btn){ btn.textContent = LT(`moving`,`... جاري النقل ...`); }
 var r = await apiFetch(`/api/admin/item-orphans-clean`, { method:`POST` });
-toast(`انتهى: ${r.moved} نُقلت للمهملات، ${r.failed} فشلت`,
+toast(LTF(`itMoveDone`, function(ok2, fail2){
+return `انتهى: ${ok2} نُقلت للمهملات، ${fail2} فشلت`;
+}, r.moved, r.failed),
 r.moved > 0 ? `success` : `warn`);
 renderTrash();
 }catch(e){
-toast(`⚠️ فشل التنظيف: ` + e.message, `error`);
+toast(LT(`cleanFail`,`⚠️ فشل التنظيف: `) + e.message, `error`);
 }
 if(btn){ btn.disabled = false; btn.textContent = old; }
 }
@@ -1606,29 +1656,35 @@ card = document.createElement(`div`);
 card.className = `v15-card`;
 card.id = `cmpCard`;
 card.innerHTML =
-`<h3>🗜️ ضغط الصور قبل الرفع</h3>` +
+`<h3 id="cmpCardTitle">` + LT(`cmpTitle`,`🗜️ ضغط الصور قبل الرفع`) + `</h3>` +
 `<div class="v15-row" style="justify-content:space-between">` +
-`<label class="cmp-sw"><input type="checkbox" id="cmpOn"> تفعيل الضغط التلقائي</label>` +
-`<button class="v15-clean" id="cmpReset">↺ الإعدادات الافتراضية</button>` +
+`<label class="cmp-sw"><input type="checkbox" id="cmpOn"> ` +
+`<span id="cmpOnLbl">` + LT(`cmpEnable`,`تفعيل الضغط التلقائي`) + `</span></label>` +
+`<button class="v15-clean" id="cmpReset">` + LT(`cmpReset`,`↺ الإعدادات الافتراضية`) + `</button>` +
 `</div>` +
 `<div class="cmp-grid" style="margin-top:.7rem">` +
-`<div class="cmp-fld"><label>الصيغة</label>` +
+`<div class="cmp-fld"><label id="cmpFmtLbl">` + LT(`cmpFormat`,`الصيغة`) + `</label>` +
 `<select class="v15-sel" id="cmpFmt" style="width:100%">` +
-`<option value="webp">WebP (الأفضل)</option>` +
-`<option value="jpeg">JPEG (توافق أوسع)</option>` +
+`<option value="webp">` + LT(`cmpFmtWebp`,`WebP (الأفضل)`) + `</option>` +
+`<option value="jpeg">` + LT(`cmpFmtJpeg`,`JPEG (توافق أوسع)`) + `</option>` +
 `</select></div>` +
-`<div class="cmp-fld"><label>أقصى بُعد — الأصناف <span class="cmp-val" id="cmpItemV"></span></label>` +
+`<div class="cmp-fld"><label><span id="cmpItemLbl">` + LT(`cmpItemMax`,`أقصى بُعد — الأصناف`) + `</span> ` +
+`<span class="cmp-val" id="cmpItemV"></span></label>` +
 `<input type="range" id="cmpItem" min="480" max="2400" step="40"></div>` +
-`<div class="cmp-fld"><label>أقصى بُعد — البانرات <span class="cmp-val" id="cmpBanV"></span></label>` +
+`<div class="cmp-fld"><label><span id="cmpBanLbl">` + LT(`cmpBannerMax`,`أقصى بُعد — البانرات`) + `</span> ` +
+`<span class="cmp-val" id="cmpBanV"></span></label>` +
 `<input type="range" id="cmpBan" min="640" max="3200" step="40"></div>` +
-`<div class="cmp-fld"><label>أقصى بُعد — صور التطبيق <span class="cmp-val" id="cmpAppV"></span></label>` +
+`<div class="cmp-fld"><label><span id="cmpAppLbl">` + LT(`cmpAppMax`,`أقصى بُعد — صور التطبيق`) + `</span> ` +
+`<span class="cmp-val" id="cmpAppV"></span></label>` +
 `<input type="range" id="cmpApp" min="480" max="3200" step="40"></div>` +
-`<div class="cmp-fld"><label>الجودة <span class="cmp-val" id="cmpQV"></span></label>` +
+`<div class="cmp-fld"><label><span id="cmpQLbl">` + LT(`cmpQuality`,`الجودة`) + `</span> ` +
+`<span class="cmp-val" id="cmpQV"></span></label>` +
 `<input type="range" id="cmpQ" min="40" max="98" step="1"></div>` +
-`<div class="cmp-fld"><label>الحجم المستهدف <span class="cmp-val" id="cmpTKV"></span></label>` +
+`<div class="cmp-fld"><label><span id="cmpTKLbl">` + LT(`cmpTarget`,`الحجم المستهدف`) + `</span> ` +
+`<span class="cmp-val" id="cmpTKV"></span></label>` +
 `<input type="range" id="cmpTK" min="80" max="1200" step="20"></div>` +
 `</div>` +
-`<div class="cmp-last" id="cmpLast">لم تُرفع صورة بعد في هذه الجلسة.</div>`;
+`<div class="cmp-last" id="cmpLast">` + LT(`cmpNone`,`لم تُرفع صورة بعد في هذه الجلسة.`) + `</div>`;
 var anchor = el(`modsTitlesCard`) || el(`v15FeeCard`);
 if(anchor && anchor.parentNode === sec) sec.insertBefore(card, anchor.nextSibling);
 else sec.insertBefore(card, sec.firstChild);
@@ -1650,7 +1706,10 @@ el(`cmpTKV`).textContent = CMP.targetKB + `KB`;
 sync();
 el(`cmpOn`).addEventListener(`change`, function(){
 CMP.enabled = this.checked; cmpSave();
-toast(CMP.enabled ? `الضغط مُفعّل` : `الضغط مُعطّل — سترفع الصور بأحجامها الأصلية`,
+toast(
+CMP.enabled
+? LT(`cmpOn`,`الضغط مُفعّل`)
+: LT(`cmpOff`,`الضغط مُعطّل — سترفع الصور بأحجامها الأصلية`),
 CMP.enabled ? `success` : `warn`);
 });
 el(`cmpFmt`).addEventListener(`change`, function(){
@@ -1684,7 +1743,7 @@ cmpSave();
 el(`cmpReset`).addEventListener(`click`, function(){
 CMP = Object.assign({}, CMP_DEFAULTS);
 cmpSave(); sync();
-toast(`↺ أُعيدت إعدادات الضغط الافتراضية`, `success`);
+toast(LT(`cmpResetDone`,`↺ أُعيدت إعدادات الضغط الافتراضية`), `success`);
 });
 return;
 }
@@ -1710,9 +1769,9 @@ var card = document.createElement(`div`);
 card.className = `v15-card`;
 card.id = `trashCard`;
 card.innerHTML =
-`<h3>🗑️ سلة مهملات الصور (30 يوماً)</h3>` +
+`<h3 id="trashCardTitle">` + LT(`trashTitle`,`🗑️ سلة مهملات الصور (30 يوماً)`) + `</h3>` +
 `<div class="v15-row">` +
-`<button class="v15-clean" id="trashRefresh">🔄 تحديث القائمة</button>` +
+`<button class="v15-clean" id="trashRefresh">` + LT(`trashRefresh`,`🔄 تحديث القائمة`) + `</button>` +
 `<span id="trashCount" style="font-size:.76rem;font-weight:900;color:var(--muted)"></span>` +
 `</div>` +
 `<div class="trash-list" id="trashList" style="margin-top:.7rem"></div>`;
@@ -1729,31 +1788,36 @@ try{
 var r = await apiFetch(`/api/img/restore`, {
 method:`POST`, body: JSON.stringify({ trashKey: key })
 });
-toast(`✔ استُرجعت الصورة`, `success`, r.restored);
+toast(LT(`trashRestored`,`✔ استُرجعت الصورة`), `success`, r.restored);
 renderTrash();
 renderBannersAdmin();
 }catch(err){
-toast(`فشل الاسترجاع: ` + err.message, `error`);
-rs.disabled = false; rs.textContent = `↩ استرجاع`;
+toast(LT(`trashRestoreFail`,`فشل الاسترجاع: `) + err.message, `error`);
+rs.disabled = false;
+rs.textContent = LT(`trashRestore`,`↩ استرجاع`);
 }
 return;
 }
 if(pg){
 var key2 = pg.getAttribute(`data-purge`);
 var ok = await askConfirm(
-`حذف نهائي من سلة المهملات — لا يمكن التراجع.\n\n` + key2,
-`حذف نهائي`, `⛔`, `حذف نهائي`, true);
+LTF(`trashPurgeMsg`, function(k){
+return `حذف نهائي من سلة المهملات — لا يمكن التراجع.\n\n` + k;
+}, key2),
+LT(`trashPurgeTitle`,`حذف نهائي`), `⛔`,
+LT(`trashPurgeBtn`,`حذف نهائي`), true);
 if(!ok) return;
 pg.disabled = true; pg.textContent = `...`;
 try{
 await apiFetch(`/api/img/purge`, {
 method:`POST`, body: JSON.stringify({ trashKey: key2 })
 });
-toast(`⛔ حُذفت نهائياً`, `success`);
+toast(LT(`trashPurged`,`⛔ حُذفت نهائياً`), `success`);
 renderTrash();
 }catch(err){
-toast(`فشل الحذف: ` + err.message, `error`);
-pg.disabled = false; pg.textContent = `⛔ نهائي`;
+toast(LT(`trashPurgeFail`,`فشل الحذف: `) + err.message, `error`);
+pg.disabled = false;
+pg.textContent = LT(`trashPurge`,`⛔ نهائي`);
 }
 }
 });
@@ -1763,17 +1827,24 @@ async function renderTrash(){
 var box = el(`trashList`);
 if(!box) return;
 if(!CFG && !sessionStorage.getItem(`mk_admin_token`)){
-box.innerHTML = `<div class="v15-empty">سجّل الدخول لعرض سلة المهملات</div>`;
+box.innerHTML = `<div class="v15-empty">` +
+LT(`trashLogin`,`سجّل الدخول لعرض سلة المهملات`) + `</div>`;
 return;
 }
-box.innerHTML = `<div class="v15-empty">⏳ جارٍ التحميل...</div>`;
+box.innerHTML = `<div class="v15-empty">` +
+LT(`trashLoading`,`⏳ جارٍ التحميل...`) + `</div>`;
 try{
 var j = await apiFetch(`/api/img/trash`);
 var items = j.items || [];
 var cnt = el(`trashCount`);
-if(cnt) cnt.textContent = items.length ? (items.length + ` عنصر`) : ``;
+if(cnt){
+cnt.textContent = items.length
+? (items.length + ` ` + LT(`trashItemUnit`,`عنصر`))
+: ``;
+}
 if(!items.length){
-box.innerHTML = `<div class="v15-empty">سلة المهملات فارغة ✔</div>`;
+box.innerHTML = `<div class="v15-empty">` +
+LT(`trashEmpty`,`سلة المهملات فارغة ✔`) + `</div>`;
 return;
 }
 box.innerHTML = items.map(function(it){
@@ -1781,15 +1852,19 @@ return `<div class="trash-row">` +
 `<div class="trash-ico">🖼️</div>` +
 `<div class="trash-meta">` + esc(it.name) +
 `<small>` + esc(it.originalKey) + `</small>` +
-`<small>` + fmtKB(it.size) + ` · متبقٍ ` + it.daysLeft + ` يوم</small>` +
+`<small>` + fmtKB(it.size) + ` · ` + LT(`trashDaysLeft`,`متبقٍ`) + ` ` +
+it.daysLeft + ` ` + LT(`trashDayUnit`,`يوم`) + `</small>` +
 `</div>` +
 `<div class="trash-act">` +
-`<button class="tr-restore" data-restore="` + esc(it.trashKey) + `">↩ استرجاع</button>` +
-`<button class="tr-purge" data-purge="` + esc(it.trashKey) + `">⛔ نهائي</button>` +
+`<button class="tr-restore" data-restore="` + esc(it.trashKey) + `">` +
+LT(`trashRestore`,`↩ استرجاع`) + `</button>` +
+`<button class="tr-purge" data-purge="` + esc(it.trashKey) + `">` +
+LT(`trashPurge`,`⛔ نهائي`) + `</button>` +
 `</div></div>`;
 }).join(``);
 }catch(e){
-box.innerHTML = `<div class="v15-empty">تعذر التحميل: ` + esc(e.message) + `</div>`;
+box.innerHTML = `<div class="v15-empty">` +
+LT(`trashLoadFail`,`تعذر التحميل: `) + esc(e.message) + `</div>`;
 }
 }
 
@@ -1806,26 +1881,33 @@ var card = document.createElement(`div`);
 card.className = `v15-card`;
 card.id = `bkCard`;
 card.innerHTML =
-`<h3>🛡️ النسخ الاحتياطي (يشمل المنيو والإعدادات)</h3>` +
+`<h3 id="bkCardTitle">` + LT(`bkTitle`,`🛡️ النسخ الاحتياطي (يشمل المنيو والإعدادات)`) + `</h3>` +
 `<div class="v15-row">` +
-`<button class="v15-pub" id="bkNow">💾 إنشاء نسخة الآن</button>` +
-`<button class="v15-clean" id="bkList">📋 عرض النسخ المحفوظة</button>` +
+`<button class="v15-pub" id="bkNow">` + LT(`bkNow`,`💾 إنشاء نسخة الآن`) + `</button>` +
+`<button class="v15-clean" id="bkList">` + LT(`bkList`,`📋 عرض النسخ المحفوظة`) + `</button>` +
 `</div>` +
-`<div class="bk-info" id="bkInfo">النسخة الليلية تعمل تلقائياً وتحفظ المنيو والإعدادات والطلبات والمستخدمين وجرد الصور.</div>`;
+`<div class="bk-info" id="bkInfo">` +
+LT(`bkInfo`,`النسخة الليلية تعمل تلقائياً وتحفظ المنيو والإعدادات والطلبات والمستخدمين وجرد الصور.`) +
+`</div>`;
 sec.appendChild(card);
 el(`bkNow`).addEventListener(`click`, async function(){
 var b = this, old = b.textContent;
-b.disabled = true; b.textContent = `... جارٍ النسخ ...`;
+b.disabled = true;
+b.textContent = LT(`bkWorking`,`... جارٍ النسخ ...`);
 try{
 var r = await apiFetch(`/api/admin/backup-now`, { method:`POST` });
 el(`bkInfo`).innerHTML =
-`✔ حُفظت: <b>` + esc(r.key) + `</b><br>` +
-`المنيو: ` + r.menu_sections + ` أقسام / ` + r.menu_items + ` صنف · ` +
-`الإعدادات: ` + r.settings_keys + ` مفتاح<br>` +
-`الصور: ` + r.images_count + ` · الطلبات: ` + r.orders + ` · المستخدمون: ` + r.users;
-toast(`✔ نسخة احتياطية كاملة`, `success`, `تشمل المنيو والإعدادات`);
+LT(`bkSaved`,`✔ حُفظت`) + `: <b>` + esc(r.key) + `</b><br>` +
+LT(`bkMenuLbl`,`المنيو`) + `: ` + r.menu_sections + ` ` + LT(`bkSections`,`أقسام`) +
+` / ` + r.menu_items + ` ` + LT(`bkItems`,`صنف`) + ` · ` +
+LT(`bkSettingsLbl`,`الإعدادات`) + `: ` + r.settings_keys + ` ` + LT(`bkKeys`,`مفتاح`) + `<br>` +
+LT(`bkImagesLbl`,`الصور`) + `: ` + r.images_count +
+` · ` + LT(`bkOrdersLbl`,`الطلبات`) + `: ` + r.orders +
+` · ` + LT(`bkUsersLbl`,`المستخدمون`) + `: ` + r.users;
+toast(LT(`bkDone`,`✔ نسخة احتياطية كاملة`), `success`,
+LT(`bkDoneSub`,`تشمل المنيو والإعدادات`));
 }catch(e){
-toast(`فشل النسخ: ` + e.message, `error`);
+toast(LT(`bkFail`,`فشل النسخ: `) + e.message, `error`);
 }
 b.disabled = false; b.textContent = old;
 });
@@ -1836,14 +1918,14 @@ try{
 var r = await apiFetch(`/api/admin/backups`);
 var items = r.items || [];
 if(!items.length){
-el(`bkInfo`).textContent = `لا توجد نسخ محفوظة بعد.`;
+el(`bkInfo`).textContent = LT(`bkNone`,`لا توجد نسخ محفوظة بعد.`);
 }else{
 el(`bkInfo`).innerHTML = items.slice(0,10).map(function(it){
 return `• <b>` + esc(it.name) + `</b> — ` + fmtKB(it.size);
 }).join(`<br>`);
 }
 }catch(e){
-toast(`فشل العرض: ` + e.message, `error`);
+toast(LT(`bkListFail`,`فشل العرض: `) + e.message, `error`);
 }
 b.disabled = false; b.textContent = old;
 });
@@ -1870,12 +1952,15 @@ if(l.closest(`#cmpCard`)) continue;
 var t = uiTxt(l);
 if(t.indexOf(`إظهار الوصف`) >= 0 ||
    t.indexOf(`إظهار الأسعار`) >= 0 ||
-   t.indexOf(`إظهار السعرات`) >= 0){
+   t.indexOf(`إظهار السعرات`) >= 0 ||
+   t.indexOf(`Show description`) >= 0 ||
+   t.indexOf(`Show calories`) >= 0){
 var cb = l.querySelector(`input[type=checkbox]`);
 if(cb){ cb.checked = true; cb.disabled = true; }
 if(l.style.display !== `none`) l.style.display = `none`;
 var fs = l.closest(`fieldset`);
-if(fs && uiTxt(fs).indexOf(`عناصر البطاقة`) >= 0){
+if(fs && (uiTxt(fs).indexOf(`عناصر البطاقة`) >= 0 ||
+          uiTxt(fs).indexOf(`Card / row`) >= 0)){
 if(fs.style.display !== `none`) fs.style.display = `none`;
 }
 }
@@ -1886,7 +1971,10 @@ function uiHideModsTitleFields(){
 var labels = document.querySelectorAll(`label`);
 for(var i=0;i<labels.length;i++){
 var l = labels[i];
-if(uiTxt(l).indexOf(`عنوان فوق الإضافات`) >= 0){
+if(l.closest(`#modsTitlesCard`)) continue;
+var t = uiTxt(l);
+if(t.indexOf(`عنوان فوق الإضافات`) >= 0 ||
+   t.indexOf(`Add-ons heading`) >= 0){
 if(l.style.display !== `none`) l.style.display = `none`;
 var nx = l.nextElementSibling;
 if(nx && (nx.tagName === `INPUT` || nx.tagName === `TEXTAREA`)){
@@ -1907,11 +1995,14 @@ card = document.createElement(`div`);
 card.className = `v15-card`;
 card.id = `modsTitlesCard`;
 card.innerHTML =
-`<h3>🧩 عنوان قسم الإضافات (عام لكل الأصناف)</h3>` +
+`<h3 id="gmCardTitle">` + LT(`modsGlobalTitle`,`🧩 عنوان قسم الإضافات (عام لكل الأصناف)`) + `</h3>` +
 `<div style="display:flex;flex-direction:column;gap:.55rem">` +
-`<input id="gmAr" class="v15-inp" type="text" placeholder="عنوان فوق الإضافات (عربي)">` +
-`<input id="gmEn" class="v15-inp" type="text" dir="ltr" placeholder="Title above add-ons (English)">` +
-`<button class="v15-pub" id="gmPub" style="align-self:flex-start">🚀 نشر العنوان لكل الأصناف</button>` +
+`<input id="gmAr" class="v15-inp" type="text" placeholder="` +
+esc(LT(`modsGlobalPhAr`,`عنوان فوق الإضافات (عربي)`)) + `">` +
+`<input id="gmEn" class="v15-inp" type="text" dir="ltr" placeholder="` +
+esc(LT(`modsGlobalPhEn`,`Title above add-ons (English)`)) + `">` +
+`<button class="v15-pub" id="gmPub" style="align-self:flex-start">` +
+LT(`modsGlobalPub`,`🚀 نشر العنوان لكل الأصناف`) + `</button>` +
 `</div>`;
 if(anchor) sec.insertBefore(card, anchor.nextSibling);
 else sec.insertBefore(card, sec.firstChild);
@@ -1937,7 +2028,7 @@ en: (el(`gmEn`).value || ``).trim()
 applyGlobalModsTitles();
 await publishMenu(`تحديث عنوان الإضافات`);
 await publishSettings(`تحديث عنوان الإضافات`);
-toast(`✔ نُشر العنوان لكل الأصناف`, `success`);
+toast(LT(`modsGlobalDone`,`✔ نُشر العنوان لكل الأصناف`), `success`);
 }catch(e){
 handlePublishError(e, b, old);
 return;
@@ -1960,7 +2051,9 @@ if(!sec || !fee || fee.parentNode !== sec) return;
 var heads = sec.querySelectorAll(`legend, h3, h4, b, strong`);
 var target = null;
 for(var i=0;i<heads.length;i++){
-if(uiTxt(heads[i]).indexOf(`توفر خدمة التوصيل`) >= 0){
+var ht = uiTxt(heads[i]);
+if(ht.indexOf(`توفر خدمة التوصيل`) >= 0 ||
+   ht.indexOf(`Delivery Availability`) >= 0){
 target = heads[i].closest(`fieldset`) ||
          heads[i].closest(`.v15-card`) ||
          heads[i].parentElement;
@@ -1974,6 +2067,67 @@ if(anchor.parentNode !== sec) anchor = fee;
 if(target.previousElementSibling !== anchor){
 sec.insertBefore(target, anchor.nextSibling);
 }
+}
+/* 5) v6.5: إعادة ترجمة البطاقات المحقونة عند تبديل اللغة */
+function uiSetTxt(id, key, fallback){
+var n = el(id);
+if(!n) return;
+var v = LT(key, fallback);
+if(n.textContent !== v) n.textContent = v;
+}
+function uiSetPh(id, key, fallback){
+var n = el(id);
+if(!n) return;
+var v = LT(key, fallback);
+if(n.getAttribute(`placeholder`) !== v) n.setAttribute(`placeholder`, v);
+}
+function uiRetranslate(){
+/* السلايدر */
+uiSetTxt(`bnCardTitle`,`sliderTitle`,`🖼️ سلايدر الصفحة الرئيسية`);
+uiSetTxt(`bnAddBtn`,`bnAdd`,`➕ إضافة بانر`);
+uiSetTxt(`bnPublishBtn`,`bnPublish`,`🚀 نشر`);
+uiSetTxt(`bnCleanBtn`,`bnClean`,`🧹 تنظيف صور البانرات اليتيمة`);
+uiSetTxt(`itCleanBtn`,`itClean`,`🍝 تنظيف صور الأصناف اليتيمة`);
+/* الرسوم */
+uiSetTxt(`feeCardTitle`,`feeTitle`,`🛵 رسوم توصيل المطعم`);
+uiSetTxt(`v15FeeUnit`,`feeUnit`,`ريال`);
+uiSetTxt(`feePublishBtn`,`feePublish`,`🚀 نشر`);
+var fsel = el(`v15FeeMode`);
+if(fsel && fsel.options && fsel.options.length >= 3){
+fsel.options[0].textContent = LT(`feeFree`,`مجاني`);
+fsel.options[1].textContent = LT(`feeFixed`,`ثابت لكل الفروع`);
+fsel.options[2].textContent = LT(`feePerBranch`,`سعر لكل فرع`);
+}
+/* عنوان الإضافات */
+uiSetTxt(`gmCardTitle`,`modsGlobalTitle`,`🧩 عنوان قسم الإضافات (عام لكل الأصناف)`);
+uiSetPh(`gmAr`,`modsGlobalPhAr`,`عنوان فوق الإضافات (عربي)`);
+uiSetPh(`gmEn`,`modsGlobalPhEn`,`Title above add-ons (English)`);
+uiSetTxt(`gmPub`,`modsGlobalPub`,`🚀 نشر العنوان لكل الأصناف`);
+/* الضغط */
+uiSetTxt(`cmpCardTitle`,`cmpTitle`,`🗜️ ضغط الصور قبل الرفع`);
+uiSetTxt(`cmpOnLbl`,`cmpEnable`,`تفعيل الضغط التلقائي`);
+uiSetTxt(`cmpReset`,`cmpReset`,`↺ الإعدادات الافتراضية`);
+uiSetTxt(`cmpFmtLbl`,`cmpFormat`,`الصيغة`);
+uiSetTxt(`cmpItemLbl`,`cmpItemMax`,`أقصى بُعد — الأصناف`);
+uiSetTxt(`cmpBanLbl`,`cmpBannerMax`,`أقصى بُعد — البانرات`);
+uiSetTxt(`cmpAppLbl`,`cmpAppMax`,`أقصى بُعد — صور التطبيق`);
+uiSetTxt(`cmpQLbl`,`cmpQuality`,`الجودة`);
+uiSetTxt(`cmpTKLbl`,`cmpTarget`,`الحجم المستهدف`);
+var cfmt = el(`cmpFmt`);
+if(cfmt && cfmt.options && cfmt.options.length >= 2){
+cfmt.options[0].textContent = LT(`cmpFmtWebp`,`WebP (الأفضل)`);
+cfmt.options[1].textContent = LT(`cmpFmtJpeg`,`JPEG (توافق أوسع)`);
+}
+/* المهملات */
+uiSetTxt(`trashCardTitle`,`trashTitle`,`🗑️ سلة مهملات الصور (30 يوماً)`);
+uiSetTxt(`trashRefresh`,`trashRefresh`,`🔄 تحديث القائمة`);
+/* النسخ */
+uiSetTxt(`bkCardTitle`,`bkTitle`,`🛡️ النسخ الاحتياطي (يشمل المنيو والإعدادات)`);
+uiSetTxt(`bkNow`,`bkNow`,`💾 إنشاء نسخة الآن`);
+uiSetTxt(`bkList`,`bkList`,`📋 عرض النسخ المحفوظة`);
+/* إعادة رسم القوائم لتُترجم صفوفها */
+try{ if(STATE) renderBannersAdmin(); }catch(e){}
+try{ renderTrash(); }catch(e){}
 }
 /* تطبيق شامل */
 function uiApplyAll(){
@@ -2019,6 +2173,7 @@ LAST_MENU = JSON.parse(JSON.stringify(STATE.MENU));
 LAST_SETTINGS = JSON.parse(JSON.stringify(STATE.SETTINGS));
 uiApplyAll();
 renderTrash();
+try{ uiRetranslate(); }catch(e){}
 return r;
 };
-/* ===== END admin-core.js (v6.4) ===== */
+/* ===== END admin-core.js (v6.5) ===== */
