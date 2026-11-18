@@ -138,7 +138,7 @@ vars = { ENVIRONMENT = "production", LIVE_MODE = "polling" }
 #
 #  1) JWT_SECRET      ✅ موجود — توقيع رموز الدخول
 #
-#  2) RECOVERY_KEY    🔴 مفقود — يجب إضافته فوراً
+#  2) RECOVERY_KEY    ✅ موجود — استعادة كلمة مرور المالك
 #     بدونه لا توجد أي طريقة لاستعادة كلمة مرور المالك
 #     لو نسيتها. الووركر يرفض الاستعادة بـ 403 صراحةً:
 #       if (!env.RECOVERY_KEY) return error('...', 403)
