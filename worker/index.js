@@ -1,13 +1,13 @@
 // ═══════════════════════════════════════════
 //  مكرونجي - Cloudflare Worker API (كامل)
-//  الإصدار: 2.9
-//  v2.9: • إصلاح المنطقة الزمنية: كل التجميعات بتوقيت الرياض (UTC+3)
-//          - «طلبات/مبيعات اليوم» لم تعد تُخطئ بعد منتصف الليل
-//          - «أرباح السائق اليوم» صحيحة حتى 3 فجراً
-//          - حدود الأشهر في التقرير المحاسبي صحيحة
-//          - اسم ملف النسخة الاحتياطية بتاريخ الرياض
-//        • التخزين يبقى UTC — التحويل عند القراءة فقط (لا ترحيل بيانات)
-//  v2.8: احترام deliveryFeeMode + سقف كمية/عدد + حد معدل + عداد محاولات فاشلة
+//  الإصدار: 3.0
+//  v3.0: • مزامنة تلقائية للفروع: كل حفظ إعدادات يحدّث جدول branches
+//          → أي فرع جديد من اللوحة يعمل فوراً (طلب + مشرف + سائق + تقارير)
+//        • حذف الفرع من اللوحة = تعطيل (is_active=0) لا حذف — يحفظ التاريخ
+//        • توحيد معرّف الروابي تلقائياً في كل المراجع (settings/orders/users/ledger)
+//        • فحص ساعات العمل في الخادم — لم يعد القفل في المتصفح فقط
+//  v2.9: توقيت الرياض في كل التجميعات
+//  v2.8: احترام deliveryFeeMode + حدود الطلب + حد المعدل + منع التعداد
 //  v2.7-P0: التحقق من الأسعار من D1، منع حذف الطلبات النشطة، حماية صور التسليم
 // ═══════════════════════════════════════════
 
@@ -28,22 +28,24 @@ const APP_IMG_FALLBACK = [
 ];
 const TRASH_DAYS = 30;
 
-/* ===== v2.9: المنطقة الزمنية للتقارير (Asia/Riyadh) =====
-   التخزين UTC دائماً — التحويل عند التجميع/القراءة فقط.
-   لتغيير المنطقة مستقبلاً: عدّل هذين الثابتين فقط. */
+/* ===== v2.9: المنطقة الزمنية للتقارير (Asia/Riyadh) ===== */
 const TZ_OFFSET = '+3 hours';
 const TZ_HOURS = 3;
 const TZ_LABEL = 'Asia/Riyadh (UTC+3)';
 
-/* تاريخ محلي YYYY-MM-DD */
 function localDateStr(d) {
   const base = (d instanceof Date) ? d.getTime() : Date.now();
   return new Date(base + TZ_HOURS * 3600000).toISOString().slice(0, 10);
 }
-/* شهر محلي YYYY-MM */
 function localYearMonth(d) {
   return localDateStr(d).slice(0, 7);
 }
+
+/* ===== v3.0: توحيد معرّف فرع الروابي =====
+   المعرّف القديم كان مولّداً من الطابع الزمني في اللوحة،
+   بينما schema.sql زرع b-rawabi. هذا التوحيد يُصلح كل المراجع. */
+const RAWABI_LEGACY_ID = 'b-1791819751585';
+const RAWABI_CANONICAL_ID = 'b-rawabi';
 
 /* ===== v2.8: حدود الطلبات (ضد الإرهاق والتلاعب) ===== */
 const MAX_QTY_PER_ITEM = 50;
@@ -51,10 +53,10 @@ const MAX_ITEMS_PER_ORDER = 60;
 const MAX_ORDER_TOTAL = 100000;
 
 /* ===== v2.8: حدود معدل القراءة العامة ===== */
-const TRACK_RATE_PER_MIN = 300;      // يكفي ~40 عميل يتتبعون كل 8 ثوانٍ من نفس الشبكة
-const TRACK_MISS_LIMIT = 30;         // محاولات فاشلة per 5 دقائق — يوقف التعداد
+const TRACK_RATE_PER_MIN = 300;
+const TRACK_MISS_LIMIT = 30;
 const TRACK_MISS_WINDOW = 300;
-const DATA_RATE_PER_MIN = 240;       // يكفي ~30 عميل يفحصون كل 8 ثوانٍ من نفس الشبكة
+const DATA_RATE_PER_MIN = 240;
 
 const STATUS_TEXT = {
   pending: 'بانتظار القبول',
@@ -179,7 +181,6 @@ async function readAppSettings(env) {
   }
 }
 
-/* يحترم وضع الرسوم المحدد في لوحة التحكم — لا يثق بأي رقم من العميل */
 function computeDeliveryFee(settings, branch, orderType) {
   if (orderType !== 'delivery') return 0;
 
@@ -205,7 +206,6 @@ function computeDeliveryFee(settings, branch, orderType) {
     return isFinite(f) ? Math.max(0, f) : 0;
   }
 
-  /* لا وضع محدد في الإعدادات → نستخدم رسوم الفرع من قاعدة البيانات */
   const fallback = parseFloat(branch.delivery_fee);
   return isFinite(fallback) ? Math.max(0, fallback) : 0;
 }
@@ -228,6 +228,192 @@ function itemAllowedForBranch(sec, it, branchId) {
 }
 
 // ═══════════════════════════════════════════
+//  v3.0: ساعات العمل — فحص في الخادم لا المتصفح فقط
+// ═══════════════════════════════════════════
+function ryNowParts() {
+  const d = new Date(Date.now() + TZ_HOURS * 3600000);
+  return { day: d.getUTCDay(), min: d.getUTCHours() * 60 + d.getUTCMinutes() };
+}
+function hmMin(t) {
+  if (!t || typeof t !== 'object') return 0;
+  return (parseInt(t.h, 10) || 0) * 60 + (parseInt(t.m, 10) || 0);
+}
+/* نفس منطق branchStatus في app.js — حتى لا يختلف العميل عن الخادم */
+function branchOpenNow(hours) {
+  if (!Array.isArray(hours) || hours.length !== 7) {
+    return { open: true, reason: 'no-schedule' };
+  }
+  const { day, min } = ryNowParts();
+  const today = hours[day];
+  const yest = hours[(day + 6) % 7];
+
+  /* دوام أمس الممتد بعد منتصف الليل (مثل 13:00 → 02:00) */
+  if (yest && !yest.closed) {
+    const yo = hmMin(yest.o), yc = hmMin(yest.c);
+    if (yo > yc && min < yc) return { open: true };
+  }
+  if (!today || today.closed) return { open: false, reason: 'closed-today' };
+  const o = hmMin(today.o), c = hmMin(today.c);
+  if (o === c) return { open: false, reason: 'same-time' };
+  if (o < c) return { open: (min >= o && min < c) };
+  return { open: (min >= o || min < c) };
+}
+function parseHours(raw) {
+  if (!raw) return null;
+  try {
+    const h = JSON.parse(raw);
+    return Array.isArray(h) ? h : null;
+  } catch (e) { return null; }
+}
+
+// ═══════════════════════════════════════════
+//  v3.0: توحيد معرّف الروابي في كل المراجع
+//  يعمل مرة واحدة فعلياً — بعده لا يجد شيئاً فيخرج فوراً
+// ═══════════════════════════════════════════
+async function unifyRawabiId(env) {
+  const legacy = RAWABI_LEGACY_ID;
+  const canonical = RAWABI_CANONICAL_ID;
+  try {
+    const row = await env.DB.prepare('SELECT settings_json FROM app_data WHERE id = 1').first();
+    let settings = null;
+    try { settings = row && row.settings_json ? JSON.parse(row.settings_json) : null; } catch (e) { settings = null; }
+
+    const inSettings = !!(settings && Array.isArray(settings.branches) &&
+      settings.branches.some(b => b && b.id === legacy));
+
+    const o = await env.DB.prepare('SELECT COUNT(*) AS n FROM orders WHERE branch_id = ?').bind(legacy).first();
+    const u = await env.DB.prepare('SELECT COUNT(*) AS n FROM users WHERE branch_id = ?').bind(legacy).first();
+    const l = await env.DB.prepare('SELECT COUNT(*) AS n FROM order_ledger WHERE branch_id = ?').bind(legacy).first();
+    const b = await env.DB.prepare('SELECT 1 FROM branches WHERE id = ?').bind(legacy).first();
+
+    const total = (o?.n || 0) + (u?.n || 0) + (l?.n || 0) + (b ? 1 : 0) + (inSettings ? 1 : 0);
+    if (!total) return { changed: false };
+
+    /* 1) الإعدادات — المصدر الذي يقرأه الزبون */
+    if (inSettings) {
+      settings.branches.forEach(bb => { if (bb && bb.id === legacy) bb.id = canonical; });
+      if (settings.deliveryAvailability && Array.isArray(settings.deliveryAvailability.branchIds)) {
+        settings.deliveryAvailability.branchIds =
+          settings.deliveryAvailability.branchIds.map(x => x === legacy ? canonical : x);
+      }
+      await env.DB.prepare(
+        'UPDATE app_data SET settings_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1'
+      ).bind(JSON.stringify(settings)).run();
+    }
+
+    /* 2) ضمان وجود الصفCanonical قبل نقل المراجع */
+    const hasCanonical = await env.DB.prepare('SELECT 1 FROM branches WHERE id = ?').bind(canonical).first();
+    if (!hasCanonical) {
+      const oldRow = await env.DB.prepare('SELECT * FROM branches WHERE id = ?').bind(legacy).first();
+      if (oldRow) {
+        await env.DB.prepare(`
+          INSERT INTO branches (id, num, name_ar, name_en, addr_ar, addr_en, phone, wa, lat, lng, map_url, delivery_fee, hours_json, is_active)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1)
+        `).bind(canonical, oldRow.num, oldRow.name_ar, oldRow.name_en, oldRow.addr_ar, oldRow.addr_en,
+                oldRow.phone, oldRow.wa, oldRow.lat, oldRow.lng, oldRow.map_url,
+                oldRow.delivery_fee, oldRow.hours_json).run();
+      }
+    }
+
+    /* 3) نقل كل المراجع */
+    await env.DB.prepare('UPDATE orders SET branch_id = ? WHERE branch_id = ?').bind(canonical, legacy).run();
+    await env.DB.prepare('UPDATE users SET branch_id = ? WHERE branch_id = ?').bind(canonical, legacy).run();
+    await env.DB.prepare('UPDATE order_ledger SET branch_id = ? WHERE branch_id = ?').bind(canonical, legacy).run();
+
+    /* 4) حذف الصف القديم — لا مراجع له الآن */
+    await env.DB.prepare('DELETE FROM branches WHERE id = ?').bind(legacy).run();
+
+    console.log('[MK BRANCH] توحيد معرّف الروابي', { legacy, canonical, refs: total });
+    return { changed: true, refs: total };
+  } catch (e) {
+    console.error('unifyRawabiId error:', e);
+    return { changed: false, error: e.message };
+  }
+}
+
+// ═══════════════════════════════════════════
+//  v3.0: مزامنة الفروع من الإعدادات إلى جدول branches
+//  ★ هذا هو الإصلاح الجذري: اللوحة تكتب الإعدادات فقط،
+//    والووركر كان يتحقق من جدول لا يعرف الفروع الجديدة.
+//  الآن كل حفظ إعدادات يحدّث الجدول تلقائياً.
+// ═══════════════════════════════════════════
+async function syncBranchesFromSettings(env, settings) {
+  const list = (settings && Array.isArray(settings.branches)) ? settings.branches : null;
+  /* لا نُعطّل كل الفروع لو كانت الإعدادات فارغة أو تالفة */
+  if (!list || !list.length) return { synced: 0, deactivated: 0, skipped: true };
+
+  let synced = 0;
+  const ids = [];
+
+  for (let i = 0; i < list.length; i++) {
+    const b = list[i];
+    if (!b || !b.id) continue;
+    const id = String(b.id);
+    ids.push(id);
+
+    const num = (typeof b.num === 'number' && isFinite(b.num)) ? b.num : (i + 1);
+    const nameAr = String(b.nameAr || b.name_en || id);
+    const nameEn = String(b.nameEn || b.nameAr || id);
+    const addrAr = b.addrAr ? String(b.addrAr) : null;
+    const addrEn = b.addrEn ? String(b.addrEn) : null;
+    const wa = b.wa ? String(b.wa) : null;
+    /* phone كان فارغاً في البذرة — نملؤه من واتساب ليظهر في التتبع */
+    const phone = b.phone ? String(b.phone) : wa;
+    const lat = (typeof b.lat === 'number' && isFinite(b.lat)) ? b.lat : null;
+    const lng = (typeof b.lng === 'number' && isFinite(b.lng)) ? b.lng : null;
+    const mapUrl = b.map ? String(b.map) : null;
+    const fee = (typeof b.deliveryFee === 'number' && isFinite(b.deliveryFee)) ? b.deliveryFee : 0;
+    const hoursJson = Array.isArray(b.hours) ? JSON.stringify(b.hours) : null;
+
+    try {
+      await env.DB.prepare(`
+        INSERT INTO branches
+          (id, num, name_ar, name_en, addr_ar, addr_en, phone, wa, lat, lng, map_url, delivery_fee, hours_json, is_active)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1)
+        ON CONFLICT(id) DO UPDATE SET
+          num          = excluded.num,
+          name_ar      = excluded.name_ar,
+          name_en      = excluded.name_en,
+          addr_ar      = excluded.addr_ar,
+          addr_en      = excluded.addr_en,
+          phone        = excluded.phone,
+          wa           = excluded.wa,
+          lat          = excluded.lat,
+          lng          = excluded.lng,
+          map_url      = excluded.map_url,
+          delivery_fee = excluded.delivery_fee,
+          hours_json   = excluded.hours_json,
+          is_active    = 1,
+          updated_at   = CURRENT_TIMESTAMP
+      `).bind(id, num, nameAr, nameEn, addrAr, addrEn, phone, wa, lat, lng, mapUrl, fee, hoursJson).run();
+      synced++;
+    } catch (e) {
+      console.error('[MK BRANCH] فشل مزامنة فرع', id, e.message);
+    }
+  }
+
+  /* تعطيل ما لم يعد في الإعدادات — لا حذف، حفاظاً على الطلبات التاريخية */
+  let deactivated = 0;
+  if (ids.length) {
+    try {
+      const ph = ids.map(() => '?').join(',');
+      const r = await env.DB.prepare(
+        `UPDATE branches SET is_active = 0, updated_at = CURRENT_TIMESTAMP
+         WHERE is_active = 1 AND id NOT IN (${ph})`
+      ).bind(...ids).run();
+      deactivated = r.meta?.changes || 0;
+    } catch (e) {
+      console.error('[MK BRANCH] فشل تعطيل الفروع المحذوفة', e.message);
+    }
+  }
+
+  if (synced || deactivated) {
+    console.log('[MK BRANCH] مزامنة', { synced, deactivated });
+  }
+  return { synced, deactivated };
+}
+
+// ═══════════════════════════════════════════
 //  الدفتر المحاسبي
 // ═══════════════════════════════════════════
 async function ledgerInsert(env, order, kind) {
@@ -245,8 +431,7 @@ async function ledgerInsert(env, order, kind) {
 }
 
 // ═══════════════════════════════════════════
-//  الحذف الكسول (P0 Fixed: حذف pending فقط > 24 ساعة)
-//  ملاحظة: مقارنة نسبية بين طابعين UTC — لا تحتاج تحويل منطقة
+//  الحذف الكسول (pending فقط > 24 ساعة)
 // ═══════════════════════════════════════════
 async function purgeStaleOrders(env) {
   try {
@@ -269,7 +454,6 @@ async function purgeStaleOrders(env) {
 
 // ═══════════════════════════════════════════
 //  توليد رقم طلب عشوائي
-//  v2.9: تاريخ الانتهاء بتوقيت الرياض
 // ═══════════════════════════════════════════
 async function generateOrderNumber(db) {
   const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -482,6 +666,7 @@ async function handleGetSettings(env) {
 
 // ═══════════════════════════════════════════
 //  0.9) حفظ الإعدادات في D1
+//  v3.0: + توحيد معرّف الروابي + مزامنة جدول الفروع
 // ═══════════════════════════════════════════
 async function handleSaveSettings(request, env) {
   const auth = await requireAuth(request, env, ['super_admin']);
@@ -489,10 +674,37 @@ async function handleSaveSettings(request, env) {
   try {
     const body = await request.json();
     if (!body.settings || typeof body.settings !== 'object') return error('بيانات الإعدادات غير صالحة', 400);
+
+    /* 1) توحيد المعرّف القديم قبل أي شيء — حتى لا تُعطّل المزامنة الصف الصحيح */
+    const unified = await unifyRawabiId(env);
+
+    /* 2) إن عدّل التوحيد الإعدادات، ندمج معرّف الروابي في الحمولة القادمة */
+    let settings = body.settings;
+    if (unified.changed && Array.isArray(settings.branches)) {
+      settings.branches.forEach(b => {
+        if (b && b.id === RAWABI_LEGACY_ID) b.id = RAWABI_CANONICAL_ID;
+      });
+      if (settings.deliveryAvailability && Array.isArray(settings.deliveryAvailability.branchIds)) {
+        settings.deliveryAvailability.branchIds =
+          settings.deliveryAvailability.branchIds.map(x => x === RAWABI_LEGACY_ID ? RAWABI_CANONICAL_ID : x);
+      }
+    }
+
+    /* 3) كتابة الإعدادات */
     await env.DB.prepare(`
       UPDATE app_data SET settings_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1
-    `).bind(JSON.stringify(body.settings)).run();
-    return json({ success: true, message: 'تم حفظ الإعدادات بنجاح' });
+    `).bind(JSON.stringify(settings)).run();
+
+    /* 4) ★ مزامنة جدول الفروع — بدون هذا لا تعمل الفروع الجديدة */
+    const sync = await syncBranchesFromSettings(env, settings);
+
+    return json({
+      success: true,
+      message: 'تم حفظ الإعدادات ومزامنة الفروع بنجاح',
+      branches_synced: sync.synced || 0,
+      branches_deactivated: sync.deactivated || 0,
+      rawabi_unified: !!unified.changed
+    });
   } catch (e) {
     console.error('Save settings error:', e);
     return error('فشل حفظ الإعدادات: ' + e.message, 500);
@@ -501,6 +713,7 @@ async function handleSaveSettings(request, env) {
 
 // ═══════════════════════════════════════════
 //  0.10) نقل البيانات من GitHub إلى D1
+//  v3.0: + مزامنة الفروع بعد النقل
 // ═══════════════════════════════════════════
 async function handleMigrateFromGithub(request, env) {
   const auth = await requireAuth(request, env, ['super_admin']);
@@ -511,11 +724,15 @@ async function handleMigrateFromGithub(request, env) {
     await env.DB.prepare(`
       UPDATE app_data SET menu_json = ?, settings_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1
     `).bind(JSON.stringify(body.menu), JSON.stringify(body.settings)).run();
+
+    const sync = await syncBranchesFromSettings(env, body.settings);
+
     return json({
       success: true,
-      message: 'تم نقل البيانات من GitHub إلى D1 بنجاح',
+      message: 'تم نقل البيانات من GitHub إلى D1 ومزامنة الفروع بنجاح',
       menu_items: body.menu.length || 0,
-      settings_keys: Object.keys(body.settings).length || 0
+      settings_keys: Object.keys(body.settings).length || 0,
+      branches_synced: sync.synced || 0
     });
   } catch (e) {
     console.error('Migration error:', e);
@@ -639,7 +856,7 @@ async function handleChangePassword(request, env) {
 
 // ═══════════════════════════════════════════
 //  4) إنشاء طلب
-//  v2.8: أسعار من D1 + رسوم حسب وضع الإعدادات + حدود كمية/عدد + فحص التوفر
+//  v3.0: + فحص ساعات العمل في الخادم
 // ═══════════════════════════════════════════
 async function handleCreateOrder(request, env) {
   const ip = getIP(request);
@@ -665,8 +882,20 @@ async function handleCreateOrder(request, env) {
   if (items.length > MAX_ITEMS_PER_ORDER) return error(`عدد الأصناف كبير جداً (الحد ${MAX_ITEMS_PER_ORDER} صنف)`, 400);
 
   /* جلب الفرع + المنيو + الإعدادات من قاعدة البيانات */
-  const branch = await env.DB.prepare('SELECT id, name_ar, phone, delivery_fee FROM branches WHERE id = ? AND is_active = 1').bind(branchId).first();
-  if (!branch) return error('الفرع غير موجود أو غير نشط');
+  const branch = await env.DB.prepare(
+    'SELECT id, name_ar, phone, delivery_fee, hours_json FROM branches WHERE id = ? AND is_active = 1'
+  ).bind(branchId).first();
+  if (!branch) {
+    console.error('[MK ORDER] فرع غير موجود في الجدول', { branchId });
+    return error('الفرع غير موجود أو غير نشط');
+  }
+
+  /* ===== v3.0: الفرع مفتوح الآن؟ (كان القفل في المتصفح فقط) ===== */
+  const hours = parseHours(branch.hours_json);
+  const st = branchOpenNow(hours);
+  if (!st.open) {
+    return error('الفرع مغلق حالياً — لا يمكن استقبال طلبات الآن', 409);
+  }
 
   const menuRow = await env.DB.prepare('SELECT menu_json FROM app_data WHERE id = 1').first();
   let menuData = [];
@@ -687,7 +916,7 @@ async function handleCreateOrder(request, env) {
     }
   }
 
-  /* فهرس الأصناف مع القسم الأب (لفحص التوفر والإخفاء) */
+  /* فهرس الأصناف مع القسم الأب */
   const menuMap = new Map();
   menuData.forEach(sec => {
     (sec.items || []).forEach(it => {
@@ -739,7 +968,6 @@ async function handleCreateOrder(request, env) {
     });
   }
 
-  /* الرسوم من الإعدادات — لا ثقة بأي رقم قادم من العميل */
   const deliveryFee = computeDeliveryFee(settings, branch, orderType);
   const total = Math.round((subtotal + deliveryFee) * 100) / 100;
 
@@ -748,7 +976,6 @@ async function handleCreateOrder(request, env) {
 
   const orderNumber = await generateOrderNumber(env.DB);
 
-  /* إحداثيات مُقيّدة بنطاق جغرافي صحيح */
   let customerLat = parseFloat(body.customer_lat);
   let customerLng = parseFloat(body.customer_lng);
   customerLat = (isFinite(customerLat) && customerLat >= -90 && customerLat <= 90) ? customerLat : null;
@@ -776,7 +1003,6 @@ async function handleCreateOrder(request, env) {
 
 // ═══════════════════════════════════════════
 //  5) تتبع الطلب
-//  v2.8: حد معدل + عداد محاولات فاشلة يوقف تعداد الأرقام
 // ═══════════════════════════════════════════
 async function handleTrackOrder(orderNumber, request, env) {
   const ip = getIP(request);
@@ -945,7 +1171,6 @@ async function handleClaim(orderId, request, env) {
 
 // ═══════════════════════════════════════════
 //  10) توصيلات السائق
-//  v2.9: «اليوم» بتوقيت الرياض — أرباح ما بعد منتصف الليل صحيحة
 // ═══════════════════════════════════════════
 async function handleDriverOrders(request, env) {
   const auth = await requireAuth(request, env, ['driver']);
@@ -1107,7 +1332,6 @@ async function handleGetPhoto(orderId, request, env) {
 
 // ═══════════════════════════════════════════
 //  16) كل الطلبات (المالك)
-//  v2.9: فلترة التاريخ بتوقيت الرياض
 // ═══════════════════════════════════════════
 async function handleAdminOrders(request, env) {
   const auth = await requireAuth(request, env, ['super_admin']);
@@ -1166,6 +1390,9 @@ async function handleAdminUsersCreate(request, env) {
   if (!name || !username) return error('الاسم واسم المستخدم مطلوبان');
   if (!['supervisor', 'driver'].includes(role)) return error('دور غير صالح');
   if (!branchId) return error('يجب تحديد الفرع');
+  /* v3.0: تأكيد وجود الفرع في الجدول قبل إنشاء الحساب */
+  const br = await env.DB.prepare('SELECT id FROM branches WHERE id = ?').bind(branchId).first();
+  if (!br) return error('الفرع غير موجود في النظام — احفظ الإعدادات أولاً لمزامنة الفروع', 409);
   const exists = await env.DB.prepare('SELECT 1 FROM users WHERE username = ?').bind(username).first();
   if (exists) return error('اسم المستخدم مستخدم بالفعل', 409);
   const tempPass = password || ('Mk@' + generateSalt().slice(0, 8));
@@ -1218,7 +1445,6 @@ async function handleAdminUsersReset(userId, request, env) {
 
 // ═══════════════════════════════════════════
 //  18) التقرير التشغيلي
-//  v2.9: كل التجميعات بتوقيت الرياض
 // ═══════════════════════════════════════════
 async function handleReportsSummary(request, env) {
   const auth = await requireAuth(request, env, ['super_admin', 'supervisor']);
@@ -1288,7 +1514,6 @@ async function handleReportsSummary(request, env) {
 
 // ═══════════════════════════════════════════
 //  19) التقرير المحاسبي
-//  v2.9: حدود الأشهر والأيام بتوقيت الرياض
 // ═══════════════════════════════════════════
 async function handleReportsAccounting(request, env) {
   const auth = await requireAuth(request, env, ['super_admin', 'supervisor']);
@@ -1395,7 +1620,6 @@ function imgCt(key) {
   if (/\.ico$/i.test(key)) return 'image/x-icon';
   return 'application/octet-stream';
 }
-/* كشف النوع الحقيقي — يسمح بتخزين WebP مضغوط داخل مفتاح .png */
 function sniffImageType(b) {
   if (!b || b.length < 12) return null;
   if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47) return 'image/png';
@@ -1411,7 +1635,6 @@ function validImgKey(key) {
 
 async function handleImgServe(key, env) {
   if (!validImgKey(key)) return error('مفتاح صورة غير صالح', 400);
-  /* حماية صور التسليم من الوصول العام */
   if (!key.startsWith('img/')) return error('غير مصرح بالوصول', 403);
 
   try {
@@ -1427,7 +1650,6 @@ async function handleImgServe(key, env) {
     }
   } catch (e) {}
 
-  /* النقل الذاتي لصور التطبيق الثابتة فقط */
   if (APP_IMG_FALLBACK.indexOf(key) >= 0) {
     try {
       const safeUrl = RAW_BASE + key.split('/').map(encodeURIComponent).join('/');
@@ -1467,7 +1689,6 @@ async function handleImgPut(request, env, key) {
   return json({ success: true, key, url: '/api/img/' + key, bytes: bytes.length, contentType: ct });
 }
 
-/* الحذف ينقل إلى سلة المهملات أولاً */
 async function handleImgDelete(request, env, key) {
   const auth = await requireAuth(request, env, ['super_admin']);
   if (auth.error) return auth.error;
@@ -1570,8 +1791,7 @@ async function purgeOldTrash(env, days) {
 }
 
 // ═══════════════════════════════════════════
-//  21) النسخ الاحتياطي (يشمل المنيو والإعدادات)
-//  v2.9: اسم الملف بتاريخ الرياض
+//  21) النسخ الاحتياطي
 // ═══════════════════════════════════════════
 async function buildAndStoreBackup(env) {
   const [orders, users, branches, tracking, ledger, appRow] = await Promise.all([
@@ -1601,7 +1821,7 @@ async function buildAndStoreBackup(env) {
     exported_at: new Date().toISOString(),
     local_date: localDateStr(),
     timezone: TZ_LABEL,
-    version: '2.9',
+    version: '3.0',
     app_data: appData,
     images_inventory: imageKeys,
     branches: branches.results,
@@ -1746,8 +1966,8 @@ export default {
     try {
       if (path === '/api/health' && request.method === 'GET') return json({
         status: 'ok',
-        version: '2.9',
-        features: ['r2-images','image-trash','trash-restore','backup-appdata','item-orphans','read-through-app-only','server-pricing','fee-mode-honored','order-caps','public-rate-limit','track-anti-enum','riyadh-time-reports'],
+        version: '3.0',
+        features: ['r2-images','image-trash','trash-restore','backup-appdata','item-orphans','read-through-app-only','server-pricing','fee-mode-honored','order-caps','public-rate-limit','track-anti-enum','riyadh-time-reports','branch-auto-sync','branch-soft-delete','server-hours-check','rawabi-id-unify'],
         live_mode: env.LIVE_MODE || 'polling',
         timezone: TZ_LABEL,
         local_date: localDateStr(),
@@ -1756,7 +1976,6 @@ export default {
       });
       if (path === '/api/recover-owner' && request.method === 'GET') return await handleRecoverOwner(request, env);
 
-      /* ===== قراءة عامة بحد معدل (v2.8) ===== */
       if (path === '/api/data/menu' && request.method === 'GET') {
         const r = await checkRateLimit(env, `data:${getIP(request)}`, DATA_RATE_PER_MIN, 60);
         if (!r.allowed) return error('محاولات كثيرة — انتظر قليلاً', 429);
@@ -1830,8 +2049,6 @@ export default {
 
   // ═════════════════════════════════════════
   //  المهام المجدولة
-  //  ملاحظة: المقارنات النسبية (-7 days / -90 days) تبقى UTC — صحيحة
-  //  لأنها الفرق بين طابعين UTC، لا تعتمد على بداية اليوم
   // ═════════════════════════════════════════
   async scheduled(event, env, ctx) {
     try {
@@ -1841,7 +2058,6 @@ export default {
         await env.DB.prepare("DELETE FROM driver_locations WHERE created_at < datetime('now', '-7 days')").run();
         await env.DB.prepare(`DELETE FROM order_tracking WHERE order_id IN (SELECT id FROM orders WHERE status = 'archived' AND updated_at < datetime('now', '-90 days'))`).run();
 
-        /* حذف الطلبات المعلقة فقط الأقدم من 24 ساعة */
         const old = await env.DB.prepare(`SELECT * FROM orders WHERE status = 'pending' AND created_at < datetime('now', '-24 hours')`).all();
         for (const o of old.results) {
           await ledgerInsert(env, o, 'abandoned');
@@ -1865,13 +2081,19 @@ export default {
             AND NOT EXISTS (SELECT 1 FROM order_ledger l WHERE l.order_number = o.order_number AND l.kind = 'cancelled')
         `).run();
 
-        /* نسخة احتياطية تشمل المنيو والإعدادات + جرد الصور */
+        /* v3.0: مزامنة الفروع ليلةً أيضاً — شبكة أمان */
+        try {
+          const s = await readAppSettings(env);
+          await unifyRawabiId(env);
+          const sync = await syncBranchesFromSettings(env, s);
+          console.log('nightly branch sync:', JSON.stringify(sync));
+        } catch (e) { console.error('branch sync error:', e); }
+
         try {
           const info = await buildAndStoreBackup(env);
           console.log('backup ok:', JSON.stringify(info));
         } catch (e) { console.error('backup error:', e); }
 
-        /* تفريغ سلة المهملات الأقدم من 30 يوماً */
         try {
           const removed = await purgeOldTrash(env, TRASH_DAYS);
           console.log('trash purged:', removed);
@@ -1884,5 +2106,5 @@ export default {
 };
 
 // ═══════════════════════════════════════════
-//  نهاية worker/index.js (v2.9)
+//  نهاية worker/index.js (v3.0)
 // ═══════════════════════════════════════════
