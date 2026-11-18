@@ -1,14 +1,17 @@
 // ═══════════════════════════════════════════
 //  مكرونجي - Cloudflare Worker API (كامل)
-//  الإصدار: 3.0
-//  v3.0: • مزامنة تلقائية للفروع: كل حفظ إعدادات يحدّث جدول branches
-//          → أي فرع جديد من اللوحة يعمل فوراً (طلب + مشرف + سائق + تقارير)
-//        • حذف الفرع من اللوحة = تعطيل (is_active=0) لا حذف — يحفظ التاريخ
-//        • توحيد معرّف الروابي تلقائياً في كل المراجع (settings/orders/users/ledger)
-//        • فحص ساعات العمل في الخادم — لم يعد القفل في المتصفح فقط
+//  الإصدار: 3.1
+//  v3.1: • ★ نزع اللغم: لا تعطيل للفروع أبداً إن فشلت المزامنة
+//          (v3.0 عطّل الروابي لأن كل الإدخالات فشلت بصمت)
+//        • كشف أعمدة الجدول فعلياً وبناء أمر الإدخال عليها
+//          → عمود ناقص لم يعد يُفشل المزامنة بالكامل
+//        • ساعات العمل تُقرأ من الإعدادات لا من عمود اختياري
+//        • فشل المزامنة يُبلَّغ صريحاً في الاستجابة والسجلات
+//        • حذف توحيد المعرّف المفترض (كان تخميناً خاطئاً — المعرّفات موحّدة أصلاً)
+//        • ➕ /api/admin/schema-check لفحص بنية القاعدة مقابل المتوقّع
+//  v3.0: مزامنة تلقائية للفروع + تعطيل بدل الحذف + فحص ساعات العمل
 //  v2.9: توقيت الرياض في كل التجميعات
 //  v2.8: احترام deliveryFeeMode + حدود الطلب + حد المعدل + منع التعداد
-//  v2.7-P0: التحقق من الأسعار من D1، منع حذف الطلبات النشطة، حماية صور التسليم
 // ═══════════════════════════════════════════
 
 const CORS_HEADERS = {
@@ -20,7 +23,6 @@ const CORS_HEADERS = {
 
 const RAW_BASE = 'https://raw.githubusercontent.com/makaronjy/Makaronjy/main/';
 
-/* النقل الذاتي مسموح لصور التطبيق الثابتة فقط */
 const APP_IMG_FALLBACK = [
   'img/logo.png', 'img/bg.png', 'img/welcome.png', 'img/closed.png',
   'img/icon-192.png', 'img/icon-512.png', 'img/missing.png',
@@ -28,7 +30,7 @@ const APP_IMG_FALLBACK = [
 ];
 const TRASH_DAYS = 30;
 
-/* ===== v2.9: المنطقة الزمنية للتقارير (Asia/Riyadh) ===== */
+/* ===== المنطقة الزمنية (Asia/Riyadh) ===== */
 const TZ_OFFSET = '+3 hours';
 const TZ_HOURS = 3;
 const TZ_LABEL = 'Asia/Riyadh (UTC+3)';
@@ -41,22 +43,33 @@ function localYearMonth(d) {
   return localDateStr(d).slice(0, 7);
 }
 
-/* ===== v3.0: توحيد معرّف فرع الروابي =====
-   المعرّف القديم كان مولّداً من الطابع الزمني في اللوحة،
-   بينما schema.sql زرع b-rawabi. هذا التوحيد يُصلح كل المراجع. */
-const RAWABI_LEGACY_ID = 'b-1791819751585';
-const RAWABI_CANONICAL_ID = 'b-rawabi';
-
-/* ===== v2.8: حدود الطلبات (ضد الإرهاق والتلاعب) ===== */
+/* ===== حدود الطلبات ===== */
 const MAX_QTY_PER_ITEM = 50;
 const MAX_ITEMS_PER_ORDER = 60;
 const MAX_ORDER_TOTAL = 100000;
 
-/* ===== v2.8: حدود معدل القراءة العامة ===== */
+/* ===== حدود معدل القراءة العامة ===== */
 const TRACK_RATE_PER_MIN = 300;
 const TRACK_MISS_LIMIT = 30;
 const TRACK_MISS_WINDOW = 300;
 const DATA_RATE_PER_MIN = 240;
+
+/* ===== v3.1: البنية المتوقّعة — لفحص الترحيل الناقص ===== */
+const EXPECTED_COLUMNS = {
+  branches: ['id','num','name_ar','name_en','addr_ar','addr_en','phone','wa',
+             'lat','lng','map_url','delivery_fee','hours_json','is_active',
+             'created_at','updated_at'],
+  orders: ['id','order_number','branch_id','order_type','lang','customer_name',
+           'customer_phone','customer_address','customer_lat','customer_lng',
+           'items_json','subtotal','delivery_fee','total','payment_method',
+           'payment_status','status','driver_id','driver_lat','driver_lng',
+           'delivery_photo','notes','created_at','updated_at','delivered_at'],
+  app_data: ['id','menu_json','settings_json','updated_at'],
+  order_ledger: ['id','order_number','branch_id','order_type','kind','gross',
+                 'fees','driver_id','created_at','closed_at']
+};
+/* أعمدة لا يعمل النظام بدونها */
+const REQUIRED_BRANCH_COLS = ['id','num','name_ar','name_en','is_active'];
 
 const STATUS_TEXT = {
   pending: 'بانتظار القبول',
@@ -153,7 +166,6 @@ async function checkRateLimit(env, key, limit = 100, ttl = 60) {
     return { allowed: true, remaining: limit - current - 1 };
   } catch (e) { return { allowed: true, remaining: -1 }; }
 }
-/* سرد R2 مع ترقيم الصفحات */
 async function r2ListAll(bucket, prefix) {
   const out = [];
   let cursor;
@@ -167,7 +179,23 @@ async function r2ListAll(bucket, prefix) {
 }
 
 // ═══════════════════════════════════════════
-//  v2.8: قراءة الإعدادات + حساب رسوم التوصيل
+//  v3.1: كشف أعمدة الجدول فعلياً
+//  اسم الجدول يُمرَّر من الكود فقط — لا مدخلات مستخدم
+// ═══════════════════════════════════════════
+async function tableColumns(env, table) {
+  try {
+    const r = await env.DB.prepare(`SELECT name FROM pragma_table_info('${table}')`).all();
+    const s = new Set();
+    (r.results || []).forEach(x => { if (x && x.name) s.add(x.name); });
+    return s;
+  } catch (e) {
+    console.error('[MK SCHEMA] فشل قراءة أعمدة ' + table + ':', e.message);
+    return new Set();
+  }
+}
+
+// ═══════════════════════════════════════════
+//  الإعدادات + رسوم التوصيل
 // ═══════════════════════════════════════════
 async function readAppSettings(env) {
   try {
@@ -183,9 +211,7 @@ async function readAppSettings(env) {
 
 function computeDeliveryFee(settings, branch, orderType) {
   if (orderType !== 'delivery') return 0;
-
   const mode = settings.deliveryFeeMode;
-
   if (mode === 'free') return 0;
 
   if (mode === 'perBranch') {
@@ -210,7 +236,6 @@ function computeDeliveryFee(settings, branch, orderType) {
   return isFinite(fallback) ? Math.max(0, fallback) : 0;
 }
 
-/* فحص توفر الصنف للفرع (التوفر الدائم + النفد اليومي) */
 function itemAllowedForBranch(sec, it, branchId) {
   if (sec && sec.hidden === true) return { ok: false, reason: 'hidden' };
   if (it && it.hidden === true) return { ok: false, reason: 'hidden' };
@@ -228,7 +253,8 @@ function itemAllowedForBranch(sec, it, branchId) {
 }
 
 // ═══════════════════════════════════════════
-//  v3.0: ساعات العمل — فحص في الخادم لا المتصفح فقط
+//  ساعات العمل — نفس منطق app.js تماماً
+//  v3.1: تُقرأ من الإعدادات، لا من عمود الجدول
 // ═══════════════════════════════════════════
 function ryNowParts() {
   const d = new Date(Date.now() + TZ_HOURS * 3600000);
@@ -238,7 +264,6 @@ function hmMin(t) {
   if (!t || typeof t !== 'object') return 0;
   return (parseInt(t.h, 10) || 0) * 60 + (parseInt(t.m, 10) || 0);
 }
-/* نفس منطق branchStatus في app.js — حتى لا يختلف العميل عن الخادم */
 function branchOpenNow(hours) {
   if (!Array.isArray(hours) || hours.length !== 7) {
     return { open: true, reason: 'no-schedule' };
@@ -247,7 +272,6 @@ function branchOpenNow(hours) {
   const today = hours[day];
   const yest = hours[(day + 6) % 7];
 
-  /* دوام أمس الممتد بعد منتصف الليل (مثل 13:00 → 02:00) */
   if (yest && !yest.closed) {
     const yo = hmMin(yest.o), yc = hmMin(yest.c);
     if (yo > yc && min < yc) return { open: true };
@@ -258,159 +282,152 @@ function branchOpenNow(hours) {
   if (o < c) return { open: (min >= o && min < c) };
   return { open: (min >= o || min < c) };
 }
-function parseHours(raw) {
-  if (!raw) return null;
-  try {
-    const h = JSON.parse(raw);
-    return Array.isArray(h) ? h : null;
-  } catch (e) { return null; }
+/* v3.1: ساعات الفرع من الإعدادات — مصدر الحقيقة الذي تكتبه اللوحة */
+function hoursFromSettings(settings, branchId) {
+  if (!settings || !Array.isArray(settings.branches)) return null;
+  const sb = settings.branches.find(b => b && b.id === branchId);
+  return (sb && Array.isArray(sb.hours)) ? sb.hours : null;
 }
 
 // ═══════════════════════════════════════════
-//  v3.0: توحيد معرّف الروابي في كل المراجع
-//  يعمل مرة واحدة فعلياً — بعده لا يجد شيئاً فيخرج فوراً
-// ═══════════════════════════════════════════
-async function unifyRawabiId(env) {
-  const legacy = RAWABI_LEGACY_ID;
-  const canonical = RAWABI_CANONICAL_ID;
-  try {
-    const row = await env.DB.prepare('SELECT settings_json FROM app_data WHERE id = 1').first();
-    let settings = null;
-    try { settings = row && row.settings_json ? JSON.parse(row.settings_json) : null; } catch (e) { settings = null; }
-
-    const inSettings = !!(settings && Array.isArray(settings.branches) &&
-      settings.branches.some(b => b && b.id === legacy));
-
-    const o = await env.DB.prepare('SELECT COUNT(*) AS n FROM orders WHERE branch_id = ?').bind(legacy).first();
-    const u = await env.DB.prepare('SELECT COUNT(*) AS n FROM users WHERE branch_id = ?').bind(legacy).first();
-    const l = await env.DB.prepare('SELECT COUNT(*) AS n FROM order_ledger WHERE branch_id = ?').bind(legacy).first();
-    const b = await env.DB.prepare('SELECT 1 FROM branches WHERE id = ?').bind(legacy).first();
-
-    const total = (o?.n || 0) + (u?.n || 0) + (l?.n || 0) + (b ? 1 : 0) + (inSettings ? 1 : 0);
-    if (!total) return { changed: false };
-
-    /* 1) الإعدادات — المصدر الذي يقرأه الزبون */
-    if (inSettings) {
-      settings.branches.forEach(bb => { if (bb && bb.id === legacy) bb.id = canonical; });
-      if (settings.deliveryAvailability && Array.isArray(settings.deliveryAvailability.branchIds)) {
-        settings.deliveryAvailability.branchIds =
-          settings.deliveryAvailability.branchIds.map(x => x === legacy ? canonical : x);
-      }
-      await env.DB.prepare(
-        'UPDATE app_data SET settings_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1'
-      ).bind(JSON.stringify(settings)).run();
-    }
-
-    /* 2) ضمان وجود الصفCanonical قبل نقل المراجع */
-    const hasCanonical = await env.DB.prepare('SELECT 1 FROM branches WHERE id = ?').bind(canonical).first();
-    if (!hasCanonical) {
-      const oldRow = await env.DB.prepare('SELECT * FROM branches WHERE id = ?').bind(legacy).first();
-      if (oldRow) {
-        await env.DB.prepare(`
-          INSERT INTO branches (id, num, name_ar, name_en, addr_ar, addr_en, phone, wa, lat, lng, map_url, delivery_fee, hours_json, is_active)
-          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1)
-        `).bind(canonical, oldRow.num, oldRow.name_ar, oldRow.name_en, oldRow.addr_ar, oldRow.addr_en,
-                oldRow.phone, oldRow.wa, oldRow.lat, oldRow.lng, oldRow.map_url,
-                oldRow.delivery_fee, oldRow.hours_json).run();
-      }
-    }
-
-    /* 3) نقل كل المراجع */
-    await env.DB.prepare('UPDATE orders SET branch_id = ? WHERE branch_id = ?').bind(canonical, legacy).run();
-    await env.DB.prepare('UPDATE users SET branch_id = ? WHERE branch_id = ?').bind(canonical, legacy).run();
-    await env.DB.prepare('UPDATE order_ledger SET branch_id = ? WHERE branch_id = ?').bind(canonical, legacy).run();
-
-    /* 4) حذف الصف القديم — لا مراجع له الآن */
-    await env.DB.prepare('DELETE FROM branches WHERE id = ?').bind(legacy).run();
-
-    console.log('[MK BRANCH] توحيد معرّف الروابي', { legacy, canonical, refs: total });
-    return { changed: true, refs: total };
-  } catch (e) {
-    console.error('unifyRawabiId error:', e);
-    return { changed: false, error: e.message };
-  }
-}
-
-// ═══════════════════════════════════════════
-//  v3.0: مزامنة الفروع من الإعدادات إلى جدول branches
-//  ★ هذا هو الإصلاح الجذري: اللوحة تكتب الإعدادات فقط،
-//    والووركر كان يتحقق من جدول لا يعرف الفروع الجديدة.
-//  الآن كل حفظ إعدادات يحدّث الجدول تلقائياً.
+//  v3.1: مزامنة الفروع — محصّنة
+//  ★ لا تعطيل أبداً إن فشلت المزامنة (كان اللغم)
+//  ★ تبني أمر الإدخال على الأعمدة الموجودة فعلاً
+//  ★ تُبلّغ عن كل فشل صريحاً
 // ═══════════════════════════════════════════
 async function syncBranchesFromSettings(env, settings) {
   const list = (settings && Array.isArray(settings.branches)) ? settings.branches : null;
-  /* لا نُعطّل كل الفروع لو كانت الإعدادات فارغة أو تالفة */
-  if (!list || !list.length) return { synced: 0, deactivated: 0, skipped: true };
+  if (!list || !list.length) {
+    return { ok: false, synced: 0, deactivated: 0, skipped: true,
+             reason: 'لا فروع في الإعدادات — لم يُلمس الجدول', failures: [] };
+  }
 
+  const cols = await tableColumns(env, 'branches');
+  const missingRequired = REQUIRED_BRANCH_COLS.filter(c => !cols.has(c));
+  if (cols.size === 0 || missingRequired.length) {
+    console.error('[MK BRANCH] بنية الجدول ناقصة — أُلغيت المزامنة entirely', missingRequired);
+    return { ok: false, synced: 0, deactivated: 0,
+             reason: 'بنية جدول branches ناقصة — أُلغيت المزامنة حمايةً للفروع',
+             missing_required: missingRequired, failures: [] };
+  }
+
+  const allIds = [];
   let synced = 0;
-  const ids = [];
+  const failures = [];
 
   for (let i = 0; i < list.length; i++) {
     const b = list[i];
-    if (!b || !b.id) continue;
+    if (!b || !b.id) { failures.push({ index: i, reason: 'فرع بلا معرّف' }); continue; }
     const id = String(b.id);
-    ids.push(id);
+    allIds.push(id);
 
-    const num = (typeof b.num === 'number' && isFinite(b.num)) ? b.num : (i + 1);
-    const nameAr = String(b.nameAr || b.name_en || id);
-    const nameEn = String(b.nameEn || b.nameAr || id);
-    const addrAr = b.addrAr ? String(b.addrAr) : null;
-    const addrEn = b.addrEn ? String(b.addrEn) : null;
-    const wa = b.wa ? String(b.wa) : null;
-    /* phone كان فارغاً في البذرة — نملؤه من واتساب ليظهر في التتبع */
-    const phone = b.phone ? String(b.phone) : wa;
-    const lat = (typeof b.lat === 'number' && isFinite(b.lat)) ? b.lat : null;
-    const lng = (typeof b.lng === 'number' && isFinite(b.lng)) ? b.lng : null;
-    const mapUrl = b.map ? String(b.map) : null;
-    const fee = (typeof b.deliveryFee === 'number' && isFinite(b.deliveryFee)) ? b.deliveryFee : 0;
-    const hoursJson = Array.isArray(b.hours) ? JSON.stringify(b.hours) : null;
+    /* كل القيم المرشّحة — نستخدم الموجود في الجدول فقط */
+    const cand = {
+      id: id,
+      num: (typeof b.num === 'number' && isFinite(b.num)) ? b.num : (i + 1),
+      name_ar: String(b.nameAr || b.nameEn || id),
+      name_en: String(b.nameEn || b.nameAr || id),
+      addr_ar: b.addrAr ? String(b.addrAr) : null,
+      addr_en: b.addrEn ? String(b.addrEn) : null,
+      phone: b.phone ? String(b.phone) : (b.wa ? String(b.wa) : null),
+      wa: b.wa ? String(b.wa) : null,
+      lat: (typeof b.lat === 'number' && isFinite(b.lat)) ? b.lat : null,
+      lng: (typeof b.lng === 'number' && isFinite(b.lng)) ? b.lng : null,
+      map_url: b.map ? String(b.map) : null,
+      delivery_fee: (typeof b.deliveryFee === 'number' && isFinite(b.deliveryFee)) ? b.deliveryFee : 0,
+      hours_json: Array.isArray(b.hours) ? JSON.stringify(b.hours) : null,
+      is_active: 1
+    };
 
+    const use = Object.keys(cand).filter(k => cols.has(k));
+    const ph = use.map(() => '?').join(',');
+    const sets = use.filter(k => k !== 'id').map(k => `${k}=excluded.${k}`);
+    if (cols.has('updated_at')) sets.push('updated_at=CURRENT_TIMESTAMP');
+
+    const sql = `INSERT INTO branches (${use.join(',')}) VALUES (${ph})
+                 ON CONFLICT(id) DO UPDATE SET ${sets.join(',')}`;
     try {
-      await env.DB.prepare(`
-        INSERT INTO branches
-          (id, num, name_ar, name_en, addr_ar, addr_en, phone, wa, lat, lng, map_url, delivery_fee, hours_json, is_active)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1)
-        ON CONFLICT(id) DO UPDATE SET
-          num          = excluded.num,
-          name_ar      = excluded.name_ar,
-          name_en      = excluded.name_en,
-          addr_ar      = excluded.addr_ar,
-          addr_en      = excluded.addr_en,
-          phone        = excluded.phone,
-          wa           = excluded.wa,
-          lat          = excluded.lat,
-          lng          = excluded.lng,
-          map_url      = excluded.map_url,
-          delivery_fee = excluded.delivery_fee,
-          hours_json   = excluded.hours_json,
-          is_active    = 1,
-          updated_at   = CURRENT_TIMESTAMP
-      `).bind(id, num, nameAr, nameEn, addrAr, addrEn, phone, wa, lat, lng, mapUrl, fee, hoursJson).run();
+      await env.DB.prepare(sql).bind(...use.map(k => cand[k])).run();
       synced++;
     } catch (e) {
+      failures.push({ id, error: e.message });
       console.error('[MK BRANCH] فشل مزامنة فرع', id, e.message);
     }
   }
 
-  /* تعطيل ما لم يعد في الإعدادات — لا حذف، حفاظاً على الطلبات التاريخية */
+  /* ★★★ اللغم المنزوع ★★★
+     التعطيل لا يعمل إلا إذا نجحت كل الإدخالات.
+     أي فشل → لا تعطيل إطلاقاً → الفروع العاملة تبقى عاملة. */
   let deactivated = 0;
-  if (ids.length) {
+  if (synced > 0 && failures.length === 0 && allIds.length) {
     try {
-      const ph = ids.map(() => '?').join(',');
+      const ph = allIds.map(() => '?').join(',');
+      const stamp = cols.has('updated_at') ? ', updated_at=CURRENT_TIMESTAMP' : '';
       const r = await env.DB.prepare(
-        `UPDATE branches SET is_active = 0, updated_at = CURRENT_TIMESTAMP
-         WHERE is_active = 1 AND id NOT IN (${ph})`
-      ).bind(...ids).run();
+        `UPDATE branches SET is_active=0${stamp}
+         WHERE is_active=1 AND id NOT IN (${ph})`
+      ).bind(...allIds).run();
       deactivated = r.meta?.changes || 0;
     } catch (e) {
-      console.error('[MK BRANCH] فشل تعطيل الفروع المحذوفة', e.message);
+      console.error('[MK BRANCH] فشل تعطيل الفروع المحذوفة:', e.message);
     }
+  } else if (failures.length) {
+    console.warn('[MK BRANCH] أُُلغي التعطيل بسبب فشل المزامنة — حمايةً للفروع العاملة');
   }
 
-  if (synced || deactivated) {
-    console.log('[MK BRANCH] مزامنة', { synced, deactivated });
+  const optional = ['addr_ar','addr_en','phone','wa','lat','lng','map_url',
+                    'delivery_fee','hours_json','updated_at'];
+  const missingOptional = optional.filter(c => !cols.has(c));
+
+  if (synced || deactivated) console.log('[MK BRANCH] مزامنة', { synced, deactivated, failures: failures.length });
+
+  return {
+    ok: failures.length === 0,
+    synced, deactivated, failures,
+    missing_optional: missingOptional
+  };
+}
+
+// ═══════════════════════════════════════════
+//  v3.1: فحص بنية القاعدة مقابل المتوقّع
+// ═══════════════════════════════════════════
+async function handleSchemaCheck(request, env) {
+  const auth = await requireAuth(request, env, ['super_admin']);
+  if (auth.error) return auth.error;
+  const out = {};
+  let allOk = true;
+  for (const table of Object.keys(EXPECTED_COLUMNS)) {
+    const cols = await tableColumns(env, table);
+    const expected = EXPECTED_COLUMNS[table];
+    const missing = expected.filter(c => !cols.has(c));
+    const extra = [...cols].filter(c => expected.indexOf(c) < 0);
+    out[table] = {
+      exists: cols.size > 0,
+      detected: [...cols],
+      missing,
+      extra,
+      ok: cols.size > 0 && missing.length === 0
+    };
+    if (!out[table].ok) allOk = false;
   }
-  return { synced, deactivated };
+  const fixes = [];
+  for (const t of Object.keys(out)) {
+    out[t].missing.forEach(c => {
+      if (t === 'branches' && c === 'wa') fixes.push(`ALTER TABLE branches ADD COLUMN wa TEXT;`);
+      else if (t === 'branches' && c === 'hours_json') fixes.push(`ALTER TABLE branches ADD COLUMN hours_json TEXT;`);
+      else if (t === 'branches' && c === 'map_url') fixes.push(`ALTER TABLE branches ADD COLUMN map_url TEXT;`);
+      else if (t === 'branches' && c === 'updated_at') fixes.push(`ALTER TABLE branches ADD COLUMN updated_at DATETIME;`);
+      else if (t === 'orders' && c === 'lang') fixes.push(`ALTER TABLE orders ADD COLUMN lang TEXT NOT NULL DEFAULT 'ar';`);
+      else if (t === 'orders' && c === 'order_type') fixes.push(`ALTER TABLE orders ADD COLUMN order_type TEXT NOT NULL DEFAULT 'delivery';`);
+      else fixes.push(`-- ناقص: ${t}.${c} — راجع schema.sql`);
+    });
+  }
+  return json({
+    ok: allOk,
+    tables: out,
+    suggested_fixes: fixes,
+    note: 'نفّذ كل statement منفصلاً في D1 Console — دفعة واحدة تُجهض عند أول خطأ'
+  });
 }
 
 // ═══════════════════════════════════════════
@@ -581,7 +598,7 @@ async function handleFixOwnerPassword(env) {
 }
 
 // ═══════════════════════════════════════════
-//  0.55) استعادة كلمة مرور المالك (محمية بمتغير سري)
+//  0.55) استعادة كلمة مرور المالك
 // ═══════════════════════════════════════════
 async function handleRecoverOwner(request, env) {
   if (!env.RECOVERY_KEY) return error('الاستعادة غير مفعّلة — أضف متغير RECOVERY_KEY في إعدادات الووركر', 403);
@@ -665,8 +682,8 @@ async function handleGetSettings(env) {
 }
 
 // ═══════════════════════════════════════════
-//  0.9) حفظ الإعدادات في D1
-//  v3.0: + توحيد معرّف الروابي + مزامنة جدول الفروع
+//  0.9) حفظ الإعدادات + مزامنة الفروع
+//  v3.1: الفشل يُبلَّغ صريحاً ولا يُبتلع
 // ═══════════════════════════════════════════
 async function handleSaveSettings(request, env) {
   const auth = await requireAuth(request, env, ['super_admin']);
@@ -675,35 +692,33 @@ async function handleSaveSettings(request, env) {
     const body = await request.json();
     if (!body.settings || typeof body.settings !== 'object') return error('بيانات الإعدادات غير صالحة', 400);
 
-    /* 1) توحيد المعرّف القديم قبل أي شيء — حتى لا تُعطّل المزامنة الصف الصحيح */
-    const unified = await unifyRawabiId(env);
-
-    /* 2) إن عدّل التوحيد الإعدادات، ندمج معرّف الروابي في الحمولة القادمة */
-    let settings = body.settings;
-    if (unified.changed && Array.isArray(settings.branches)) {
-      settings.branches.forEach(b => {
-        if (b && b.id === RAWABI_LEGACY_ID) b.id = RAWABI_CANONICAL_ID;
-      });
-      if (settings.deliveryAvailability && Array.isArray(settings.deliveryAvailability.branchIds)) {
-        settings.deliveryAvailability.branchIds =
-          settings.deliveryAvailability.branchIds.map(x => x === RAWABI_LEGACY_ID ? RAWABI_CANONICAL_ID : x);
-      }
-    }
-
-    /* 3) كتابة الإعدادات */
     await env.DB.prepare(`
       UPDATE app_data SET settings_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1
-    `).bind(JSON.stringify(settings)).run();
+    `).bind(JSON.stringify(body.settings)).run();
 
-    /* 4) ★ مزامنة جدول الفروع — بدون هذا لا تعمل الفروع الجديدة */
-    const sync = await syncBranchesFromSettings(env, settings);
+    const sync = await syncBranchesFromSettings(env, body.settings);
+
+    /* فشل كامل → أُبلغ المالك بوضوء: الإعدادات حُفظت لكن الطلبات لن تعمل */
+    if (sync.synced === 0 && !sync.skipped) {
+      return error(
+        'تم حفظ الإعدادات، لكن فشل تسجيل الفروع في النظام — الطلبات لن تعمل. ' +
+        (sync.reason || 'راجع السجلات أو /api/admin/schema-check'),
+        409,
+        { branches_synced: 0, failures: sync.failures, missing_required: sync.missing_required || [] }
+      );
+    }
 
     return json({
       success: true,
-      message: 'تم حفظ الإعدادات ومزامنة الفروع بنجاح',
-      branches_synced: sync.synced || 0,
-      branches_deactivated: sync.deactivated || 0,
-      rawabi_unified: !!unified.changed
+      message: sync.ok
+        ? 'تم حفظ الإعدادات ومزامنة الفروع بنجاح'
+        : 'تم حفظ الإعدادات — بعض الفروع لم تُزامن (راجع التفاصيل)',
+      branches_synced: sync.synced,
+      branches_deactivated: sync.deactivated,
+      branch_sync_ok: sync.ok,
+      branch_sync_failures: sync.failures || [],
+      missing_optional_columns: sync.missing_optional || [],
+      skipped: !!sync.skipped
     });
   } catch (e) {
     console.error('Save settings error:', e);
@@ -713,7 +728,6 @@ async function handleSaveSettings(request, env) {
 
 // ═══════════════════════════════════════════
 //  0.10) نقل البيانات من GitHub إلى D1
-//  v3.0: + مزامنة الفروع بعد النقل
 // ═══════════════════════════════════════════
 async function handleMigrateFromGithub(request, env) {
   const auth = await requireAuth(request, env, ['super_admin']);
@@ -729,10 +743,12 @@ async function handleMigrateFromGithub(request, env) {
 
     return json({
       success: true,
-      message: 'تم نقل البيانات من GitHub إلى D1 ومزامنة الفروع بنجاح',
+      message: 'تم نقل البيانات ومزامنة الفروع',
       menu_items: body.menu.length || 0,
       settings_keys: Object.keys(body.settings).length || 0,
-      branches_synced: sync.synced || 0
+      branches_synced: sync.synced,
+      branch_sync_ok: sync.ok,
+      branch_sync_failures: sync.failures || []
     });
   } catch (e) {
     console.error('Migration error:', e);
@@ -782,7 +798,7 @@ async function handleLogin(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  2) جسر المالك (يقبل JWT مباشرة)
+//  2) جسر المالك
 // ═══════════════════════════════════════════
 async function handleAdminBridge(request, env) {
   const ip = getIP(request);
@@ -856,7 +872,7 @@ async function handleChangePassword(request, env) {
 
 // ═══════════════════════════════════════════
 //  4) إنشاء طلب
-//  v3.0: + فحص ساعات العمل في الخادم
+//  v3.1: ساعات العمل من الإعدادات — لا اعتماد على عمود اختياري
 // ═══════════════════════════════════════════
 async function handleCreateOrder(request, env) {
   const ip = getIP(request);
@@ -881,17 +897,19 @@ async function handleCreateOrder(request, env) {
   if (items.length === 0) return error('السلة فارغة');
   if (items.length > MAX_ITEMS_PER_ORDER) return error(`عدد الأصناف كبير جداً (الحد ${MAX_ITEMS_PER_ORDER} صنف)`, 400);
 
-  /* جلب الفرع + المنيو + الإعدادات من قاعدة البيانات */
+  /* v3.1: لا نطلب hours_json — الأعمدة الأساسية فقط */
   const branch = await env.DB.prepare(
-    'SELECT id, name_ar, phone, delivery_fee, hours_json FROM branches WHERE id = ? AND is_active = 1'
+    'SELECT id, name_ar, phone, delivery_fee FROM branches WHERE id = ? AND is_active = 1'
   ).bind(branchId).first();
   if (!branch) {
-    console.error('[MK ORDER] فرع غير موجود في الجدول', { branchId });
+    console.error('[MK ORDER] فرع غير موجود أو معطّل في الجدول', { branchId });
     return error('الفرع غير موجود أو غير نشط');
   }
 
-  /* ===== v3.0: الفرع مفتوح الآن؟ (كان القفل في المتصفح فقط) ===== */
-  const hours = parseHours(branch.hours_json);
+  const settings = await readAppSettings(env);
+
+  /* ساعات العمل من الإعدادات — نفس ما يراه الزبون */
+  const hours = hoursFromSettings(settings, branchId);
   const st = branchOpenNow(hours);
   if (!st.open) {
     return error('الفرع مغلق حالياً — لا يمكن استقبال طلبات الآن', 409);
@@ -902,9 +920,6 @@ async function handleCreateOrder(request, env) {
   try { menuData = menuRow ? JSON.parse(menuRow.menu_json) : []; } catch (e) { menuData = []; }
   if (!Array.isArray(menuData) || !menuData.length) return error('المنيو غير متاح حالياً — حاول لاحقاً', 503);
 
-  const settings = await readAppSettings(env);
-
-  /* فحص توفر التوصيل للفرع */
   if (orderType === 'delivery') {
     const da = settings.deliveryAvailability;
     if (da && typeof da === 'object') {
@@ -916,7 +931,6 @@ async function handleCreateOrder(request, env) {
     }
   }
 
-  /* فهرس الأصناف مع القسم الأب */
   const menuMap = new Map();
   menuData.forEach(sec => {
     (sec.items || []).forEach(it => {
@@ -1149,7 +1163,7 @@ async function handleBranchPool(request, env) {
 }
 
 // ═══════════════════════════════════════════
-//  9) استلام السائق للطلب (claim)
+//  9) استلام السائق للطلب
 // ═══════════════════════════════════════════
 async function handleClaim(orderId, request, env) {
   const auth = await requireAuth(request, env, ['driver']);
@@ -1390,7 +1404,6 @@ async function handleAdminUsersCreate(request, env) {
   if (!name || !username) return error('الاسم واسم المستخدم مطلوبان');
   if (!['supervisor', 'driver'].includes(role)) return error('دور غير صالح');
   if (!branchId) return error('يجب تحديد الفرع');
-  /* v3.0: تأكيد وجود الفرع في الجدول قبل إنشاء الحساب */
   const br = await env.DB.prepare('SELECT id FROM branches WHERE id = ?').bind(branchId).first();
   if (!br) return error('الفرع غير موجود في النظام — احفظ الإعدادات أولاً لمزامنة الفروع', 409);
   const exists = await env.DB.prepare('SELECT 1 FROM users WHERE username = ?').bind(username).first();
@@ -1821,7 +1834,7 @@ async function buildAndStoreBackup(env) {
     exported_at: new Date().toISOString(),
     local_date: localDateStr(),
     timezone: TZ_LABEL,
-    version: '3.0',
+    version: '3.1',
     app_data: appData,
     images_inventory: imageKeys,
     branches: branches.results,
@@ -1966,8 +1979,8 @@ export default {
     try {
       if (path === '/api/health' && request.method === 'GET') return json({
         status: 'ok',
-        version: '3.0',
-        features: ['r2-images','image-trash','trash-restore','backup-appdata','item-orphans','read-through-app-only','server-pricing','fee-mode-honored','order-caps','public-rate-limit','track-anti-enum','riyadh-time-reports','branch-auto-sync','branch-soft-delete','server-hours-check','rawabi-id-unify'],
+        version: '3.1',
+        features: ['r2-images','image-trash','trash-restore','backup-appdata','item-orphans','read-through-app-only','server-pricing','fee-mode-honored','order-caps','public-rate-limit','track-anti-enum','riyadh-time-reports','branch-auto-sync','branch-soft-delete','server-hours-check','schema-aware-sync','no-deactivate-on-failure','schema-check-endpoint'],
         live_mode: env.LIVE_MODE || 'polling',
         timezone: TZ_LABEL,
         local_date: localDateStr(),
@@ -2018,6 +2031,9 @@ export default {
       if (m && request.method === 'PUT') return await handleAdminUsersUpdate(parseInt(m[1]), request, env);
       if (path === '/api/reports/summary' && request.method === 'GET') return await handleReportsSummary(request, env);
       if (path === '/api/reports/accounting' && request.method === 'GET') return await handleReportsAccounting(request, env);
+
+      /* ===== v3.1: فحص بنية القاعدة ===== */
+      if (path === '/api/admin/schema-check' && request.method === 'GET') return await handleSchemaCheck(request, env);
 
       /* ===== النسخ الاحتياطي ===== */
       if (path === '/api/admin/backup-now' && request.method === 'POST') return await handleBackupNow(request, env);
@@ -2081,10 +2097,9 @@ export default {
             AND NOT EXISTS (SELECT 1 FROM order_ledger l WHERE l.order_number = o.order_number AND l.kind = 'cancelled')
         `).run();
 
-        /* v3.0: مزامنة الفروع ليلةً أيضاً — شبكة أمان */
+        /* مزامنة الفروع ليلةً — شبكة أمان محصّنة */
         try {
           const s = await readAppSettings(env);
-          await unifyRawabiId(env);
           const sync = await syncBranchesFromSettings(env, s);
           console.log('nightly branch sync:', JSON.stringify(sync));
         } catch (e) { console.error('branch sync error:', e); }
@@ -2106,5 +2121,5 @@ export default {
 };
 
 // ═══════════════════════════════════════════
-//  نهاية worker/index.js (v3.0)
+//  نهاية worker/index.js (v3.1)
 // ═══════════════════════════════════════════
