@@ -1,4 +1,8 @@
-/* ===== admin-core.js — النواة: D1 + صور R2 مضغوطة + سلة مهملات (v6.5) =====
+/* ===== admin-core.js — النواة: D1 + صور R2 مضغوطة + سلة مهملات (v6.6) =====
+   v6.6: • ➕ بطاقة «استرجاع المنيو والإعدادات» — قائمة النسخ + معاينة
+           + تحذير صريح + بوابة كتابة yes + تأكيد ثانٍ
+         • الاسترجاع يشمل المنيو والإعدادات فقط — الطلبات والمستخدمون لا تُمسّ
+         • نسخة أمان تلقائية في الخادم قبل التنفيذ + إعادة تحميل الحالة بعده
    v6.5: • كل البطاقات المحقونة تستخدم مفاتيح admin-i18n (ثنائية اللغة فعلياً)
          • LT(key,fallback) — لا يظهر مفتاح خام إن كان القاموس أقدم
          • uiRetranslate() — ترجمة فورية للبطاقات عند تبديل اللغة
@@ -1932,6 +1936,180 @@ b.disabled = false; b.textContent = old;
 }
 
 /* =====================================================
+   ===== v6.6: استرجاع المنيو والإعدادات من نسخة =====
+   • قائمة النسخ + معاينة إلزامية قبل التنفيذ
+   • بوابة كتابة yes + تأكيد ثانٍ
+   • الخادم ينشئ نسخة أمان تلقائياً ولا يمسّ الطلبات
+===================================================== */
+var rsPreviewed = null;
+function rsGate(){
+var y = el(`rsYes`), g = el(`rsGo`), p = el(`rsPick`);
+if(!y || !g || !p) return;
+var ok = ((y.value || ``).trim().toLowerCase() === `yes`) && !!p.value;
+g.disabled = !ok;
+g.style.opacity = ok ? `1` : `.45`;
+g.style.cursor = ok ? `pointer` : `default`;
+}
+function ensureRestoreCard(){
+if(el(`rsCard`)) return;
+var sec = uiSettingsSection() ||
+document.querySelector(`main > section`);
+if(!sec) return;
+v15Style();
+var card = document.createElement(`div`);
+card.className = `v15-card`;
+card.id = `rsCard`;
+card.innerHTML =
+`<h3 id="rsCardTitle">` + LT(`rsTitle`,`📥 استرجاع المنيو والإعدادات`) + `</h3>` +
+`<div class="v15-row">` +
+`<select class="v15-sel" id="rsPick" style="flex:1;min-width:170px;width:auto"></select>` +
+`<button class="v15-clean" id="rsLoad">` + LT(`rsLoad`,`🔄 تحميل النسخ`) + `</button>` +
+`<button class="v15-clean" id="rsPrev">` + LT(`rsPrev`,`🔍 معاينة`) + `</button>` +
+`</div>` +
+`<div class="bk-info" id="rsInfo">` +
+LT(`rsInfo`,`اختر نسخة ثم عاينها قبل الاسترجاع. الاسترجاع يشمل المنيو والإعدادات فقط.`) +
+`</div>` +
+`<div id="rsWarn" style="margin-top:.6rem;padding:.6rem .8rem;background:#fff6e6;border:1.5px dashed #e0912f;border-radius:10px;font-size:.74rem;font-weight:800;color:#a06b1c;line-height:1.9">` +
+LT(`rsWarn`,`⚠️ سيستبدل المنيو والإعدادات الحالية بما في النسخة.`) + `<br>` +
+LT(`rsSafe1`,`✅ الطلبات والمستخدمون والدفتر لن تُمسّ.`) + `<br>` +
+LT(`rsSafe2`,`🛡️ ستُنشأ نسخة أمان للحالة الحالية تلقائياً قبل التنفيذ.`) +
+`</div>` +
+`<div class="v15-row" style="margin-top:.7rem">` +
+`<input id="rsYes" class="v15-inp" type="text" autocomplete="off" spellcheck="false" dir="ltr" ` +
+`style="max-width:130px;text-align:center;letter-spacing:1px" placeholder="yes">` +
+`<button class="v15-pub" id="rsGo" disabled style="opacity:.45;cursor:default">` +
+LT(`rsGo`,`تنفيذ الاسترجاع`) + `</button>` +
+`</div>` +
+`<small id="rsHint" style="display:block;color:var(--muted);font-weight:700;font-size:.7rem;margin-top:.4rem;line-height:1.6">` +
+LT(`rsHint`,`للتأكيد اكتب yes في الحقل — الزر مقفل حتى تكتبها.`) + `</small>`;
+var anchor = el(`bkCard`);
+if(anchor && anchor.parentNode === sec) sec.insertBefore(card, anchor.nextSibling);
+else sec.appendChild(card);
+
+el(`rsYes`).addEventListener(`input`, rsGate);
+el(`rsPick`).addEventListener(`change`, function(){
+rsPreviewed = null; rsGate();
+});
+rsGate();
+
+el(`rsLoad`).addEventListener(`click`, async function(){
+var b = this, old = b.textContent;
+b.disabled = true; b.textContent = `...`;
+try{
+var r = await apiFetch(`/api/admin/backups`);
+var items = r.items || [];
+var p = el(`rsPick`), info = el(`rsInfo`);
+if(!items.length){
+if(p){
+p.innerHTML = `<option value="">` +
+esc(LT(`rsNone`,`لا توجد نسخ محفوظة بعد.`)) + `</option>`;
+}
+if(info) info.textContent = LT(`rsNone`,`لا توجد نسخ محفوظة بعد.`);
+}else{
+if(p){
+p.innerHTML = items.map(function(it){
+return `<option value="` + esc(it.key) + `">` +
+esc(it.name) + ` — ` + fmtKB(it.size) + `</option>`;
+}).join(``);
+}
+if(info){
+info.textContent = LT(`rsLoaded`,`✔ حُمّلت النسخ`) +
+` (` + items.length + `) — ` +
+LT(`rsPreviewFirst`,`اضغط معاينة قبل التنفيذ`);
+}
+}
+rsPreviewed = null; rsGate();
+}catch(e){
+toast(LT(`rsLoadFail`,`فشل تحميل النسخ: `) + e.message, `error`);
+}
+b.disabled = false; b.textContent = old;
+});
+
+el(`rsPrev`).addEventListener(`click`, async function(){
+var p = el(`rsPick`);
+var key = p ? p.value : ``;
+if(!key){
+toast(LT(`rsPickFirst`,`اختر نسخة أولاً`), `warn`);
+return;
+}
+var b = this, old = b.textContent;
+b.disabled = true; b.textContent = `...`;
+try{
+var r = await apiFetch(`/api/admin/backup-preview?key=` +
+encodeURIComponent(key));
+rsPreviewed = key;
+var info = el(`rsInfo`);
+if(info){
+info.innerHTML =
+`<b>` + esc(r.key) + `</b><br>` +
+LT(`bkMenuLbl`,`المنيو`) + `: ` + r.menu_sections + ` ` + LT(`bkSections`,`أقسام`) +
+` / ` + r.menu_items + ` ` + LT(`bkItems`,`صنف`) +
+` · ` + LT(`rsBranches`,`الفروع`) + `: ` + r.branches + `<br>` +
+LT(`bkSettingsLbl`,`الإعدادات`) + `: ` + r.settings_keys + ` ` + LT(`bkKeys`,`مفتاح`) +
+` · ` + LT(`rsDate`,`التاريخ`) + `: ` + esc(r.local_date || r.exported_at || `—`) + `<br>` +
+(r.restorable
+? `<span style="color:var(--green);font-weight:900">` + LT(`rsOk`,`✔ صالحة للاسترجاع`) + `</span>`
+: `<span style="color:#b91c1c;font-weight:900">` + LT(`rsBad`,`✖ لا تحتوي منيو وإعدادات صالحة`) + `</span>`) +
+`<br><small>` + LT(`rsInBk`,`في النسخة`) + `: ` + r.orders_in_backup + ` ` +
+LT(`bkOrdersLbl`,`الطلبات`) + ` / ` + r.users_in_backup + ` ` +
+LT(`bkUsersLbl`,`المستخدمون`) + ` — ` + LT(`rsNotRestored`,`لن تُسترجع`) + `</small>`;
+}
+}catch(e){
+rsPreviewed = null;
+toast(LT(`rsPrevFail`,`فشل المعاينة: `) + e.message, `error`);
+}
+b.disabled = false; b.textContent = old;
+});
+
+el(`rsGo`).addEventListener(`click`, async function(){
+var p = el(`rsPick`), y = el(`rsYes`);
+var key = p ? p.value : ``;
+if(!key) return;
+if(!y || (y.value || ``).trim().toLowerCase() !== `yes`) return;
+if(rsPreviewed !== key){
+toast(LT(`rsPrevRequired`,`عاين النسخة أولاً قبل التنفيذ`), `warn`);
+return;
+}
+var ok = await askConfirm(
+LTF(`rsConfirmMsg`, function(k){
+return `سيُستبدل المنيو والإعدادات الحالية بما في:\n` + k +
+`\n\nالطلبات والمستخدمون والدفتر لن تُمسّ.\nستُنشأ نسخة أمان تلقائياً قبل التنفيذ.\n\nمتابعة؟`;
+}, key),
+LT(`rsConfirmTitle`,`استرجاع المنيو والإعدادات`), `📥`,
+LT(`rsConfirmBtn`,`استرجاع`), false);
+if(!ok) return;
+var b = this, old = b.textContent;
+b.disabled = true; b.textContent = LT(`rsWorking`,`... جارٍ الاسترجاع ...`);
+try{
+var r = await apiFetch(`/api/admin/restore-appdata`, {
+method:`POST`,
+body: JSON.stringify({ backupKey: key, confirm: `yes` })
+});
+var info = el(`rsInfo`);
+if(info){
+info.innerHTML =
+`<b style="color:var(--green)">` + LT(`rsDone`,`✔ تم الاسترجاع`) + `</b><br>` +
+LT(`rsFrom`,`من`) + `: ` + esc(r.restored_from) + `<br>` +
+LT(`rsSafety`,`نسخة الأمان`) + `: ` + esc(r.safety_backup) + `<br>` +
+LT(`bkMenuLbl`,`المنيو`) + `: ` + r.menu_sections + ` ` + LT(`bkSections`,`أقسام`) +
+` / ` + r.menu_items + ` ` + LT(`bkItems`,`صنف`) +
+` · ` + LT(`rsSynced`,`الفروع المُزامنة`) + `: ` + r.branches_synced;
+}
+toast(LT(`rsDone`,`✔ تم الاسترجاع`), `success`,
+LT(`rsDoneSub`,`الطلبات والمستخدمون لم تُمسّ`));
+rsPreviewed = null;
+try{ await loadAll(); }catch(e){}
+var y2 = el(`rsYes`);
+if(y2) y2.value = ``;
+}catch(e){
+toast(LT(`rsFail`,`فشل الاسترجاع: `) + e.message, `error`);
+}
+if(document.body.contains(b)){ b.disabled = false; b.textContent = old; }
+rsGate();
+});
+}
+
+/* =====================================================
    ===== تخصيصات واجهة اللوحة =====
    • إخفاء «إظهار الوصف / إظهار الأسعار» وفرضهما دائمين
    • عنوان الإضافات عام في الإعدادات بدل نافذة كل صنف
@@ -2125,6 +2303,20 @@ uiSetTxt(`trashRefresh`,`trashRefresh`,`🔄 تحديث القائمة`);
 uiSetTxt(`bkCardTitle`,`bkTitle`,`🛡️ النسخ الاحتياطي (يشمل المنيو والإعدادات)`);
 uiSetTxt(`bkNow`,`bkNow`,`💾 إنشاء نسخة الآن`);
 uiSetTxt(`bkList`,`bkList`,`📋 عرض النسخ المحفوظة`);
+/* v6.6: الاسترجاع */
+uiSetTxt(`rsCardTitle`,`rsTitle`,`📥 استرجاع المنيو والإعدادات`);
+uiSetTxt(`rsLoad`,`rsLoad`,`🔄 تحميل النسخ`);
+uiSetTxt(`rsPrev`,`rsPrev`,`🔍 معاينة`);
+uiSetTxt(`rsGo`,`rsGo`,`تنفيذ الاسترجاع`);
+uiSetTxt(`rsHint`,`rsHint`,`للتأكيد اكتب yes في الحقل — الزر مقفل حتى تكتبها.`);
+var rw = el(`rsWarn`);
+if(rw){
+rw.innerHTML =
+LT(`rsWarn`,`⚠️ سيستبدل المنيو والإعدادات الحالية بما في النسخة.`) + `<br>` +
+LT(`rsSafe1`,`✅ الطلبات والمستخدمون والدفتر لن تُمسّ.`) + `<br>` +
+LT(`rsSafe2`,`🛡️ ستُنشأ نسخة أمان للحالة الحالية تلقائياً قبل التنفيذ.`);
+}
+try{ rsGate(); }catch(e){}
 /* إعادة رسم القوائم لتُترجم صفوفها */
 try{ if(STATE) renderBannersAdmin(); }catch(e){}
 try{ renderTrash(); }catch(e){}
@@ -2138,6 +2330,7 @@ try{ uiEnsureModsTitlesCard(); }catch(e){}
 try{ ensureCompressCard(); }catch(e){}
 try{ ensureTrashCard(); }catch(e){}
 try{ ensureBackupCard(); }catch(e){}
+try{ ensureRestoreCard(); }catch(e){}
 try{ uiMoveDeliveryCard(); }catch(e){}
 }
 var uiBusy = false;
@@ -2176,4 +2369,4 @@ renderTrash();
 try{ uiRetranslate(); }catch(e){}
 return r;
 };
-/* ===== END admin-core.js (v6.5) ===== */
+/* ===== END admin-core.js (v6.6) ===== */
