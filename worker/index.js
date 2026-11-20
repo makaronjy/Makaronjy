@@ -1925,9 +1925,8 @@ async function handleBackupPreview(request, env) {
   if (auth.error) return auth.error;
   const key = new URL(request.url).searchParams.get('key') || '';
   if (!validBackupKey(key)) return error('مفتاح نسخة غير صالح', 400);
-  const got = await readBackup(env, key);
-  if (got.err) return got.err;
-  const data = got.data;
+  const { data, err } = await readBackup(env, key);
+  if (err) return err;
   const ad = data.app_data;
   let sections = 0, items = 0, branchCount = 0;
   if (ad && Array.isArray(ad.menu)) {
@@ -1969,9 +1968,8 @@ async function handleRestoreAppData(request, env) {
   const key = String(body.backupKey || '');
   if (!validBackupKey(key)) return error('مفتاح نسخة غير صالح', 400);
 
-  const got = await readBackup(env, key);
-  if (got.err) return got.err;
-  const data = got.data;
+  const { data, err } = await readBackup(env, key);
+  if (err) return err;
 
   const ad = data.app_data;
   if (!ad || !Array.isArray(ad.menu) || !ad.menu.length ||
@@ -2167,4 +2165,95 @@ export default {
       /* ===== v3.1: فحص بنية القاعدة ===== */
       if (path === '/api/admin/schema-check' && request.method === 'GET') return await handleSchemaCheck(request, env);
 
-      /* ===== النسخ الاحتياطي
+      /* ===== النسخ الاحتياطي ===== */
+      if (path === '/api/admin/backup-now' && request.methif (path === '/api/admin/backup-now' && request.method === 'POST') return await handleBackupNow(request, env);
+      if (path === '/api/admin/backups' && request.method === 'GET') return await handleBackupList(request, env);
+
+      /* ===== v3.2: معاينة نسخة + استرجاع المنيو والإعدادات ===== */
+      if (path === '/api/admin/backup-preview' && request.method === 'GET') return await handleBackupPreview(request, env);
+      if (path === '/api/admin/restore-appdata' && request.method === 'POST') return await handleRestoreAppData(request, env);
+
+      /* ===== صور الأصناف اليتيمة ===== */
+      if (path === '/api/admin/item-orphans' && request.method === 'GET') return await handleItemOrphans(request, env);
+      if (path === '/api/admin/item-orphans-clean' && request.method === 'POST') return await handleItemOrphansClean(request, env);
+
+      /* ===== سلة مهملات الصور ===== */
+      if (path === '/api/img/trash' && request.method === 'GET') return await handleTrashList(request, env);
+      if (path === '/api/img/restore' && request.method === 'POST') return await handleTrashRestore(request, env);
+      if (path === '/api/img/purge' && request.method === 'POST') return await handleTrashPurgeOne(request, env);
+
+      if (path === '/api/img' && request.method === 'GET') return await handleImgList(request, env);
+      if (path.startsWith('/api/img/')) {
+        const key = decodeURIComponent(path.slice('/api/img/'.length));
+        if (!key) return error('مفتاح الصورة مطلوب', 400);
+        if (request.method === 'GET') return await handleImgServe(key, env);
+        if (request.method === 'PUT') return await handleImgPut(request, env, key);
+        if (request.method === 'DELETE') return await handleImgDelete(request, env, key);
+      }
+      return error('Not found', 404);
+    } catch (e) {
+      console.error('Worker error:', e);
+      return error('Internal server error: ' + e.message, 500);
+    }
+  },
+
+  // ═════════════════════════════════════════
+  //  المهام المجدولة
+  // ═════════════════════════════════════════
+  async scheduled(event, env, ctx) {
+    try {
+      if (event.cron === '0 3 * * *') {
+        await env.DB.prepare(`DELETE FROM used_order_numbers WHERE expires_at < date('now', '${TZ_OFFSET}')`).run();
+        await env.DB.prepare("DELETE FROM sessions WHERE expires_at < datetime('now')").run();
+        await env.DB.prepare("DELETE FROM driver_locations WHERE created_at < datetime('now', '-7 days')").run();
+        await env.DB.prepare(`DELETE FROM order_tracking WHERE order_id IN (SELECT id FROM orders WHERE status = 'archived' AND updated_at < datetime('now', '-90 days'))`).run();
+
+        const old = await env.DB.prepare(`SELECT * FROM orders WHERE status = 'pending' AND created_at < datetime('now', '-24 hours')`).all();
+        for (const o of old.results) {
+          await ledgerInsert(env, o, 'abandoned');
+          await env.DB.prepare('DELETE FROM orders WHERE id = ?').bind(o.id).run();
+        }
+
+        await env.DB.prepare('DELETE FROM order_tracking WHERE order_id NOT IN (SELECT id FROM orders)').run();
+        await env.DB.prepare('DELETE FROM driver_locations WHERE order_id NOT IN (SELECT id FROM orders)').run();
+        await env.DB.prepare(`
+          INSERT OR IGNORE INTO order_ledger
+            (order_number, branch_id, order_type, kind, gross, fees, driver_id, created_at, closed_at)
+          SELECT o.order_number, o.branch_id, o.order_type, 'delivered', o.total, o.delivery_fee, o.driver_id, o.created_at, COALESCE(o.delivered_at, o.updated_at)
+          FROM orders o WHERE o.status = 'delivered'
+            AND NOT EXISTS (SELECT 1 FROM order_ledger l WHERE l.order_number = o.order_number AND l.kind = 'delivered')
+        `).run();
+        await env.DB.prepare(`
+          INSERT OR IGNORE INTO order_ledger
+            (order_number, branch_id, order_type, kind, gross, fees, driver_id, created_at, closed_at)
+          SELECT o.order_number, o.branch_id, o.order_type, 'cancelled', o.total, o.delivery_fee, o.driver_id, o.created_at, o.updated_at
+          FROM orders o WHERE o.status = 'cancelled'
+            AND NOT EXISTS (SELECT 1 FROM order_ledger l WHERE l.order_number = o.order_number AND l.kind = 'cancelled')
+        `).run();
+
+        /* مزامنة الفروع ليلةً — شبكة أمان محصّنة */
+        try {
+          const s = await readAppSettings(env);
+          const sync = await syncBranchesFromSettings(env, s);
+          console.log('nightly branch sync:', JSON.stringify(sync));
+        } catch (e) { console.error('branch sync error:', e); }
+
+        try {
+          const info = await buildAndStoreBackup(env);
+          console.log('backup ok:', JSON.stringify(info));
+        } catch (e) { console.error('backup error:', e); }
+
+        try {
+          const removed = await purgeOldTrash(env, TRASH_DAYS);
+          console.log('trash purged:', removed);
+        } catch (e) { console.error('trash purge error:', e); }
+      } else {
+        await purgeStaleOrders(env);
+      }
+    } catch (e) { console.error('Cron error:', e); }
+  },
+};
+
+// ═══════════════════════════════════════════
+//  نهاية worker/index.js (v3.2)
+// ═══════════════════════════════════════════
