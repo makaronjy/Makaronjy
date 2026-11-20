@@ -1,7 +1,12 @@
-
 // ═══════════════════════════════════════════
 //  مكرونجي - Cloudflare Worker API (كامل)
-//  الإصدار: 3.1
+//  الإصدار: 3.2
+//  v3.2: • 60 نسخة يومية بدل 30 → تغطية 60 يوماً مجاناً (BACKUP_KEEP)
+//        • buildAndStoreBackup تقبل مفتاحاً مخصصاً (لنسخ الأمان)
+//        • ➕ GET  /api/admin/backup-preview  — معاينة نسخة قبل الاسترجاع
+//        • ➕ POST /api/admin/restore-appdata — استرجاع المنيو والإعدادات فقط
+//          (كتابة yes إلزامية + نسخة أمان تلقائية + تحديث ذرّي واحد)
+//        • الطلبات والمستخدمون والدفتر والتتبّع وصور R2 لا تُمسّ إطلاقاً
 //  v3.1: • ★ نزع اللغم: لا تعطيل للفروع أبداً إن فشلت المزامنة
 //          (v3.0 عطّل الروابي لأن كل الإدخالات فشلت بصمت)
 //        • كشف أعمدة الجدول فعلياً وبناء أمر الإدخال عليها
@@ -30,6 +35,8 @@ const APP_IMG_FALLBACK = [
   'img/d-jahez.png', 'img/d-hungerstation.png', 'img/d-keeta.png'
 ];
 const TRASH_DAYS = 30;
+/* v3.2: عدد النسخ اليومية المحفوظة في R2 — 60 يوماً بدل 30 */
+const BACKUP_KEEP = 60;
 
 /* ===== المنطقة الزمنية (Asia/Riyadh) ===== */
 const TZ_OFFSET = '+3 hours';
@@ -1806,8 +1813,9 @@ async function purgeOldTrash(env, days) {
 
 // ═══════════════════════════════════════════
 //  21) النسخ الاحتياطي
+//  v3.2: مفتاح مخصص اختياري + الاحتفاظ بـ BACKUP_KEEP نسخة
 // ═══════════════════════════════════════════
-async function buildAndStoreBackup(env) {
+async function buildAndStoreBackup(env, keyOverride) {
   const [orders, users, branches, tracking, ledger, appRow] = await Promise.all([
     env.DB.prepare('SELECT * FROM orders').all(),
     env.DB.prepare('SELECT id, name, phone, username, role, branch_id, is_active FROM users').all(),
@@ -1835,7 +1843,7 @@ async function buildAndStoreBackup(env) {
     exported_at: new Date().toISOString(),
     local_date: localDateStr(),
     timezone: TZ_LABEL,
-    version: '3.1',
+    version: '3.2',
     app_data: appData,
     images_inventory: imageKeys,
     branches: branches.results,
@@ -1845,15 +1853,16 @@ async function buildAndStoreBackup(env) {
     order_ledger: ledger.results,
   };
 
-  const key = `backups/backup-${localDateStr()}.json`;
+  /* v3.2: مفتاح مخصص لنسخ الأمان قبل الاسترجاع */
+  const key = keyOverride || `backups/backup-${localDateStr()}.json`;
   await env.BACKUPS.put(key, JSON.stringify(backup), {
     httpMetadata: { contentType: 'application/json' }
   });
 
   const list = await env.BACKUPS.list({ prefix: 'backups/' });
-  if (list.objects.length > 30) {
+  if (list.objects.length > BACKUP_KEEP) {
     const sorted = list.objects.sort((a, b) => a.key.localeCompare(b.key));
-    await env.BACKUPS.delete(sorted.slice(0, list.objects.length - 30).map(o => o.key));
+    await env.BACKUPS.delete(sorted.slice(0, list.objects.length - BACKUP_KEEP).map(o => o.key));
   }
 
   let sections = 0, items = 0;
@@ -1869,7 +1878,8 @@ async function buildAndStoreBackup(env) {
     settings_keys: appData && appData.settings ? Object.keys(appData.settings).length : 0,
     images_count: imageKeys.length,
     orders: orders.results.length,
-    users: users.results.length
+    users: users.results.length,
+    retention: BACKUP_KEEP
   };
 }
 async function handleBackupNow(request, env) {
@@ -1890,7 +1900,127 @@ async function handleBackupList(request, env) {
   const items = list.objects
     .map(o => ({ key: o.key, name: o.key.split('/').pop(), size: o.size, uploaded: o.uploaded }))
     .sort((a, b) => b.key.localeCompare(a.key));
-  return json({ items, count: items.length });
+  return json({ items, count: items.length, retention: BACKUP_KEEP });
+}
+
+// ═══════════════════════════════════════════
+//  21.5) v3.2: معاينة نسخة + استرجاع المنيو والإعدادات
+//  ★ لا يمسّ الطلبات ولا المستخدمين ولا الدفتر ولا التتبّع
+//  ★ كتابة yes إلزامية + نسخة أمان تلقائية قبل التنفيذ
+// ═══════════════════════════════════════════
+function validBackupKey(k) {
+  return typeof k === 'string' && k.indexOf('backups/') === 0 &&
+         k.indexOf('..') < 0 && /\.json$/i.test(k) && k.length < 200;
+}
+async function readBackup(env, key) {
+  const obj = await env.BACKUPS.get(key);
+  if (!obj) return { err: error('النسخة غير موجودة في التخزين', 404) };
+  let data;
+  try { data = JSON.parse(await obj.text()); }
+  catch (e) { return { err: error('النسخة تالفة — ليست JSON صالحاً', 422) }; }
+  return { data };
+}
+async function handleBackupPreview(request, env) {
+  const auth = await requireAuth(request, env, ['super_admin']);
+  if (auth.error) return auth.error;
+  const key = new URL(request.url).searchParams.get('key') || '';
+  if (!validBackupKey(key)) return error('مفتاح نسخة غير صالح', 400);
+  const got = await readBackup(env, key);
+  if (got.err) return got.err;
+  const data = got.data;
+  const ad = data.app_data;
+  let sections = 0, items = 0, branchCount = 0;
+  if (ad && Array.isArray(ad.menu)) {
+    sections = ad.menu.length;
+    ad.menu.forEach(s => { items += (s.items || []).length; });
+  }
+  if (ad && ad.settings && Array.isArray(ad.settings.branches)) {
+    branchCount = ad.settings.branches.length;
+  }
+  return json({
+    key,
+    exported_at: data.exported_at || null,
+    local_date: data.local_date || null,
+    version: data.version || null,
+    restorable: !!(ad && Array.isArray(ad.menu) && ad.menu.length &&
+                   ad.settings && typeof ad.settings === 'object'),
+    menu_sections: sections,
+    menu_items: items,
+    settings_keys: ad && ad.settings ? Object.keys(ad.settings).length : 0,
+    branches: branchCount,
+    orders_in_backup: Array.isArray(data.orders) ? data.orders.length : 0,
+    users_in_backup: Array.isArray(data.users) ? data.users.length : 0,
+    note: 'الاسترجاع يشمل المنيو والإعدادات فقط — الطلبات والمستخدمون لا تُمسّ'
+  });
+}
+async function handleRestoreAppData(request, env) {
+  const auth = await requireAuth(request, env, ['super_admin']);
+  if (auth.error) return auth.error;
+
+  const rate = await checkRateLimit(env, `restore:${getIP(request)}`, 5, 900);
+  if (!rate.allowed) return error('محاولات استرجاع كثيرة — انتظر 15 دقيقة', 429);
+
+  const body = await request.json().catch(() => null);
+  if (!body) return error('بيانات ناقصة');
+  if (String(body.confirm || '').trim().toLowerCase() !== 'yes') {
+    return error('يجب كتابة yes للتأكيد — لم يُنفّذ أي تغيير', 400);
+  }
+
+  const key = String(body.backupKey || '');
+  if (!validBackupKey(key)) return error('مفتاح نسخة غير صالح', 400);
+
+  const got = await readBackup(env, key);
+  if (got.err) return got.err;
+  const data = got.data;
+
+  const ad = data.app_data;
+  if (!ad || !Array.isArray(ad.menu) || !ad.menu.length ||
+      !ad.settings || typeof ad.settings !== 'object') {
+    return error('النسخة لا تحتوي منيو وإعدادات صالحة — أُلغي الاسترجاع حمايةً لبياناتك', 422);
+  }
+
+  let sections = ad.menu.length, items = 0;
+  ad.menu.forEach(s => { items += (s.items || []).length; });
+
+  /* ★ نسخة أمان للحالة الحالية قبل أي تغيير — إلزامية */
+  let safetyKey = null;
+  try {
+    const info = await buildAndStoreBackup(env, `backups/pre-restore-${Date.now()}.json`);
+    safetyKey = info.key;
+  } catch (e) {
+    console.error('[MK RESTORE] فشل نسخة الأمان — أُلغيت العملية', e.message);
+    return error('فشل إنشاء نسخة الأمان قبل الاسترجاع — أُلغيت العملية بالكامل: ' + e.message, 500);
+  }
+
+  /* تحديث واحد ذرّي — لا يمسّ أي جدول آخر */
+  try {
+    await env.DB.prepare(`
+      UPDATE app_data SET menu_json = ?, settings_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1
+    `).bind(JSON.stringify(ad.menu), JSON.stringify(ad.settings)).run();
+  } catch (e) {
+    console.error('[MK RESTORE] فشل التحديث', e.message);
+    return error('فشل الاسترجاع — نسخة الأمان محفوظة في ' + safetyKey + ' — ' + e.message, 500);
+  }
+
+  const sync = await syncBranchesFromSettings(env, ad.settings);
+  console.log('[MK RESTORE] استرجاع منيو وإعدادات', {
+    from: key, safety: safetyKey, items, synced: sync.synced
+  });
+
+  return json({
+    success: true,
+    message: 'تم استرجاع المنيو والإعدادات — الطلبات والمستخدمون لم تُمسّ',
+    restored_from: key,
+    safety_backup: safetyKey,
+    menu_sections: sections,
+    menu_items: items,
+    settings_keys: Object.keys(ad.settings).length,
+    branches_synced: sync.synced,
+    branches_deactivated: sync.deactivated,
+    branch_sync_ok: sync.ok,
+    branch_sync_failures: sync.failures || [],
+    untouched: ['orders', 'users', 'order_ledger', 'order_tracking', 'driver_locations', 'R2 images']
+  });
 }
 
 // ═══════════════════════════════════════════
@@ -1980,12 +2110,13 @@ export default {
     try {
       if (path === '/api/health' && request.method === 'GET') return json({
         status: 'ok',
-        version: '3.1',
-        features: ['r2-images','image-trash','trash-restore','backup-appdata','item-orphans','read-through-app-only','server-pricing','fee-mode-honored','order-caps','public-rate-limit','track-anti-enum','riyadh-time-reports','branch-auto-sync','branch-soft-delete','server-hours-check','schema-aware-sync','no-deactivate-on-failure','schema-check-endpoint'],
+        version: '3.2',
+        features: ['r2-images','image-trash','trash-restore','backup-appdata','item-orphans','read-through-app-only','server-pricing','fee-mode-honored','order-caps','public-rate-limit','track-anti-enum','riyadh-time-reports','branch-auto-sync','branch-soft-delete','server-hours-check','schema-aware-sync','no-deactivate-on-failure','schema-check-endpoint','backup-60-days','backup-preview','restore-appdata-yes-gate','pre-restore-safety-backup'],
         live_mode: env.LIVE_MODE || 'polling',
         timezone: TZ_LABEL,
         local_date: localDateStr(),
         trash_days: TRASH_DAYS,
+        backup_keep: BACKUP_KEEP,
         limits: { max_qty_per_item: MAX_QTY_PER_ITEM, max_items_per_order: MAX_ITEMS_PER_ORDER }
       });
       if (path === '/api/recover-owner' && request.method === 'GET') return await handleRecoverOwner(request, env);
@@ -2036,91 +2167,4 @@ export default {
       /* ===== v3.1: فحص بنية القاعدة ===== */
       if (path === '/api/admin/schema-check' && request.method === 'GET') return await handleSchemaCheck(request, env);
 
-      /* ===== النسخ الاحتياطي ===== */
-      if (path === '/api/admin/backup-now' && request.method === 'POST') return await handleBackupNow(request, env);
-      if (path === '/api/admin/backups' && request.method === 'GET') return await handleBackupList(request, env);
-
-      /* ===== صور الأصناف اليتيمة ===== */
-      if (path === '/api/admin/item-orphans' && request.method === 'GET') return await handleItemOrphans(request, env);
-      if (path === '/api/admin/item-orphans-clean' && request.method === 'POST') return await handleItemOrphansClean(request, env);
-
-      /* ===== سلة مهملات الصور ===== */
-      if (path === '/api/img/trash' && request.method === 'GET') return await handleTrashList(request, env);
-      if (path === '/api/img/restore' && request.method === 'POST') return await handleTrashRestore(request, env);
-      if (path === '/api/img/purge' && request.method === 'POST') return await handleTrashPurgeOne(request, env);
-
-      if (path === '/api/img' && request.method === 'GET') return await handleImgList(request, env);
-      if (path.startsWith('/api/img/')) {
-        const key = decodeURIComponent(path.slice('/api/img/'.length));
-        if (!key) return error('مفتاح الصورة مطلوب', 400);
-        if (request.method === 'GET') return await handleImgServe(key, env);
-        if (request.method === 'PUT') return await handleImgPut(request, env, key);
-        if (request.method === 'DELETE') return await handleImgDelete(request, env, key);
-      }
-      return error('Not found', 404);
-    } catch (e) {
-      console.error('Worker error:', e);
-      return error('Internal server error: ' + e.message, 500);
-    }
-  },
-
-  // ═════════════════════════════════════════
-  //  المهام المجدولة
-  // ═════════════════════════════════════════
-  async scheduled(event, env, ctx) {
-    try {
-      if (event.cron === '0 3 * * *') {
-        await env.DB.prepare(`DELETE FROM used_order_numbers WHERE expires_at < date('now', '${TZ_OFFSET}')`).run();
-        await env.DB.prepare("DELETE FROM sessions WHERE expires_at < datetime('now')").run();
-        await env.DB.prepare("DELETE FROM driver_locations WHERE created_at < datetime('now', '-7 days')").run();
-        await env.DB.prepare(`DELETE FROM order_tracking WHERE order_id IN (SELECT id FROM orders WHERE status = 'archived' AND updated_at < datetime('now', '-90 days'))`).run();
-
-        const old = await env.DB.prepare(`SELECT * FROM orders WHERE status = 'pending' AND created_at < datetime('now', '-24 hours')`).all();
-        for (const o of old.results) {
-          await ledgerInsert(env, o, 'abandoned');
-          await env.DB.prepare('DELETE FROM orders WHERE id = ?').bind(o.id).run();
-        }
-
-        await env.DB.prepare('DELETE FROM order_tracking WHERE order_id NOT IN (SELECT id FROM orders)').run();
-        await env.DB.prepare('DELETE FROM driver_locations WHERE order_id NOT IN (SELECT id FROM orders)').run();
-        await env.DB.prepare(`
-          INSERT OR IGNORE INTO order_ledger
-            (order_number, branch_id, order_type, kind, gross, fees, driver_id, created_at, closed_at)
-          SELECT o.order_number, o.branch_id, o.order_type, 'delivered', o.total, o.delivery_fee, o.driver_id, o.created_at, COALESCE(o.delivered_at, o.updated_at)
-          FROM orders o WHERE o.status = 'delivered'
-            AND NOT EXISTS (SELECT 1 FROM order_ledger l WHERE l.order_number = o.order_number AND l.kind = 'delivered')
-        `).run();
-        await env.DB.prepare(`
-          INSERT OR IGNORE INTO order_ledger
-            (order_number, branch_id, order_type, kind, gross, fees, driver_id, created_at, closed_at)
-          SELECT o.order_number, o.branch_id, o.order_type, 'cancelled', o.total, o.delivery_fee, o.driver_id, o.created_at, o.updated_at
-          FROM orders o WHERE o.status = 'cancelled'
-            AND NOT EXISTS (SELECT 1 FROM order_ledger l WHERE l.order_number = o.order_number AND l.kind = 'cancelled')
-        `).run();
-
-        /* مزامنة الفروع ليلةً — شبكة أمان محصّنة */
-        try {
-          const s = await readAppSettings(env);
-          const sync = await syncBranchesFromSettings(env, s);
-          console.log('nightly branch sync:', JSON.stringify(sync));
-        } catch (e) { console.error('branch sync error:', e); }
-
-        try {
-          const info = await buildAndStoreBackup(env);
-          console.log('backup ok:', JSON.stringify(info));
-        } catch (e) { console.error('backup error:', e); }
-
-        try {
-          const removed = await purgeOldTrash(env, TRASH_DAYS);
-          console.log('trash purged:', removed);
-        } catch (e) { console.error('trash purge error:', e); }
-      } else {
-        await purgeStaleOrders(env);
-      }
-    } catch (e) { console.error('Cron error:', e); }
-  },
-};
-
-// ═══════════════════════════════════════════
-//  نهاية worker/index.js (v3.1)
-// ═══════════════════════════════════════════
+      /* ===== النسخ الاحتياطي
