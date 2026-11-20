@@ -2166,7 +2166,7 @@ export default {
       if (path === '/api/admin/schema-check' && request.method === 'GET') return await handleSchemaCheck(request, env);
 
       /* ===== النسخ الاحتياطي ===== */
-      if (path === '/api/admin/backup-now' && request.methif (path === '/api/admin/backup-now' && request.method === 'POST') return await handleBackupNow(request, env);
+      if (path === '/api/admin/backup-now' && request.method === 'POST') return await handleBackupNow(request, env);
       if (path === '/api/admin/backups' && request.method === 'GET') return await handleBackupList(request, env);
 
       /* ===== v3.2: معاينة نسخة + استرجاع المنيو والإعدادات ===== */
